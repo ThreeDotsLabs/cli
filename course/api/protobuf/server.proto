@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+option go_package = "github.com/ThreeDotsLabs/tdl-cli/course/genproto";
+
+service Server {
+  rpc GetCourses(google.protobuf.Empty) returns (GetCoursesResponse) {};
+  rpc StartCourse(StartCourseRequest) returns (google.protobuf.Empty) {};
+
+  rpc NextExercise(google.protobuf.Empty) returns (NextExerciseResponse) {};
+
+  rpc VerifyExercise(VerifyExerciseRequest) returns (stream VerifyExerciseResponse) {};
+}
+
+message Course {
+  string id = 1;
+}
+
+message GetCoursesResponse {
+  repeated Course courses = 1;
+}
+
+message StartCourseRequest {
+  string course_id = 1;
+}
+
+message StartCourseResponse {
+
+}
+
+message NextExerciseResponse {
+  string dir = 1;
+  string exercise_id = 2;
+  repeated File files_to_create = 3;
+}
+
+message NextExercise {
+  string dir = 1;
+  repeated File files_to_create = 2;
+}
+
+message VerifyExerciseRequest {
+  string course_id = 1;
+  string exercise = 2;
+  repeated File files = 3;
+}
+
+message File {
+    string name = 1;
+    string path = 2;
+    string content = 3;
+}
+
+message VerifyExerciseResponse {
+    bool finished = 1;
+    bool successful = 2;
+
+    string stdout = 3;
+    string stderr = 4;
+
+    bool last_exercise = 5;
+}
