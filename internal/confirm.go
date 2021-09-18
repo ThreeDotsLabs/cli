@@ -7,6 +7,8 @@ import (
 
 // todo - test
 func ConfirmPrompt(msg string) bool {
+	defer fmt.Println()
+
 	for {
 		fmt.Printf("%s [y/n]: ", msg)
 
@@ -27,5 +29,23 @@ func ConfirmPrompt(msg string) bool {
 		if input == "n" || input == "no" {
 			return false
 		}
+	}
+}
+
+func ConfirmPromptDefaultYes(msg string) bool {
+	defer fmt.Println()
+
+	for {
+		fmt.Printf("%s [Y/n]: ", msg)
+
+		var input string
+		_, _ = fmt.Scanln(&input)
+
+		input = strings.ToLower(input)
+		if input == "n" || input == "no" {
+			return false
+		}
+
+		return true
 	}
 }

@@ -21,7 +21,7 @@ const _ = grpc.SupportPackageIsVersion7
 type ServerClient interface {
 	GetCourses(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*GetCoursesResponse, error)
 	StartCourse(ctx context.Context, in *StartCourseRequest, opts ...grpc.CallOption) (*empty.Empty, error)
-	NextExercise(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*NextExerciseResponse, error)
+	NextExercise(ctx context.Context, in *NextExerciseRequest, opts ...grpc.CallOption) (*NextExerciseResponse, error)
 	VerifyExercise(ctx context.Context, in *VerifyExerciseRequest, opts ...grpc.CallOption) (Server_VerifyExerciseClient, error)
 }
 
@@ -51,7 +51,7 @@ func (c *serverClient) StartCourse(ctx context.Context, in *StartCourseRequest, 
 	return out, nil
 }
 
-func (c *serverClient) NextExercise(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*NextExerciseResponse, error) {
+func (c *serverClient) NextExercise(ctx context.Context, in *NextExerciseRequest, opts ...grpc.CallOption) (*NextExerciseResponse, error) {
 	out := new(NextExerciseResponse)
 	err := c.cc.Invoke(ctx, "/Server/NextExercise", in, out, opts...)
 	if err != nil {
@@ -98,7 +98,7 @@ func (x *serverVerifyExerciseClient) Recv() (*VerifyExerciseResponse, error) {
 type ServerServer interface {
 	GetCourses(context.Context, *empty.Empty) (*GetCoursesResponse, error)
 	StartCourse(context.Context, *StartCourseRequest) (*empty.Empty, error)
-	NextExercise(context.Context, *empty.Empty) (*NextExerciseResponse, error)
+	NextExercise(context.Context, *NextExerciseRequest) (*NextExerciseResponse, error)
 	VerifyExercise(*VerifyExerciseRequest, Server_VerifyExerciseServer) error
 }
 
@@ -112,7 +112,7 @@ func (UnimplementedServerServer) GetCourses(context.Context, *empty.Empty) (*Get
 func (UnimplementedServerServer) StartCourse(context.Context, *StartCourseRequest) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StartCourse not implemented")
 }
-func (UnimplementedServerServer) NextExercise(context.Context, *empty.Empty) (*NextExerciseResponse, error) {
+func (UnimplementedServerServer) NextExercise(context.Context, *NextExerciseRequest) (*NextExerciseResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method NextExercise not implemented")
 }
 func (UnimplementedServerServer) VerifyExercise(*VerifyExerciseRequest, Server_VerifyExerciseServer) error {
@@ -167,7 +167,7 @@ func _Server_StartCourse_Handler(srv interface{}, ctx context.Context, dec func(
 }
 
 func _Server_NextExercise_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(empty.Empty)
+	in := new(NextExerciseRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -179,7 +179,7 @@ func _Server_NextExercise_Handler(srv interface{}, ctx context.Context, dec func
 		FullMethod: "/Server/NextExercise",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerServer).NextExercise(ctx, req.(*empty.Empty))
+		return srv.(ServerServer).NextExercise(ctx, req.(*NextExerciseRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }

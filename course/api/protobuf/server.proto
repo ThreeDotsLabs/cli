@@ -7,7 +7,7 @@ service Server {
   rpc GetCourses(google.protobuf.Empty) returns (GetCoursesResponse) {};
   rpc StartCourse(StartCourseRequest) returns (google.protobuf.Empty) {};
 
-  rpc NextExercise(google.protobuf.Empty) returns (NextExerciseResponse) {};
+  rpc NextExercise(NextExerciseRequest) returns (NextExerciseResponse) {};
 
   rpc VerifyExercise(VerifyExerciseRequest) returns (stream VerifyExerciseResponse) {};
 }
@@ -26,6 +26,10 @@ message StartCourseRequest {
 
 message StartCourseResponse {
 
+}
+
+message NextExerciseRequest {
+  string course_id = 1;
 }
 
 message NextExerciseResponse {

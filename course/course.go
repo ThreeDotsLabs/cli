@@ -6,31 +6,21 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 
 	"github.com/BurntSushi/toml"
 	"github.com/ThreeDotsLabs/cli/course/genproto"
 	"github.com/ThreeDotsLabs/cli/internal"
+	"github.com/fatih/color"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/hexops/gotextdiff"
 	"github.com/hexops/gotextdiff/myers"
 	"github.com/hexops/gotextdiff/span"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
 
-const courseConfigFile = ".tdl-course"
-
-var courseRootNotFoundError = errors.New("course root not found")
-
-func Start() {
-	courseID := "example"
-
-	courseRoot := startCourse(courseID)
-
-	// todo - handle situation when course was started but something failed here and someone is starting excersise again (because he have no local files)
-	nextExercise(courseRoot, courseID)
-}
-
-func nextExercise(courseRoot string, courseID string) {
+func List() {
 	// todo - dedup?
 	conn, err := grpc.Dial("localhost:3000", grpc.WithInsecure())
 	if err != nil {
@@ -39,10 +29,66 @@ func nextExercise(courseRoot string, courseID string) {
 	}
 	client := genproto.NewServerClient(conn)
 
-	resp, err := client.NextExercise(context.Background(), &empty.Empty{})
+	courses, err := client.GetCourses(context.Background(), &empty.Empty{})
 	if err != nil {
 		panic(err)
 	}
+
+	for _, course := range courses.Courses {
+		fmt.Println(course.Id)
+	}
+}
+
+const courseConfigFile = ".tdl-course"
+
+type courseConfig struct {
+	CourseID string
+}
+
+var courseRootNotFoundError = errors.New("course root not found")
+
+func Start(courseID string) {
+	logrus.WithField("course_id", courseID).Debug("Starting course")
+
+	err := startCourse(courseID)
+	if err != nil {
+		// todo - handle it nicer
+		panic(err)
+	}
+
+	// todo - handle situation when course was started but something failed here and someone is starting excersise again (because he have no local files)
+	nextExercise()
+}
+
+func nextExercise() {
+	courseRoot, err := findCourseRoot()
+	if err != nil {
+		panic(err)
+	}
+
+	courseConfig := readCourseConfig()
+
+	logrus.WithFields(logrus.Fields{
+		"course_id":   courseConfig.CourseID,
+		"course_root": courseRoot,
+	}).Debug("Starting exercise")
+
+	// todo - dedup?
+	conn, err := grpc.Dial("localhost:3000", grpc.WithInsecure())
+	if err != nil {
+		// todo
+		panic(err)
+	}
+	client := genproto.NewServerClient(conn)
+
+	resp, err := client.NextExercise(context.Background(), &genproto.NextExerciseRequest{CourseId: courseConfig.CourseID})
+	if err != nil {
+		panic(err)
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"resp": resp,
+	}).Debug("Received exercise from server")
 
 	// todo - validate if resp.GetDir() or anything is empty!
 
@@ -62,8 +108,16 @@ func nextExercise(courseRoot string, courseID string) {
 		panic(err)
 	}
 
-	if pwd != expectedDir {
-		fmt.Printf("Exercise was created in '%s' directory.\nPlase run `cd %s` and `tdl course run` to execute your solution.\n", resp.GetDir(), resp.GetDir())
+	relExpectedDir, err := filepath.Rel(pwd, expectedDir)
+	if err != nil {
+		panic(err)
+	}
+
+	requireCd := pwd != expectedDir
+
+	if requireCd {
+		fmt.Printf("Next exercise was created in '%s' directory.\n", relExpectedDir)
+		fmt.Println("Please execute", color.CyanString("cd "+relExpectedDir), "to get there.")
 	}
 
 	for _, file := range resp.GetFilesToCreate() {
@@ -86,7 +140,7 @@ func nextExercise(courseRoot string, courseID string) {
 
 	exerciseConfig := ExerciseConfig{
 		ExerciseID: resp.GetExerciseId(),
-		CourseID:   courseID,
+		CourseID:   courseConfig.CourseID,
 	}
 
 	f, err := os.Create(path.Join(expectedDir, ExerciseConfigFile))
@@ -101,10 +155,14 @@ func nextExercise(courseRoot string, courseID string) {
 		panic(err)
 	}
 
-	fmt.Printf("Starting %s exercise. Please run `tdl course run` to check your solution.\n", exerciseConfig.ExerciseID)
+	fmt.Printf("\nTo run solution, please execute " + color.CyanString("tdl course run"))
+	if requireCd {
+		fmt.Print(" in ", relExpectedDir)
+	}
+	fmt.Println()
 }
 
-func startCourse(courseID string) string {
+func startCourse(courseID string) error {
 	// todo - dedup?
 	conn, err := grpc.Dial("localhost:3000", grpc.WithInsecure())
 	if err != nil {
@@ -129,17 +187,50 @@ func startCourse(courseID string) string {
 
 	courseRoot, err := findCourseRoot()
 	if errors.Is(err, courseRootNotFoundError) {
+		logrus.WithField("course_root", courseRoot).Debug("Creating course root")
+
 		courseRoot = pwd
 		f, err := os.Create(path.Join(courseRoot, courseConfigFile))
 		if err != nil {
 			panic(err)
 		}
+
+		if err := toml.NewEncoder(f).Encode(courseConfig{CourseID: courseID}); err != nil {
+			panic(err)
+		}
+
 		// todo - put some content
 		if err := f.Close(); err != nil {
 			panic(err)
 		}
+	} else {
+		logrus.WithField("course_root", courseRoot).Debug("Found course root")
+		fmt.Println("Course was already started. Course root:", pwd)
+
+		cfg := readCourseConfig()
+		if cfg.CourseID != courseRoot {
+			return fmt.Errorf("course %s was already started in this directory", cfg.CourseID)
+		}
 	}
-	return courseRoot
+
+	return nil
+}
+
+func readCourseConfig() courseConfig {
+	// todo - it would be nice to not read it every time
+	courseRoot, err := findCourseRoot()
+	if err != nil {
+		panic(err)
+	}
+
+	config := courseConfig{}
+
+	if _, err := toml.DecodeFile(path.Join(courseRoot, courseConfigFile), &config); err != nil {
+		// todo - better handling
+		panic(err)
+	}
+
+	return config
 }
 
 func shouldWriteFile(filePath string, file *genproto.File) bool {
@@ -160,7 +251,7 @@ func shouldWriteFile(filePath string, file *genproto.File) bool {
 	}
 
 	if string(actualContent) == file.Content {
-		fmt.Printf("File %s already exists, skipping\n", filePath)
+		logrus.Debug("File %s already exists, skipping\n", filePath)
 		return false
 	}
 

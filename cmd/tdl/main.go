@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"io"
 
 	"github.com/ThreeDotsLabs/cli/course"
@@ -28,6 +29,14 @@ func main() {
 	}
 
 	cmdPrint.AddCommand(&cobra.Command{
+		Use:   "list",
+		Short: "todo", // todo
+		Run: func(cmd *cobra.Command, args []string) {
+			course.List()
+		},
+	})
+
+	cmdPrint.AddCommand(&cobra.Command{
 		Use:   "run",
 		Short: "todo", // todo
 		Run: func(cmd *cobra.Command, args []string) {
@@ -36,10 +45,16 @@ func main() {
 	})
 
 	cmdPrint.AddCommand(&cobra.Command{
-		Use:   "start",
+		Use: "start [course_id]",
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) < 1 {
+				return errors.New("requires a course argument")
+			}
+			return nil
+		},
 		Short: "todo", // todo
 		Run: func(cmd *cobra.Command, args []string) {
-			course.Start()
+			course.Start(args[0])
 		},
 	})
 

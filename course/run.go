@@ -32,23 +32,19 @@ func Run() {
 		return
 	}
 
-	pwd, err := os.Getwd()
-	if err != nil {
-		panic(err)
-	}
-
 	if success && lastExercise {
 		// todo - some CTA here
 		fmt.Println("Congratulations, you finished the course " + color.YellowString("🏆"))
 		return
 	}
 
-	if !internal.ConfirmPrompt("Do you want to go to the next exercise?") {
+	fmt.Println()
+	if !internal.ConfirmPromptDefaultYes("Do you want to go to the next exercise?") {
 		return
 	}
 
 	// todo - is this assumption always valid about course dir?
-	nextExercise(path.Dir(pwd), "example")
+	nextExercise()
 }
 
 func returnExercise() (bool, bool) {
