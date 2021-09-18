@@ -20,9 +20,11 @@ import (
 	"google.golang.org/grpc"
 )
 
+const grpcAddr = "localhost:3000"
+
 func List() {
 	// todo - dedup?
-	conn, err := grpc.Dial("localhost:3000", grpc.WithInsecure())
+	conn, err := grpc.Dial(grpcAddr, grpc.WithInsecure())
 	if err != nil {
 		// todo
 		panic(err)
@@ -75,7 +77,7 @@ func nextExercise() {
 	}).Debug("Starting exercise")
 
 	// todo - dedup?
-	conn, err := grpc.Dial("localhost:3000", grpc.WithInsecure())
+	conn, err := grpc.Dial("89.73.46.88:3000", grpc.WithInsecure())
 	if err != nil {
 		// todo
 		panic(err)
@@ -217,7 +219,7 @@ func startCourse(courseID string) error {
 	}
 
 	// todo - dedup?
-	conn, err := grpc.Dial("localhost:3000", grpc.WithInsecure())
+	conn, err := grpc.Dial("89.73.46.88:3000", grpc.WithInsecure())
 	if err != nil {
 		// todo
 		panic(err)

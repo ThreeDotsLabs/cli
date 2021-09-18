@@ -99,7 +99,7 @@ func returnExercise() (bool, bool) {
 	}
 	logrus.WithField("req", req).Info("Request prepared")
 
-	conn, err := grpc.Dial("localhost:3000", grpc.WithInsecure())
+	conn, err := grpc.Dial(grpcAddr, grpc.WithInsecure())
 	if err != nil {
 		// todo
 		panic(err)
