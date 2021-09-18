@@ -2,6 +2,7 @@ package course
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -61,8 +62,12 @@ func returnExercise() (bool, bool) {
 	} else if !ok {
 		fmt.Println("You are not in an exercise directory.")
 
-		fmt.Println("Did you started the course? If no, please run `tdl course start`.")
-		fmt.Println("If you already started the course, go to exercise directory and run command again.")
+		_, err := findCourseRoot()
+		if errors.Is(err, courseRootNotFoundError) {
+			fmt.Println("You are not in a course directory. If you already started the course, please go to the exercise directory.")
+		} else {
+			fmt.Println("Please go to the exercise directory.")
+		}
 
 		return false, false
 	}
@@ -83,10 +88,14 @@ func returnExercise() (bool, bool) {
 		panic(err)
 	}
 
+	courseConfig := readCourseConfig()
+	// todo - validate if exercise id == course exercise id? to ensure about consistency
+
 	req := &genproto.VerifyExerciseRequest{
 		CourseId: config.CourseID,
 		Exercise: config.ExerciseID,
 		Files:    files,
+		Token:    courseConfig.Token,
 	}
 	logrus.WithField("req", req).Info("Request prepared")
 

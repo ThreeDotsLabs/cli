@@ -43,6 +43,7 @@ const courseConfigFile = ".tdl-course"
 
 type courseConfig struct {
 	CourseID string
+	Token    string
 }
 
 var courseRootNotFoundError = errors.New("course root not found")
@@ -81,7 +82,10 @@ func nextExercise() {
 	}
 	client := genproto.NewServerClient(conn)
 
-	resp, err := client.NextExercise(context.Background(), &genproto.NextExerciseRequest{CourseId: courseConfig.CourseID})
+	resp, err := client.NextExercise(context.Background(), &genproto.NextExerciseRequest{
+		CourseId: courseConfig.CourseID,
+		Token:    courseConfig.Token,
+	})
 	if err != nil {
 		panic(err)
 	}
@@ -114,11 +118,6 @@ func nextExercise() {
 	}
 
 	requireCd := pwd != expectedDir
-
-	if requireCd {
-		fmt.Printf("Next exercise was created in '%s' directory.\n", relExpectedDir)
-		fmt.Println("Please execute", color.CyanString("cd "+relExpectedDir), "to get there.")
-	}
 
 	for _, file := range resp.GetFilesToCreate() {
 		filePath := path.Join(expectedDir, file.Path, file.Name)
@@ -155,6 +154,11 @@ func nextExercise() {
 		panic(err)
 	}
 
+	if requireCd {
+		fmt.Printf("Exercise files were created in '%s' directory.\n", relExpectedDir)
+		fmt.Println("Please execute", color.CyanString("cd "+relExpectedDir), "to get there.")
+	}
+
 	fmt.Printf("\nTo run solution, please execute " + color.CyanString("tdl course run"))
 	if requireCd {
 		fmt.Print(" in ", relExpectedDir)
@@ -163,27 +167,16 @@ func nextExercise() {
 }
 
 func startCourse(courseID string) error {
-	// todo - dedup?
-	conn, err := grpc.Dial("localhost:3000", grpc.WithInsecure())
-	if err != nil {
-		// todo
-		panic(err)
-	}
-	client := genproto.NewServerClient(conn)
-
-	_, err = client.StartCourse(context.Background(), &genproto.StartCourseRequest{
-		CourseId: courseID, // todo - it should be some kind of uuid
-	})
-	if err != nil {
-		panic(err)
+	// todo - move somewhere
+	token := os.Getenv("TDL_TOKEN")
+	if token == "" {
+		panic("missing token")
 	}
 
 	pwd, err := os.Getwd()
 	if err != nil {
 		panic(err)
 	}
-
-	// todo - create course config
 
 	courseRoot, err := findCourseRoot()
 	if errors.Is(err, courseRootNotFoundError) {
@@ -195,7 +188,10 @@ func startCourse(courseID string) error {
 			panic(err)
 		}
 
-		if err := toml.NewEncoder(f).Encode(courseConfig{CourseID: courseID}); err != nil {
+		if err := toml.NewEncoder(f).Encode(courseConfig{
+			CourseID: courseID,
+			Token:    token,
+		}); err != nil {
 			panic(err)
 		}
 
@@ -208,10 +204,35 @@ func startCourse(courseID string) error {
 		fmt.Println("Course was already started. Course root:", pwd)
 
 		cfg := readCourseConfig()
-		if cfg.CourseID != courseRoot {
+
+		if cfg.CourseID != courseID {
 			return fmt.Errorf("course %s was already started in this directory", cfg.CourseID)
 		}
+
+		return nil
 	}
+
+	if !internal.ConfirmPromptDefaultYes(fmt.Sprintf("This command will clone course source code to %s directory. Do you want to continue?", pwd)) {
+
+	}
+
+	// todo - dedup?
+	conn, err := grpc.Dial("localhost:3000", grpc.WithInsecure())
+	if err != nil {
+		// todo
+		panic(err)
+	}
+	client := genproto.NewServerClient(conn)
+
+	_, err = client.StartCourse(context.Background(), &genproto.StartCourseRequest{
+		CourseId: courseID, // todo - it should be some kind of uuid
+		Token:    token,
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	// todo - create course config
 
 	return nil
 }
@@ -229,6 +250,8 @@ func readCourseConfig() courseConfig {
 		// todo - better handling
 		panic(err)
 	}
+
+	logrus.WithField("course_config", config).Debug("Course config")
 
 	return config
 }
