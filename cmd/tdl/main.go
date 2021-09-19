@@ -28,6 +28,25 @@ func main() {
 		Short: "Print anything to the screen", // todo
 	}
 
+	var server string
+	var override bool
+	initCmd := &cobra.Command{
+		Use:   "configure [token]",
+		Short: "todo", // todo
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) < 1 {
+				return errors.New("requires a token argument")
+			}
+			return nil
+		},
+		Run: func(cmd *cobra.Command, args []string) {
+			course.ConfigureGlobally(args[0], server, override)
+		},
+	}
+	initCmd.Flags().StringVarP(&server, "server", "s", "", "override server address")
+	initCmd.Flags().BoolVarP(&override, "override", "", false, "override config")
+	cmdPrint.AddCommand(initCmd)
+
 	cmdPrint.AddCommand(&cobra.Command{
 		Use:   "list",
 		Short: "todo", // todo

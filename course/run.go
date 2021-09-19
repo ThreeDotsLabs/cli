@@ -57,9 +57,7 @@ func returnExercise() (bool, bool) {
 	config := ExerciseConfig{}
 
 	exerciseConfig := path.Join(pwd, ExerciseConfigFile)
-	if ok, err := fileExists(exerciseConfig); err != nil {
-		panic(err)
-	} else if !ok {
+	if !fileExists(exerciseConfig) {
 		fmt.Println("You are not in an exercise directory.")
 
 		_, err := findCourseRoot()
@@ -88,18 +86,17 @@ func returnExercise() (bool, bool) {
 		panic(err)
 	}
 
-	courseConfig := readCourseConfig()
 	// todo - validate if exercise id == course exercise id? to ensure about consistency
 
 	req := &genproto.VerifyExerciseRequest{
 		CourseId: config.CourseID,
 		Exercise: config.ExerciseID,
 		Files:    files,
-		Token:    courseConfig.Token,
+		Token:    readGlobalConfig().Token,
 	}
 	logrus.WithField("req", req).Info("Request prepared")
 
-	conn, err := grpc.Dial(grpcAddr, grpc.WithInsecure())
+	conn, err := grpc.Dial(readGlobalConfig().ServerAddr, grpc.WithInsecure())
 	if err != nil {
 		// todo
 		panic(err)
