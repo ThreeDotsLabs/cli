@@ -22,7 +22,7 @@ import (
 // todo - think if it's good enough to be final (no backward compabilityu!)
 type ExerciseConfig struct {
 	ExerciseID string `toml:"exercise_id"` // todo - use uuids here
-	CourseID   string `toml:"course_id"`
+	CourseName string `toml:"course_name"`
 }
 
 const ExerciseConfigFile = ".tdl-exercise"
@@ -76,7 +76,7 @@ func returnExercise() (bool, bool) {
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"course":   config.CourseID,
+		"course":   config.CourseName,
 		"exercise": config.ExerciseID,
 		"pwd":      pwd,
 	}).Debug("Calculated course and exercise")
@@ -89,10 +89,9 @@ func returnExercise() (bool, bool) {
 	// todo - validate if exercise id == course exercise id? to ensure about consistency
 
 	req := &genproto.VerifyExerciseRequest{
-		CourseId: config.CourseID,
-		Exercise: config.ExerciseID,
-		Files:    files,
-		Token:    readGlobalConfig().Token,
+		ExerciseId: config.ExerciseID,
+		Files:      files,
+		Token:      readGlobalConfig().Token,
 	}
 	logrus.WithField("req", req).Info("Request prepared")
 

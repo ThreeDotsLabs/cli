@@ -42,15 +42,15 @@ func List() {
 const courseConfigFile = ".tdl-course"
 
 type courseConfig struct {
-	CourseID string
+	CourseName string
 }
 
 var courseRootNotFoundError = errors.New("course root not found")
 
-func Start(courseID string) {
-	logrus.WithField("course_id", courseID).Debug("Starting course")
+func Start(courseName string) {
+	logrus.WithField("course_name", courseName).Debug("Starting course")
 
-	err := startCourse(courseID)
+	err := startCourse(courseName)
 	if err != nil {
 		// todo - handle it nicer
 		panic(err)
@@ -69,7 +69,7 @@ func nextExercise() {
 	courseConfig := readCourseConfig()
 
 	logrus.WithFields(logrus.Fields{
-		"course_id":   courseConfig.CourseID,
+		"course_name": courseConfig.CourseName,
 		"course_root": courseRoot,
 	}).Debug("Starting exercise")
 
@@ -82,8 +82,8 @@ func nextExercise() {
 	client := genproto.NewServerClient(conn)
 
 	resp, err := client.NextExercise(context.Background(), &genproto.NextExerciseRequest{
-		CourseId: courseConfig.CourseID,
-		Token:    readGlobalConfig().Token,
+		CourseName: courseConfig.CourseName,
+		Token:      readGlobalConfig().Token,
 	})
 	if err != nil {
 		panic(err)
@@ -134,7 +134,7 @@ func nextExercise() {
 
 	writeConfigToml(path.Join(expectedDir, ExerciseConfigFile), ExerciseConfig{
 		ExerciseID: resp.GetExerciseId(),
-		CourseID:   courseConfig.CourseID,
+		CourseName: courseConfig.CourseName,
 	})
 
 	if requireCd {
@@ -171,7 +171,7 @@ func writeConfigToml(destPath string, v interface{}) {
 	}
 }
 
-func startCourse(courseID string) error {
+func startCourse(courseName string) error {
 	pwd, err := os.Getwd()
 	if err != nil {
 		panic(err)
@@ -191,8 +191,8 @@ func startCourse(courseID string) error {
 	client := genproto.NewServerClient(conn)
 
 	_, err = client.StartCourse(context.Background(), &genproto.StartCourseRequest{
-		CourseId: courseID, // todo - it should be some kind of uuid
-		Token:    readGlobalConfig().Token,
+		CourseName: courseName, // todo - it should be some kind of uuid
+		Token:      readGlobalConfig().Token,
 	})
 	if err != nil {
 		panic(err)
@@ -209,7 +209,7 @@ func startCourse(courseID string) error {
 		}
 
 		if err := toml.NewEncoder(f).Encode(courseConfig{
-			CourseID: courseID,
+			CourseName: courseName,
 		}); err != nil {
 			panic(err)
 		}
@@ -224,8 +224,8 @@ func startCourse(courseID string) error {
 
 		cfg := readCourseConfig()
 
-		if cfg.CourseID != courseID {
-			return fmt.Errorf("course %s was already started in this directory", cfg.CourseID)
+		if cfg.CourseName != courseName {
+			return fmt.Errorf("course %s was already started in this directory", cfg.CourseName)
 		}
 
 		return nil

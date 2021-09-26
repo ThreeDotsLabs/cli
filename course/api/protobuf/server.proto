@@ -21,7 +21,7 @@ message GetCoursesResponse {
 }
 
 message StartCourseRequest {
-  string course_id = 1;
+  string course_name = 1;
   string token = 2;
 }
 
@@ -30,7 +30,7 @@ message StartCourseResponse {
 }
 
 message NextExerciseRequest {
-  string course_id = 1;
+  string course_name = 1;
   string token = 2;
 }
 
@@ -46,8 +46,7 @@ message NextExercise {
 }
 
 message VerifyExerciseRequest {
-  string course_id = 1;
-  string exercise = 2;
+  string exercise_id = 2;
   repeated File files = 3;
   string token = 4;
 }
