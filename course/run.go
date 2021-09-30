@@ -28,21 +28,6 @@ type ExerciseConfig struct {
 const ExerciseConfigFile = ".tdl-exercise"
 
 func Run() {
-	success, _ := returnExercise()
-	if !success {
-		return
-	}
-
-	fmt.Println()
-	if !internal.ConfirmPromptDefaultYes("Do you want to go to the next exercise?") {
-		return
-	}
-
-	// todo - is this assumption always valid about course dir?
-	nextExercise()
-}
-
-func returnExercise() (bool, bool) {
 	pwd, err := os.Getwd()
 	if err != nil {
 		panic(err)
@@ -60,8 +45,7 @@ func returnExercise() (bool, bool) {
 		} else {
 			fmt.Println("Please go to the exercise directory.")
 		}
-
-		return false, false
+		return
 	}
 
 	if _, err := toml.DecodeFile(exerciseConfig, &config); err != nil {
@@ -75,6 +59,21 @@ func returnExercise() (bool, bool) {
 		"pwd":      pwd,
 	}).Debug("Calculated course and exercise")
 
+	success, _ := runExercise(config)
+	if !success {
+		return
+	}
+
+	fmt.Println()
+	if !internal.ConfirmPromptDefaultYes("Do you want to go to the next exercise?") {
+		return
+	}
+
+	// todo - is this assumption always valid about course dir?
+	nextExercise(config.ExerciseID)
+}
+
+func runExercise(config ExerciseConfig) (bool, bool) {
 	files, err := getFiles()
 	if err != nil {
 		panic(err)

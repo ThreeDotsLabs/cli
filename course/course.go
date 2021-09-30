@@ -59,10 +59,10 @@ func Start(courseName string) {
 	}
 
 	// todo - handle situation when course was started but something failed here and someone is starting excersise again (because he have no local files)
-	nextExercise()
+	nextExercise("")
 }
 
-func nextExercise() {
+func nextExercise(currentExerciseID string) {
 	courseRoot, err := findCourseRoot()
 	if err != nil {
 		panic(err)
@@ -84,8 +84,9 @@ func nextExercise() {
 	client := genproto.NewServerClient(conn)
 
 	resp, err := client.NextExercise(context.Background(), &genproto.NextExerciseRequest{
-		CourseName: courseConfig.CourseName,
-		Token:      readGlobalConfig().Token,
+		CourseName:        courseConfig.CourseName,
+		CurrentExerciseId: currentExerciseID,
+		Token:             readGlobalConfig().Token,
 	})
 	if status.Code(err) == codes.NotFound {
 		courseFinished()
