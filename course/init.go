@@ -1,12 +1,15 @@
 package course
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path"
 
 	"github.com/BurntSushi/toml"
+	"github.com/ThreeDotsLabs/cli/course/genproto"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
 )
 
 type globalConfig struct {
@@ -25,6 +28,19 @@ func ConfigureGlobally(token, serverAddr string, override bool) {
 	if !override && fileExists(configPath) {
 		fmt.Println("Courses are already configured. Please pass --override flag to configure again.")
 		return
+	}
+
+	conn, err := grpc.Dial(serverAddr, grpc.WithInsecure())
+	if err != nil {
+		// todo
+		panic(err)
+	}
+
+	client := genproto.NewServerClient(conn)
+
+	if _, err = client.Init(context.Background(), &genproto.InitRequest{Token: token}); err != nil {
+		// todo - remove all panics
+		panic(err)
 	}
 
 	writeConfigToml(configPath, globalConfig{

@@ -28,14 +28,8 @@ type ExerciseConfig struct {
 const ExerciseConfigFile = ".tdl-exercise"
 
 func Run() {
-	success, lastExercise := returnExercise()
+	success, _ := returnExercise()
 	if !success {
-		return
-	}
-
-	if success && lastExercise {
-		// todo - some CTA here
-		fmt.Println("Congratulations, you finished the course " + color.YellowString("🏆"))
 		return
 	}
 

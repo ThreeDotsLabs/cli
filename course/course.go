@@ -18,6 +18,8 @@ import (
 	"github.com/hexops/gotextdiff/span"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func List() {
@@ -85,6 +87,10 @@ func nextExercise() {
 		CourseName: courseConfig.CourseName,
 		Token:      readGlobalConfig().Token,
 	})
+	if status.Code(err) == codes.NotFound {
+		courseFinished()
+		return
+	}
 	if err != nil {
 		panic(err)
 	}
@@ -148,6 +154,12 @@ func nextExercise() {
 		fmt.Print(" in ", relExpectedDir)
 	}
 	fmt.Println()
+}
+
+func courseFinished() {
+	// todo - some CTA here
+	fmt.Println("Congratulations, you finished the course " + color.YellowString("🏆"))
+	return
 }
 
 func writeConfigToml(destPath string, v interface{}) {

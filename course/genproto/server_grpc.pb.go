@@ -19,6 +19,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ServerClient interface {
+	Init(ctx context.Context, in *InitRequest, opts ...grpc.CallOption) (*empty.Empty, error)
 	GetCourses(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*GetCoursesResponse, error)
 	StartCourse(ctx context.Context, in *StartCourseRequest, opts ...grpc.CallOption) (*empty.Empty, error)
 	NextExercise(ctx context.Context, in *NextExerciseRequest, opts ...grpc.CallOption) (*NextExerciseResponse, error)
@@ -31,6 +32,15 @@ type serverClient struct {
 
 func NewServerClient(cc grpc.ClientConnInterface) ServerClient {
 	return &serverClient{cc}
+}
+
+func (c *serverClient) Init(ctx context.Context, in *InitRequest, opts ...grpc.CallOption) (*empty.Empty, error) {
+	out := new(empty.Empty)
+	err := c.cc.Invoke(ctx, "/Server/Init", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *serverClient) GetCourses(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*GetCoursesResponse, error) {
@@ -96,6 +106,7 @@ func (x *serverVerifyExerciseClient) Recv() (*VerifyExerciseResponse, error) {
 // All implementations should embed UnimplementedServerServer
 // for forward compatibility
 type ServerServer interface {
+	Init(context.Context, *InitRequest) (*empty.Empty, error)
 	GetCourses(context.Context, *empty.Empty) (*GetCoursesResponse, error)
 	StartCourse(context.Context, *StartCourseRequest) (*empty.Empty, error)
 	NextExercise(context.Context, *NextExerciseRequest) (*NextExerciseResponse, error)
@@ -106,6 +117,9 @@ type ServerServer interface {
 type UnimplementedServerServer struct {
 }
 
+func (UnimplementedServerServer) Init(context.Context, *InitRequest) (*empty.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Init not implemented")
+}
 func (UnimplementedServerServer) GetCourses(context.Context, *empty.Empty) (*GetCoursesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetCourses not implemented")
 }
@@ -128,6 +142,24 @@ type UnsafeServerServer interface {
 
 func RegisterServerServer(s grpc.ServiceRegistrar, srv ServerServer) {
 	s.RegisterService(&Server_ServiceDesc, srv)
+}
+
+func _Server_Init_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InitRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ServerServer).Init(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/Server/Init",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ServerServer).Init(ctx, req.(*InitRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _Server_GetCourses_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -212,6 +244,10 @@ var Server_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "Server",
 	HandlerType: (*ServerServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Init",
+			Handler:    _Server_Init_Handler,
+		},
 		{
 			MethodName: "GetCourses",
 			Handler:    _Server_GetCourses_Handler,

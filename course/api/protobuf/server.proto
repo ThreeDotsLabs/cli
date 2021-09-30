@@ -4,12 +4,18 @@ import "google/protobuf/empty.proto";
 option go_package = "github.com/ThreeDotsLabs/tdl-cli/course/genproto";
 
 service Server {
+  rpc Init(InitRequest) returns (google.protobuf.Empty) {};
+
   rpc GetCourses(google.protobuf.Empty) returns (GetCoursesResponse) {};
   rpc StartCourse(StartCourseRequest) returns (google.protobuf.Empty) {};
 
   rpc NextExercise(NextExerciseRequest) returns (NextExerciseResponse) {};
 
   rpc VerifyExercise(VerifyExerciseRequest) returns (stream VerifyExerciseResponse) {};
+}
+
+message InitRequest {
+   string token = 1;
 }
 
 message Course {
