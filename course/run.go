@@ -61,6 +61,7 @@ func Run() {
 
 	success, _ := runExercise(config)
 	if !success {
+		os.Exit(1)
 		return
 	}
 
