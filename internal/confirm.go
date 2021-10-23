@@ -2,18 +2,22 @@ package internal
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"strings"
 )
 
-// todo - test
+var stdin io.Reader = os.Stdin
+var stdout io.Writer = os.Stdout
+
 func ConfirmPrompt(msg string) bool {
-	defer fmt.Println()
+	defer fmt.Fprintln(stdout)
 
 	for {
-		fmt.Printf("%s [y/n]: ", msg)
+		fmt.Fprintf(stdout, "%s [y/n]: ", msg)
 
 		var input string
-		_, err := fmt.Scanln(&input)
+		_, err := fmt.Fscanln(stdin, &input)
 		if err != nil {
 			continue
 		}
@@ -36,10 +40,10 @@ func ConfirmPromptDefaultYes(msg string) bool {
 	defer fmt.Println()
 
 	for {
-		fmt.Printf("%s [Y/n]: ", msg)
+		fmt.Fprintf(stdout, "%s [Y/n]: ", msg)
 
 		var input string
-		_, _ = fmt.Scanln(&input)
+		_, _ = fmt.Fscanln(stdin, &input)
 
 		input = strings.ToLower(input)
 		if input == "n" || input == "no" {
