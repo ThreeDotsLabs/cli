@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/ThreeDotsLabs/cli/tdl/course"
+	"github.com/ThreeDotsLabs/cli/tdl/trainings"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 )
@@ -61,14 +61,14 @@ func main() {
 								return errors.New("missing token argument")
 							}
 
-							return course.ConfigureGlobally(token, c.String("server"), c.Bool("override"))
+							return trainings.ConfigureGlobally(token, c.String("server"), c.Bool("override"))
 						},
 					},
 					{
 						Name:  "list",
 						Usage: "list trainings",
 						Action: func(c *cli.Context) error {
-							return course.List()
+							return trainings.List()
 						},
 					},
 					{
@@ -76,7 +76,7 @@ func main() {
 						Aliases: []string{"r"},
 						Usage:   "run exercise",
 						Action: func(c *cli.Context) error {
-							return course.Run()
+							return trainings.Run()
 						},
 					},
 					{
@@ -89,7 +89,7 @@ func main() {
 								return errors.New("missing trainingID argument")
 							}
 
-							return course.Init(trainingID)
+							return trainings.Init(trainingID)
 						},
 					},
 				},

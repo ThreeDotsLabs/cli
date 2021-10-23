@@ -1,4 +1,4 @@
-package course
+package trainings
 
 import (
 	"context"
@@ -9,10 +9,9 @@ import (
 	"path/filepath"
 
 	"github.com/BurntSushi/toml"
-	"github.com/ThreeDotsLabs/cli/tdl/course/genproto"
 	"github.com/ThreeDotsLabs/cli/tdl/internal"
+	"github.com/ThreeDotsLabs/cli/tdl/trainings/genproto"
 	"github.com/fatih/color"
-	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/hexops/gotextdiff"
 	"github.com/hexops/gotextdiff/myers"
 	"github.com/hexops/gotextdiff/span"
@@ -22,61 +21,40 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func List() error {
-	// todo - dedup?
-	conn, err := grpc.Dial(readGlobalConfig().ServerAddr, grpc.WithInsecure())
-	if err != nil {
-		// todo
-		panic(err)
-	}
-	client := genproto.NewServerClient(conn)
+const trainingConfigFile = ".tdl-training"
 
-	courses, err := client.GetCourses(context.Background(), &empty.Empty{})
-	if err != nil {
-		panic(err)
-	}
-
-	for _, course := range courses.Courses {
-		fmt.Println(course.Id)
-	}
-
-	return nil
+type trainingConfig struct {
+	TrainingName string
 }
 
-const courseConfigFile = ".tdl-course"
+var trainingRootNotFoundError = errors.New("training root not found")
 
-type courseConfig struct {
-	CourseName string
-}
+func Init(trainingName string) error {
+	logrus.WithField("training_name", trainingName).Debug("Starting training")
 
-var courseRootNotFoundError = errors.New("course root not found")
-
-func Init(courseName string) error {
-	logrus.WithField("course_name", courseName).Debug("Starting course")
-
-	err := startCourse(courseName)
+	err := startTraining(trainingName)
 	if err != nil {
 		// todo - handle it nicer
 		panic(err)
 	}
 
-	// todo - handle situation when course was started but something failed here and someone is starting excersise again (because he have no local files)
+	// todo - handle situation when training was started but something failed here and someone is starting excersise again (because he have no local files)
 	nextExercise("")
 
 	return nil
 }
 
 func nextExercise(currentExerciseID string) {
-	courseRoot, err := findCourseRoot()
+	trainingRoot, err := findTrainingRoot()
 	if err != nil {
 		panic(err)
 	}
 
-	courseConfig := readCourseConfig()
+	trainingConfig := readTrainingConfig()
 
 	logrus.WithFields(logrus.Fields{
-		"course_name": courseConfig.CourseName,
-		"course_root": courseRoot,
+		"training_name": trainingConfig.TrainingName,
+		"training_root": trainingRoot,
 	}).Debug("Starting exercise")
 
 	// todo - dedup?
@@ -88,12 +66,12 @@ func nextExercise(currentExerciseID string) {
 	client := genproto.NewServerClient(conn)
 
 	resp, err := client.NextExercise(context.Background(), &genproto.NextExerciseRequest{
-		CourseName:        courseConfig.CourseName,
+		TrainingName:      trainingConfig.TrainingName,
 		CurrentExerciseId: currentExerciseID,
 		Token:             readGlobalConfig().Token,
 	})
 	if status.Code(err) == codes.NotFound {
-		courseFinished()
+		trainingFinished()
 		return
 	}
 	if err != nil {
@@ -106,7 +84,7 @@ func nextExercise(currentExerciseID string) {
 
 	// todo - validate if resp.GetDir() or anything is empty!
 
-	expectedDir := path.Join(courseRoot, resp.GetDir())
+	expectedDir := path.Join(trainingRoot, resp.GetDir())
 
 	if !fileExists(expectedDir) {
 		if err := os.MkdirAll(expectedDir, 0755); err != nil {
@@ -144,8 +122,8 @@ func nextExercise(currentExerciseID string) {
 	}
 
 	writeConfigToml(path.Join(expectedDir, ExerciseConfigFile), ExerciseConfig{
-		ExerciseID: resp.GetExerciseId(),
-		CourseName: courseConfig.CourseName,
+		ExerciseID:   resp.GetExerciseId(),
+		TrainingName: trainingConfig.TrainingName,
 	})
 
 	if requireCd {
@@ -154,16 +132,16 @@ func nextExercise(currentExerciseID string) {
 	}
 
 	fmt.Printf("\nPlase go to http://localhost:3002/about see exercise content.\n")
-	fmt.Printf("To run solution, please execute " + color.CyanString("tdl course run"))
+	fmt.Printf("To run solution, please execute " + color.CyanString("tdl training run"))
 	if requireCd {
 		fmt.Print(" in ", relExpectedDir)
 	}
 	fmt.Println()
 }
 
-func courseFinished() {
+func trainingFinished() {
 	// todo - some CTA here
-	fmt.Println("Congratulations, you finished the course " + color.YellowString("🏆"))
+	fmt.Println("Congratulations, you finished the training " + color.YellowString("🏆"))
 	return
 }
 
@@ -188,13 +166,13 @@ func writeConfigToml(destPath string, v interface{}) {
 	}
 }
 
-func startCourse(courseName string) error {
+func startTraining(trainingName string) error {
 	pwd, err := os.Getwd()
 	if err != nil {
 		panic(err)
 	}
 
-	if !internal.ConfirmPromptDefaultYes(fmt.Sprintf("This command will clone course source code to %s directory. Do you want to continue?", pwd)) {
+	if !internal.ConfirmPromptDefaultYes(fmt.Sprintf("This command will clone training source code to %s directory. Do you want to continue?", pwd)) {
 		// todo - better handling
 		return errors.New("interrupted")
 	}
@@ -207,26 +185,26 @@ func startCourse(courseName string) error {
 	}
 	client := genproto.NewServerClient(conn)
 
-	_, err = client.StartCourse(context.Background(), &genproto.StartCourseRequest{
-		CourseName: courseName, // todo - it should be some kind of uuid
-		Token:      readGlobalConfig().Token,
+	_, err = client.StartTraining(context.Background(), &genproto.StartTrainingRequest{
+		TrainingName: trainingName, // todo - it should be some kind of uuid
+		Token:        readGlobalConfig().Token,
 	})
 	if err != nil {
 		panic(err)
 	}
 
-	courseRoot, err := findCourseRoot()
-	if errors.Is(err, courseRootNotFoundError) {
-		logrus.WithField("course_root", courseRoot).Debug("Creating course root")
+	trainingRoot, err := findTrainingRoot()
+	if errors.Is(err, trainingRootNotFoundError) {
+		logrus.WithField("training_root", trainingRoot).Debug("Creating training root")
 
-		courseRoot = pwd
-		f, err := os.Create(path.Join(courseRoot, courseConfigFile))
+		trainingRoot = pwd
+		f, err := os.Create(path.Join(trainingRoot, trainingConfigFile))
 		if err != nil {
 			panic(err)
 		}
 
-		if err := toml.NewEncoder(f).Encode(courseConfig{
-			CourseName: courseName,
+		if err := toml.NewEncoder(f).Encode(trainingConfig{
+			TrainingName: trainingName,
 		}); err != nil {
 			panic(err)
 		}
@@ -236,13 +214,13 @@ func startCourse(courseName string) error {
 			panic(err)
 		}
 	} else {
-		logrus.WithField("course_root", courseRoot).Debug("Found course root")
-		fmt.Println("Course was already started. Course root:", pwd)
+		logrus.WithField("training_root", trainingRoot).Debug("Found training root")
+		fmt.Println("Training was already started. Training root:", pwd)
 
-		cfg := readCourseConfig()
+		cfg := readTrainingConfig()
 
-		if cfg.CourseName != courseName {
-			return fmt.Errorf("course %s was already started in this directory", cfg.CourseName)
+		if cfg.TrainingName != trainingName {
+			return fmt.Errorf("training %s was already started in this directory", cfg.TrainingName)
 		}
 
 		return nil
@@ -251,20 +229,20 @@ func startCourse(courseName string) error {
 	return nil
 }
 
-func readCourseConfig() courseConfig {
+func readTrainingConfig() trainingConfig {
 	// todo - it would be nice to not read it every time
-	courseRoot, err := findCourseRoot()
+	trainingRoot, err := findTrainingRoot()
 	if err != nil {
 		panic(err)
 	}
 
-	config := courseConfig{}
-	if _, err := toml.DecodeFile(path.Join(courseRoot, courseConfigFile), &config); err != nil {
+	config := trainingConfig{}
+	if _, err := toml.DecodeFile(path.Join(trainingRoot, trainingConfigFile), &config); err != nil {
 		// todo - better handling
 		panic(err)
 	}
 
-	logrus.WithField("course_config", config).Debug("Course config")
+	logrus.WithField("training_config", config).Debug("Training config")
 
 	return config
 }
@@ -301,7 +279,7 @@ func shouldWriteFile(filePath string, file *genproto.File) bool {
 	}
 }
 
-func findCourseRoot() (string, error) {
+func findTrainingRoot() (string, error) {
 	pwd, err := os.Getwd()
 	if err != nil {
 		return "", err
@@ -310,7 +288,7 @@ func findCourseRoot() (string, error) {
 	dir := pwd
 
 	for {
-		if fileExists(path.Join(dir, courseConfigFile)) {
+		if fileExists(path.Join(dir, trainingConfigFile)) {
 			return dir, nil
 		}
 
@@ -320,7 +298,7 @@ func findCourseRoot() (string, error) {
 		}
 	}
 
-	return "", courseRootNotFoundError
+	return "", trainingRootNotFoundError
 }
 
 func fileExists(path string) bool {

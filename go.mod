@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/BurntSushi/toml v0.4.1
-	github.com/ThreeDotsLabs/cli/tdl/course/genproto v0.0.0-00010101000000-000000000000
+	github.com/ThreeDotsLabs/cli/tdl/trainings/genproto v0.0.0-00010101000000-000000000000
 	github.com/fatih/color v1.12.0
 	github.com/golang/protobuf v1.5.2
 	github.com/hexops/gotextdiff v1.0.3
@@ -30,4 +30,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 )
 
-replace github.com/ThreeDotsLabs/cli/tdl/course/genproto => ./course/genproto
+replace github.com/ThreeDotsLabs/cli/tdl/trainings/genproto => ./trainings/genproto

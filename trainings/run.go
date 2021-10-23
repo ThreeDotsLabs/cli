@@ -1,4 +1,4 @@
-package course
+package trainings
 
 import (
 	"context"
@@ -11,18 +11,17 @@ import (
 	"path/filepath"
 
 	"github.com/BurntSushi/toml"
-	"github.com/ThreeDotsLabs/cli/tdl/course/genproto"
 	"github.com/ThreeDotsLabs/cli/tdl/internal"
+	"github.com/ThreeDotsLabs/cli/tdl/trainings/genproto"
 	"github.com/fatih/color"
 	"github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
 )
 
 // todo - separate file?
 // todo - think if it's good enough to be final (no backward compabilityu!)
 type ExerciseConfig struct {
-	ExerciseID string `toml:"exercise_id"` // todo - use uuids here
-	CourseName string `toml:"course_name"`
+	ExerciseID   string `toml:"exercise_id"` // todo - use uuids here
+	TrainingName string `toml:"training_name"`
 }
 
 const ExerciseConfigFile = ".tdl-exercise"
@@ -39,9 +38,9 @@ func Run() error {
 	if !fileExists(exerciseConfig) {
 		fmt.Println("You are not in an exercise directory.")
 
-		_, err := findCourseRoot()
-		if errors.Is(err, courseRootNotFoundError) {
-			fmt.Println("You are not in a course directory. If you already started the course, please go to the exercise directory.")
+		_, err := findTrainingRoot()
+		if errors.Is(err, trainingRootNotFoundError) {
+			fmt.Println("You are not in a training directory. If you already started the training, please go to the exercise directory.")
 		} else {
 			fmt.Println("Please go to the exercise directory.")
 		}
@@ -54,10 +53,10 @@ func Run() error {
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"course":   config.CourseName,
+		"training": config.TrainingName,
 		"exercise": config.ExerciseID,
 		"pwd":      pwd,
-	}).Debug("Calculated course and exercise")
+	}).Debug("Calculated training and exercise")
 
 	success, _ := runExercise(config)
 	if !success {
@@ -70,7 +69,7 @@ func Run() error {
 		return nil
 	}
 
-	// todo - is this assumption always valid about course dir?
+	// todo - is this assumption always valid about training dir?
 	nextExercise(config.ExerciseID)
 
 	return nil
@@ -82,8 +81,7 @@ func runExercise(config ExerciseConfig) (bool, bool) {
 		panic(err)
 	}
 
-	// todo - validate if exercise id == course exercise id? to ensure about consistency
-
+	// todo - validate if exercise id == training exercise id? to ensure about consistency
 	req := &genproto.VerifyExerciseRequest{
 		ExerciseId: config.ExerciseID,
 		Files:      files,
@@ -91,15 +89,7 @@ func runExercise(config ExerciseConfig) (bool, bool) {
 	}
 	logrus.WithField("req", req).Info("Request prepared")
 
-	conn, err := grpc.Dial(readGlobalConfig().ServerAddr, grpc.WithInsecure())
-	if err != nil {
-		// todo
-		panic(err)
-	}
-
-	client := genproto.NewServerClient(conn)
-
-	stream, err := client.VerifyExercise(context.Background(), req)
+	stream, err := NewGrpcClient(readGlobalConfig().ServerAddr).VerifyExercise(context.Background(), req)
 	if err != nil {
 		// todo - remove all panics
 		panic(err)

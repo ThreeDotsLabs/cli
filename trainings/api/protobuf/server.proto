@@ -1,13 +1,13 @@
 syntax = "proto3";
 
 import "google/protobuf/empty.proto";
-option go_package = "github.com/ThreeDotsLabs/cli/tdl-cli/course/genproto";
+option go_package = "github.com/ThreeDotsLabs/cli/tdl-cli/trainings/genproto";
 
 service Server {
   rpc Init(InitRequest) returns (google.protobuf.Empty) {};
 
-  rpc GetCourses(google.protobuf.Empty) returns (GetCoursesResponse) {};
-  rpc StartCourse(StartCourseRequest) returns (google.protobuf.Empty) {};
+  rpc GetTrainings(google.protobuf.Empty) returns (GetTrainingsResponse) {};
+  rpc StartTraining(StartTrainingRequest) returns (google.protobuf.Empty) {};
 
   rpc NextExercise(NextExerciseRequest) returns (NextExerciseResponse) {};
 
@@ -18,25 +18,25 @@ message InitRequest {
    string token = 1;
 }
 
-message Course {
+message Training {
   string id = 1;
 }
 
-message GetCoursesResponse {
-  repeated Course courses = 1;
+message GetTrainingsResponse {
+  repeated Training trainings = 1;
 }
 
-message StartCourseRequest {
-  string course_name = 1;
+message StartTrainingRequest {
+  string training_name = 1;
   string token = 2;
 }
 
-message StartCourseResponse {
+message StartTrainingResponse {
 
 }
 
 message NextExerciseRequest {
-  string course_name = 1;
+  string training_name = 1;
   string current_exercise_id = 2;
   string token = 3;
 }

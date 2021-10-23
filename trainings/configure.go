@@ -1,15 +1,13 @@
-package course
+package trainings
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path"
 
 	"github.com/BurntSushi/toml"
-	"github.com/ThreeDotsLabs/cli/tdl/course/genproto"
+	"github.com/ThreeDotsLabs/cli/tdl/trainings/genproto"
 	"github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
 )
 
 type globalConfig struct {
@@ -19,28 +17,23 @@ type globalConfig struct {
 
 const defaultServerAddress = "localhost:3000"
 
-const globalCoursesConfigFile = ".courses-config"
+const globalTrainingsConfigFile = ".trainings-config"
 const configDir = "three-dots-labs"
 
 func ConfigureGlobally(token, serverAddr string, override bool) error {
-	logrus.WithFields(logrus.Fields{"serverAddr": serverAddr, "override": override}).Debug("Configuring")
-
 	configPath := globalConfigPath()
 
+	logrus.WithFields(logrus.Fields{
+		"serverAddr": serverAddr,
+		"override":   override,
+		"configPath": configPath,
+	}).Debug("Configuring")
+
 	if !override && fileExists(configPath) {
-		fmt.Println("Courses are already configured. Please pass --override flag to configure again.")
-		return nil
+		panic("Trainings are already configured. Please pass --override flag to configure again.")
 	}
 
-	conn, err := grpc.Dial(serverAddr, grpc.WithInsecure())
-	if err != nil {
-		// todo
-		panic(err)
-	}
-
-	client := genproto.NewServerClient(conn)
-
-	if _, err = client.Init(context.Background(), &genproto.InitRequest{Token: token}); err != nil {
+	if _, err := NewGrpcClient(serverAddr).Init(context.Background(), &genproto.InitRequest{Token: token}); err != nil {
 		// todo - remove all panics
 		panic(err)
 	}
@@ -60,7 +53,7 @@ func globalConfigPath() string {
 	}
 
 	configDir := path.Join(userConfigDir, configDir)
-	configPath := path.Join(configDir, globalCoursesConfigFile)
+	configPath := path.Join(configDir, globalTrainingsConfigFile)
 
 	return configPath
 }
@@ -72,7 +65,7 @@ func readGlobalConfig() globalConfig {
 	if !fileExists(configPath) {
 		// todo - better UX
 		// todo - site url when to get token?
-		panic("course not configured, plase run tdl course configure")
+		panic("training not configured, please run tdl training configure")
 	}
 
 	config := globalConfig{}
@@ -88,7 +81,7 @@ func readGlobalConfig() globalConfig {
 		panic("empty token")
 	}
 
-	logrus.WithField("course_config", config).Debug("Global config")
+	logrus.WithField("training_config", config).Debug("Global config")
 
 	return config
 }

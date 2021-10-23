@@ -20,8 +20,8 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ServerClient interface {
 	Init(ctx context.Context, in *InitRequest, opts ...grpc.CallOption) (*empty.Empty, error)
-	GetCourses(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*GetCoursesResponse, error)
-	StartCourse(ctx context.Context, in *StartCourseRequest, opts ...grpc.CallOption) (*empty.Empty, error)
+	GetTrainings(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*GetTrainingsResponse, error)
+	StartTraining(ctx context.Context, in *StartTrainingRequest, opts ...grpc.CallOption) (*empty.Empty, error)
 	NextExercise(ctx context.Context, in *NextExerciseRequest, opts ...grpc.CallOption) (*NextExerciseResponse, error)
 	VerifyExercise(ctx context.Context, in *VerifyExerciseRequest, opts ...grpc.CallOption) (Server_VerifyExerciseClient, error)
 }
@@ -43,18 +43,18 @@ func (c *serverClient) Init(ctx context.Context, in *InitRequest, opts ...grpc.C
 	return out, nil
 }
 
-func (c *serverClient) GetCourses(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*GetCoursesResponse, error) {
-	out := new(GetCoursesResponse)
-	err := c.cc.Invoke(ctx, "/Server/GetCourses", in, out, opts...)
+func (c *serverClient) GetTrainings(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*GetTrainingsResponse, error) {
+	out := new(GetTrainingsResponse)
+	err := c.cc.Invoke(ctx, "/Server/GetTrainings", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *serverClient) StartCourse(ctx context.Context, in *StartCourseRequest, opts ...grpc.CallOption) (*empty.Empty, error) {
+func (c *serverClient) StartTraining(ctx context.Context, in *StartTrainingRequest, opts ...grpc.CallOption) (*empty.Empty, error) {
 	out := new(empty.Empty)
-	err := c.cc.Invoke(ctx, "/Server/StartCourse", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/Server/StartTraining", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -107,8 +107,8 @@ func (x *serverVerifyExerciseClient) Recv() (*VerifyExerciseResponse, error) {
 // for forward compatibility
 type ServerServer interface {
 	Init(context.Context, *InitRequest) (*empty.Empty, error)
-	GetCourses(context.Context, *empty.Empty) (*GetCoursesResponse, error)
-	StartCourse(context.Context, *StartCourseRequest) (*empty.Empty, error)
+	GetTrainings(context.Context, *empty.Empty) (*GetTrainingsResponse, error)
+	StartTraining(context.Context, *StartTrainingRequest) (*empty.Empty, error)
 	NextExercise(context.Context, *NextExerciseRequest) (*NextExerciseResponse, error)
 	VerifyExercise(*VerifyExerciseRequest, Server_VerifyExerciseServer) error
 }
@@ -120,11 +120,11 @@ type UnimplementedServerServer struct {
 func (UnimplementedServerServer) Init(context.Context, *InitRequest) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Init not implemented")
 }
-func (UnimplementedServerServer) GetCourses(context.Context, *empty.Empty) (*GetCoursesResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetCourses not implemented")
+func (UnimplementedServerServer) GetTrainings(context.Context, *empty.Empty) (*GetTrainingsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTrainings not implemented")
 }
-func (UnimplementedServerServer) StartCourse(context.Context, *StartCourseRequest) (*empty.Empty, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method StartCourse not implemented")
+func (UnimplementedServerServer) StartTraining(context.Context, *StartTrainingRequest) (*empty.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StartTraining not implemented")
 }
 func (UnimplementedServerServer) NextExercise(context.Context, *NextExerciseRequest) (*NextExerciseResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method NextExercise not implemented")
@@ -162,38 +162,38 @@ func _Server_Init_Handler(srv interface{}, ctx context.Context, dec func(interfa
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Server_GetCourses_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _Server_GetTrainings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(empty.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ServerServer).GetCourses(ctx, in)
+		return srv.(ServerServer).GetTrainings(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/Server/GetCourses",
+		FullMethod: "/Server/GetTrainings",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerServer).GetCourses(ctx, req.(*empty.Empty))
+		return srv.(ServerServer).GetTrainings(ctx, req.(*empty.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Server_StartCourse_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(StartCourseRequest)
+func _Server_StartTraining_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartTrainingRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ServerServer).StartCourse(ctx, in)
+		return srv.(ServerServer).StartTraining(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/Server/StartCourse",
+		FullMethod: "/Server/StartTraining",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerServer).StartCourse(ctx, req.(*StartCourseRequest))
+		return srv.(ServerServer).StartTraining(ctx, req.(*StartTrainingRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -249,12 +249,12 @@ var Server_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Server_Init_Handler,
 		},
 		{
-			MethodName: "GetCourses",
-			Handler:    _Server_GetCourses_Handler,
+			MethodName: "GetTrainings",
+			Handler:    _Server_GetTrainings_Handler,
 		},
 		{
-			MethodName: "StartCourse",
-			Handler:    _Server_StartCourse_Handler,
+			MethodName: "StartTraining",
+			Handler:    _Server_StartTraining_Handler,
 		},
 		{
 			MethodName: "NextExercise",
