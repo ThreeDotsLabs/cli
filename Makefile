@@ -8,4 +8,4 @@ proto:
 
 .PHONY: install
 install:
-	go install ./cmd/tdl
+	go install .

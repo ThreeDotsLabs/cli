@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 import "google/protobuf/empty.proto";
-option go_package = "github.com/ThreeDotsLabs/tdl-cli/course/genproto";
+option go_package = "github.com/ThreeDotsLabs/cli/tdl-cli/course/genproto";
 
 service Server {
   rpc Init(InitRequest) returns (google.protobuf.Empty) {};

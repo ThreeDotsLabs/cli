@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 
 	"github.com/BurntSushi/toml"
-	"github.com/ThreeDotsLabs/cli/course/genproto"
-	"github.com/ThreeDotsLabs/cli/internal"
+	"github.com/ThreeDotsLabs/cli/tdl/course/genproto"
+	"github.com/ThreeDotsLabs/cli/tdl/internal"
 	"github.com/fatih/color"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/hexops/gotextdiff"
@@ -22,7 +22,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func List() {
+func List() error {
 	// todo - dedup?
 	conn, err := grpc.Dial(readGlobalConfig().ServerAddr, grpc.WithInsecure())
 	if err != nil {
@@ -39,6 +39,8 @@ func List() {
 	for _, course := range courses.Courses {
 		fmt.Println(course.Id)
 	}
+
+	return nil
 }
 
 const courseConfigFile = ".tdl-course"
@@ -49,7 +51,7 @@ type courseConfig struct {
 
 var courseRootNotFoundError = errors.New("course root not found")
 
-func Start(courseName string) {
+func Init(courseName string) error {
 	logrus.WithField("course_name", courseName).Debug("Starting course")
 
 	err := startCourse(courseName)
@@ -60,6 +62,8 @@ func Start(courseName string) {
 
 	// todo - handle situation when course was started but something failed here and someone is starting excersise again (because he have no local files)
 	nextExercise("")
+
+	return nil
 }
 
 func nextExercise(currentExerciseID string) {

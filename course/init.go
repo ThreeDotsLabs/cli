@@ -7,7 +7,7 @@ import (
 	"path"
 
 	"github.com/BurntSushi/toml"
-	"github.com/ThreeDotsLabs/cli/course/genproto"
+	"github.com/ThreeDotsLabs/cli/tdl/course/genproto"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
@@ -22,12 +22,14 @@ const defaultServerAddress = "localhost:3000"
 const globalCoursesConfigFile = ".courses-config"
 const configDir = "three-dots-labs"
 
-func ConfigureGlobally(token, serverAddr string, override bool) {
+func ConfigureGlobally(token, serverAddr string, override bool) error {
+	logrus.WithFields(logrus.Fields{"serverAddr": serverAddr, "override": override}).Debug("Configuring")
+
 	configPath := globalConfigPath()
 
 	if !override && fileExists(configPath) {
 		fmt.Println("Courses are already configured. Please pass --override flag to configure again.")
-		return
+		return nil
 	}
 
 	conn, err := grpc.Dial(serverAddr, grpc.WithInsecure())
@@ -47,6 +49,8 @@ func ConfigureGlobally(token, serverAddr string, override bool) {
 		Token:      token,
 		ServerAddr: serverAddr,
 	})
+
+	return nil
 }
 
 func globalConfigPath() string {

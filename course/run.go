@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 
 	"github.com/BurntSushi/toml"
-	"github.com/ThreeDotsLabs/cli/course/genproto"
-	"github.com/ThreeDotsLabs/cli/internal"
+	"github.com/ThreeDotsLabs/cli/tdl/course/genproto"
+	"github.com/ThreeDotsLabs/cli/tdl/internal"
 	"github.com/fatih/color"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
@@ -27,7 +27,7 @@ type ExerciseConfig struct {
 
 const ExerciseConfigFile = ".tdl-exercise"
 
-func Run() {
+func Run() error {
 	pwd, err := os.Getwd()
 	if err != nil {
 		panic(err)
@@ -45,7 +45,7 @@ func Run() {
 		} else {
 			fmt.Println("Please go to the exercise directory.")
 		}
-		return
+		return nil
 	}
 
 	if _, err := toml.DecodeFile(exerciseConfig, &config); err != nil {
@@ -62,16 +62,18 @@ func Run() {
 	success, _ := runExercise(config)
 	if !success {
 		os.Exit(1)
-		return
+		return nil
 	}
 
 	fmt.Println()
 	if !internal.ConfirmPromptDefaultYes("Do you want to go to the next exercise?") {
-		return
+		return nil
 	}
 
 	// todo - is this assumption always valid about course dir?
 	nextExercise(config.ExerciseID)
+
+	return nil
 }
 
 func runExercise(config ExerciseConfig) (bool, bool) {
