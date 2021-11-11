@@ -1,7 +1,7 @@
 package main
 
 import (
-	"errors"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -57,8 +57,10 @@ func main() {
 						},
 						Action: func(c *cli.Context) error {
 							token := c.Args().First()
+
 							if token == "" {
-								return errors.New("missing token argument")
+								fmt.Print("Missing token argument! Usage:\n\n")
+								cli.ShowSubcommandHelpAndExit(c, 1)
 							}
 
 							return trainings.ConfigureGlobally(token, c.String("server"), c.Bool("override"))
@@ -81,12 +83,14 @@ func main() {
 					},
 					{
 						Name:      "init",
-						ArgsUsage: "[training id]",
+						ArgsUsage: "[trainingID]",
 						Usage:     "initialise training files in your current directory",
 						Action: func(c *cli.Context) error {
 							trainingID := c.Args().First()
+
 							if trainingID == "" {
-								return errors.New("missing trainingID argument")
+								fmt.Print("Missing trainingID argument! Usage:\n\n")
+								cli.ShowSubcommandHelpAndExit(c, 1)
 							}
 
 							return trainings.Init(trainingID)
