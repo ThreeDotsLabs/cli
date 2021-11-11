@@ -2,12 +2,12 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"time"
 
 	"github.com/ThreeDotsLabs/cli/tdl/trainings"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 )
@@ -18,6 +18,16 @@ func main() {
 		Usage:     "https://threedots.tech/ CLI.",
 		Compiled:  time.Now(),
 		Copyright: "(c) Three Dots Labs",
+		ExitErrHandler: func(c *cli.Context, err error) {
+			if errors.As(err, &missingArgumentError{}) {
+				fmt.Printf("%s. Usage:\n\n", err.Error())
+				cli.ShowSubcommandHelpAndExit(c, 1)
+			}
+
+			fmt.Printf("%+v\n", err)
+			os.Exit(1)
+
+		},
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "debug",
@@ -30,7 +40,7 @@ func main() {
 				logrus.SetLevel(logrus.DebugLevel)
 				logrus.SetFormatter(&logrus.TextFormatter{})
 			} else {
-				logrus.SetOutput(io.Discard)
+				logrus.SetLevel(logrus.ErrorLevel)
 			}
 			return nil
 		},
@@ -59,8 +69,7 @@ func main() {
 							token := c.Args().First()
 
 							if token == "" {
-								fmt.Print("Missing token argument! Usage:\n\n")
-								cli.ShowSubcommandHelpAndExit(c, 1)
+								return missingArgumentError{"Missing token argument"}
 							}
 
 							return trainings.ConfigureGlobally(token, c.String("server"), c.Bool("override"))
@@ -89,8 +98,7 @@ func main() {
 							trainingID := c.Args().First()
 
 							if trainingID == "" {
-								fmt.Print("Missing trainingID argument! Usage:\n\n")
-								cli.ShowSubcommandHelpAndExit(c, 1)
+								return missingArgumentError{"Missing trainingID argument"}
 							}
 
 							return trainings.Init(trainingID)
@@ -105,4 +113,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+type missingArgumentError struct {
+	msg string
+}
+
+func (m missingArgumentError) Error() string {
+	return m.msg
 }
