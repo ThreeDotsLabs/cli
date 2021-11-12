@@ -7,8 +7,8 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 )
 
-func List() error {
-	trainings, err := NewGrpcClient(readGlobalConfig().ServerAddr).GetTrainings(context.Background(), &empty.Empty{})
+func (h *Handlers) List(ctx context.Context) error {
+	trainings, err := h.newGrpcClient(ctx).GetTrainings(context.Background(), &empty.Empty{})
 	if err != nil {
 		panic(err)
 	}

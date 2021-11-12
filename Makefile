@@ -9,3 +9,17 @@ proto:
 .PHONY: install
 install:
 	go install .
+
+
+.PHONY: lint
+lint:
+	golangci-lint run
+
+.PHONY: test
+test:
+	go test ./...
+
+.PHONY: fmt
+fmt:
+	goimports -local github.com/ThreeDotsLabs -l -w .
+

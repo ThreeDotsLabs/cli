@@ -2,101 +2,76 @@ package trainings
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
-	"path"
-	"path/filepath"
+	"time"
 
-	"github.com/BurntSushi/toml"
-	"github.com/ThreeDotsLabs/cli/tdl/internal"
-	"github.com/ThreeDotsLabs/cli/tdl/trainings/genproto"
 	"github.com/fatih/color"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
+	"github.com/ThreeDotsLabs/cli/tdl/internal"
+	"github.com/ThreeDotsLabs/cli/tdl/trainings/config"
+	"github.com/ThreeDotsLabs/cli/tdl/trainings/genproto"
 )
 
-// todo - separate file?
-// todo - think if it's good enough to be final (no backward compabilityu!)
-type ExerciseConfig struct {
-	ExerciseID   string `toml:"exercise_id"` // todo - use uuids here
-	TrainingName string `toml:"training_name"`
-}
-
-const ExerciseConfigFile = ".tdl-exercise"
-
-func Run() error {
-	pwd, err := os.Getwd()
+func (h *Handlers) Run(ctx context.Context) (bool, error) {
+	wd, err := os.Getwd()
 	if err != nil {
-		panic(err)
+		return false, errors.WithStack(err)
 	}
 
-	config := ExerciseConfig{}
+	if _, err := h.config.FindTrainingRoot(wd); errors.Is(err, config.TrainingRootNotFoundError) {
+		fmt.Println("You are not in a training directory. If you already started the training, please go to the exercise directory.")
+		fmt.Printf("Please run %s if you didn't start training yet.\n", internal.SprintCommand("tdl training init"))
+		return false, nil
+	}
 
-	exerciseConfig := path.Join(pwd, ExerciseConfigFile)
-	if !fileExists(exerciseConfig) {
+	if !h.config.ExerciseConfigExists(wd) {
 		fmt.Println("You are not in an exercise directory.")
-
-		_, err := findTrainingRoot()
-		if errors.Is(err, trainingRootNotFoundError) {
-			fmt.Println("You are not in a training directory. If you already started the training, please go to the exercise directory.")
-		} else {
-			fmt.Println("Please go to the exercise directory.")
-		}
-		return nil
+		fmt.Println("Please go to the exercise directory.")
+		return false, nil
 	}
 
-	if _, err := toml.DecodeFile(exerciseConfig, &config); err != nil {
-		// todo - better handling
-		panic(err)
-	}
-
-	logrus.WithFields(logrus.Fields{
-		"training": config.TrainingName,
-		"exercise": config.ExerciseID,
-		"pwd":      pwd,
-	}).Debug("Calculated training and exercise")
-
-	success, _ := runExercise(config)
-	if !success {
-		os.Exit(1)
-		return nil
+	// todo - validate if exercise id == training exercise id? to ensure about consistency
+	success, err := h.runExercise(ctx, wd)
+	if !success || err != nil {
+		return success, err
 	}
 
 	fmt.Println()
 	if !internal.ConfirmPromptDefaultYes("Do you want to go to the next exercise?") {
-		return nil
+		return success, nil
 	}
 
 	// todo - is this assumption always valid about training dir?
-	nextExercise(config.ExerciseID)
-
-	return nil
+	return success, h.nextExercise(ctx, h.config.ExerciseConfig(wd).ExerciseID, wd)
 }
 
-func runExercise(config ExerciseConfig) (bool, bool) {
-	files, err := getFiles()
+func (h *Handlers) runExercise(ctx context.Context, dir string) (bool, error) {
+	files, err := h.files.ReadSolutionFiles(dir)
 	if err != nil {
-		panic(err)
+		return false, err
 	}
 
-	// todo - validate if exercise id == training exercise id? to ensure about consistency
 	req := &genproto.VerifyExerciseRequest{
-		ExerciseId: config.ExerciseID,
+		ExerciseId: h.config.ExerciseConfig(dir).ExerciseID,
 		Files:      files,
-		Token:      readGlobalConfig().Token,
+		Token:      h.config.GlobalConfig().Token,
 	}
 	logrus.WithField("req", req).Info("Request prepared")
 
-	stream, err := NewGrpcClient(readGlobalConfig().ServerAddr).VerifyExercise(context.Background(), req)
+	runCtx, cancel := context.WithTimeout(context.Background(), time.Second*15)
+	defer cancel()
+
+	stream, err := h.newGrpcClient(ctx).VerifyExercise(runCtx, req)
 	if err != nil {
-		// todo - remove all panics
-		panic(err)
+		return false, err
 	}
 
 	successful := false
-	lastExercise := false
+	finished := false
 
 	for {
 		response, err := stream.Recv()
@@ -115,9 +90,10 @@ func runExercise(config ExerciseConfig) (bool, bool) {
 			if response.Successful {
 				msg = color.GreenString("SUCCESS")
 				successful = true
-				lastExercise = response.LastExercise
+				finished = true
 			} else {
 				msg = color.RedString("FAIL")
+				finished = true
 			}
 
 			fmt.Println(msg)
@@ -128,62 +104,13 @@ func runExercise(config ExerciseConfig) (bool, bool) {
 		}
 		if len(response.Stderr) > 0 {
 			_, _ = fmt.Fprintln(os.Stderr, response.Stderr)
-			// todo log err
 		}
-		// todo - print result
 		// todo - support stderr and commands
 	}
 
-	return successful, lastExercise
-}
-
-func getFiles() ([]*genproto.File, error) {
-	pwd, err := os.Getwd()
-	if err != nil {
-		// todo - not panic
-		panic(err)
+	if !finished {
+		return false, errors.New("execution didn't finish")
+	} else {
+		return successful, nil
 	}
-
-	// todo - make it comon
-	// todo - add unit tests here
-	var filesPaths []string
-	err = filepath.Walk(
-		pwd,
-		func(filePath string, info os.FileInfo, err error) error {
-			// todo - make it more secure (only go files?)
-			if info.IsDir() {
-				return nil
-			}
-			// todo - is it secure enough?
-			if path.Ext(info.Name()) != ".go" && info.Name() != "go.mod" {
-				return nil
-			}
-
-			filesPaths = append(filesPaths, filePath)
-			return nil
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("unable to read golden files %w", err)
-	}
-
-	var files []*genproto.File
-	for _, filePath := range filesPaths {
-		content, err := ioutil.ReadFile(filePath)
-		if err != nil {
-			return nil, fmt.Errorf("unable to read golden file %s: %w", filePath, err)
-		}
-
-		relPath, err := filepath.Rel(pwd, filepath.Dir(filePath))
-		if err != nil {
-			return nil, err
-		}
-
-		files = append(files, &genproto.File{
-			Name:    filepath.Base(filePath),
-			Path:    relPath,
-			Content: string(content),
-		})
-	}
-	return files, nil
 }

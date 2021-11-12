@@ -2,7 +2,6 @@ package internal
 
 import (
 	"bytes"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -50,17 +49,12 @@ func TestConfirmPrompt(t *testing.T) {
 		tc := testCases[i]
 
 		t.Run(tc.Input, func(t *testing.T) {
-			defer func() {
-				stdin = os.Stdin
-				stdout = os.Stdout
-			}()
+			stdin := bytes.NewBufferString(tc.Input)
+			stdout := bytes.NewBuffer(nil)
 
-			stdin = bytes.NewBufferString(tc.Input)
-			stdout = bytes.NewBuffer(nil)
-
-			ok := ConfirmPrompt("some msg")
+			ok := FConfirmPrompt("some msg", stdin, stdout)
 			assert.Equal(t, tc.ExpectedResult, ok)
-			assert.Equal(t, tc.ExpectedMessage, stdout.(*bytes.Buffer).String())
+			assert.Equal(t, tc.ExpectedMessage, stdout.String())
 		})
 	}
 }
@@ -104,17 +98,12 @@ func TestConfirmPromptDefaultYes(t *testing.T) {
 		tc := testCases[i]
 
 		t.Run(tc.Input, func(t *testing.T) {
-			defer func() {
-				stdin = os.Stdin
-				stdout = os.Stdout
-			}()
+			stdin := bytes.NewBufferString(tc.Input)
+			stdout := bytes.NewBuffer(nil)
 
-			stdin = bytes.NewBufferString(tc.Input)
-			stdout = bytes.NewBuffer(nil)
-
-			ok := ConfirmPromptDefaultYes("some msg")
+			ok := FConfirmPromptDefaultYes("some msg", stdin, stdout)
 			assert.Equal(t, tc.ExpectedResult, ok)
-			assert.Equal(t, "some msg [Y/n]: ", stdout.(*bytes.Buffer).String())
+			assert.Equal(t, "some msg [Y/n]: \n", stdout.String())
 		})
 	}
 }

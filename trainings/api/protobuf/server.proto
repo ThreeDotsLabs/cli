@@ -59,9 +59,8 @@ message VerifyExerciseRequest {
 }
 
 message File {
-  string name = 1;
-  string path = 2;
-  string content = 3;
+  string path = 1;
+  string content = 2;
 }
 
 message VerifyExerciseResponse {

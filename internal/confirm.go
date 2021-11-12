@@ -7,14 +7,17 @@ import (
 	"strings"
 )
 
-var stdin io.Reader = os.Stdin
-var stdout io.Writer = os.Stdout
-
 func ConfirmPrompt(msg string) bool {
-	defer fmt.Fprintln(stdout)
+	return FConfirmPrompt(msg, os.Stdin, os.Stdout)
+}
+
+func FConfirmPrompt(msg string, stdin io.Reader, stdout io.Writer) bool {
+	defer func() {
+		_, _ = fmt.Fprintln(stdout)
+	}()
 
 	for {
-		fmt.Fprintf(stdout, "%s [y/n]: ", msg)
+		_, _ = fmt.Fprintf(stdout, "%s [y/n]: ", msg)
 
 		var input string
 		_, err := fmt.Fscanln(stdin, &input)
@@ -37,10 +40,16 @@ func ConfirmPrompt(msg string) bool {
 }
 
 func ConfirmPromptDefaultYes(msg string) bool {
-	defer fmt.Println()
+	return FConfirmPromptDefaultYes(msg, os.Stdin, os.Stdout)
+}
+
+func FConfirmPromptDefaultYes(msg string, stdin io.Reader, stdout io.Writer) bool {
+	defer func() {
+		_, _ = fmt.Fprintln(stdout)
+	}()
 
 	for {
-		fmt.Fprintf(stdout, "%s [Y/n]: ", msg)
+		_, _ = fmt.Fprintf(stdout, "%s [Y/n]: ", msg)
 
 		var input string
 		_, _ = fmt.Fscanln(stdin, &input)
@@ -48,8 +57,8 @@ func ConfirmPromptDefaultYes(msg string) bool {
 		input = strings.ToLower(input)
 		if input == "n" || input == "no" {
 			return false
+		} else {
+			return true
 		}
-
-		return true
 	}
 }
