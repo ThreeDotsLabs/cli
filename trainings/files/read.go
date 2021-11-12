@@ -14,7 +14,7 @@ import (
 func (f Files) ReadSolutionFiles(dir string) ([]*genproto.File, error) {
 	var filesPaths []string
 	err := afero.Walk(
-		f.mainFs,
+		f.fs,
 		dir,
 		func(filePath string, info os.FileInfo, err error) error {
 			if info.IsDir() {
@@ -34,7 +34,7 @@ func (f Files) ReadSolutionFiles(dir string) ([]*genproto.File, error) {
 
 	var files []*genproto.File
 	for _, filePath := range filesPaths {
-		content, err := afero.ReadFile(f.mainFs, filePath)
+		content, err := afero.ReadFile(f.fs, filePath)
 		if err != nil {
 			return nil, errors.Wrapf(err, "unable to read solution file %s", filePath)
 		}

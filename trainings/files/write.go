@@ -18,7 +18,7 @@ import (
 )
 
 type Files struct {
-	mainFs afero.Fs
+	fs     afero.Fs
 	stdin  io.Reader
 	stdout io.Writer
 }
@@ -27,9 +27,9 @@ func NewDefaultFiles() Files {
 	return NewFiles(afero.NewOsFs(), os.Stdin, os.Stdout)
 }
 
-func NewFiles(mainFs afero.Fs, stdin io.Reader, stdout io.Writer) Files {
+func NewFiles(fs afero.Fs, stdin io.Reader, stdout io.Writer) Files {
 	return Files{
-		mainFs: mainFs,
+		fs:     fs,
 		stdin:  stdin,
 		stdout: stdout,
 	}
@@ -44,18 +44,21 @@ func (i InvalidFilePathError) Error() string {
 }
 
 func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, exerciseDir string) error {
-	// We should never trust the remote server. We are using BasePath to protect from Path Traversal attack.
-	// For more info please check: https://owasp.org/www-community/attacks/Path_Traversal
-	exerciseBaseFs := afero.NewBasePathFs(f.mainFs, exerciseDir)
-
-	if !f.dirOrFileExists("/", exerciseBaseFs) {
-		if err := exerciseBaseFs.MkdirAll("/", 0755); err != nil {
+	if !f.dirOrFileExists(exerciseDir) {
+		if err := f.fs.MkdirAll(exerciseDir, 0755); err != nil {
 			return errors.Wrapf(err, "can't create %s", exerciseDir)
 		}
 	}
 
 	for _, file := range filesToCreate {
-		shouldWrite, err := f.shouldWriteFile(file.Path, file, exerciseBaseFs)
+		// We should never trust the remote server.
+		// Writing files based on external name is a vector for Path Traversal attack.
+		// For more info please check: https://owasp.org/www-community/attacks/Path_Traversal
+		//
+		// Fortunately, path.Join is protecting us from that by calling path.Clean().
+		fullFilePath := path.Join(exerciseDir, file.Path)
+
+		shouldWrite, err := f.shouldWriteFile(fullFilePath, file)
 		if err != nil {
 			return err
 		}
@@ -63,29 +66,29 @@ func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, exerciseDir st
 			continue
 		}
 
-		f, err := exerciseBaseFs.Create(file.Path)
+		f, err := f.fs.Create(fullFilePath)
 		if err != nil {
-			return errors.Wrapf(err, "can't create %s", path.Join(exerciseDir, file.Path))
+			return errors.Wrapf(err, "can't create %s", fullFilePath)
 		}
 
 		if _, err := f.WriteString(file.Content); err != nil {
-			return errors.Wrapf(err, "can't write to %s", path.Join(exerciseDir, file.Path))
+			return errors.Wrapf(err, "can't write to %s", fullFilePath)
 		}
 
 		if err := f.Close(); err != nil {
-			return errors.Wrapf(err, "can't close %s", path.Join(exerciseDir, file.Path))
+			return errors.Wrapf(err, "can't close %s", fullFilePath)
 		}
 	}
 
 	return nil
 }
 
-func (f Files) shouldWriteFile(filePath string, file *genproto.File, baseFs afero.Fs) (bool, error) {
-	if !f.dirOrFileExists(filePath, baseFs) {
+func (f Files) shouldWriteFile(filePath string, file *genproto.File) (bool, error) {
+	if !f.dirOrFileExists(filePath) {
 		return true, nil
 	}
 
-	actualContent, err := afero.ReadFile(baseFs, filePath)
+	actualContent, err := afero.ReadFile(f.fs, filePath)
 	if err != nil {
 		return false, errors.Wrapf(err, "can't read %s", filePath)
 	}
@@ -109,8 +112,8 @@ func (f Files) shouldWriteFile(filePath string, file *genproto.File, baseFs afer
 	}
 }
 
-func (f Files) dirOrFileExists(path string, baseFs afero.Fs) bool {
-	_, err := baseFs.Stat(path)
+func (f Files) dirOrFileExists(path string) bool {
+	_, err := f.fs.Stat(path)
 	if err == nil {
 		return true
 	}

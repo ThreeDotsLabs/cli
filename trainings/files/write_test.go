@@ -2,6 +2,7 @@ package files_test
 
 import (
 	"bytes"
+	"os"
 	"strings"
 	"testing"
 
@@ -169,4 +170,64 @@ func main() {
 		stdout.String(),
 		"already exists, diff:",
 	)
+}
+
+// TestWriteExerciseFiles_path_traversal is checking if WriteExerciseFiles is valuable for path traversal.
+// path.Join should protect us from that attack. But let's double-check.
+func TestWriteExerciseFiles_path_traversal(t *testing.T) {
+	testCases := []struct {
+		Name     string
+		FilePath string
+	}{
+		{
+			Name:     "absolute_dir",
+			FilePath: "/secret.txt",
+		},
+		{
+			Name:     "parent_directory",
+			FilePath: "../secret.txt",
+		},
+		{
+			Name:     "parent_directory_no_slash",
+			FilePath: "/../secret.txt",
+		},
+		{
+			Name:     "parent_directory_windows",
+			FilePath: "..\\secret.txt",
+		},
+		{
+			Name:     "three_dots",
+			FilePath: ".../foo/main.go",
+		},
+	}
+
+	for i := range testCases {
+		tc := testCases[i]
+
+		t.Run(tc.Name, func(t *testing.T) {
+			fs := afero.NewMemMapFs()
+
+			originalFileContent := "original"
+			err := afero.WriteFile(fs, "/secret.txt", []byte(originalFileContent), 0755)
+			require.NoError(t, err)
+
+			f := files.NewFiles(fs, bytes.NewBufferString(strings.Repeat("y\n", 2)), os.Stdout)
+
+			err = f.WriteExerciseFiles(
+				[]*genproto.File{
+					{
+						Path:    tc.FilePath,
+						Content: "modified",
+					},
+				},
+				"dir",
+			)
+			require.NoError(t, err)
+
+			currentFileContent, err := afero.ReadFile(fs, "/secret.txt")
+			require.NoError(t, err)
+
+			assert.Equal(t, originalFileContent, string(currentFileContent))
+		})
+	}
 }

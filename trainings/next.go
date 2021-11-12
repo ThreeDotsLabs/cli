@@ -15,7 +15,6 @@ import (
 
 	"github.com/ThreeDotsLabs/cli/tdl/internal"
 	"github.com/ThreeDotsLabs/cli/tdl/trainings/config"
-	"github.com/ThreeDotsLabs/cli/tdl/trainings/files"
 	"github.com/ThreeDotsLabs/cli/tdl/trainings/genproto"
 	"github.com/ThreeDotsLabs/cli/tdl/trainings/web"
 )
@@ -55,19 +54,15 @@ func (h *Handlers) getNextExercise(ctx context.Context, currentExerciseID string
 
 	logrus.WithFields(logrus.Fields{"resp": resp}).Debug("Received exercise from server")
 
-	// We should never trust the remote server. We are using BasePath to protect from Path Traversal attack.
-	// For more info please check: https://owasp.org/www-community/attacks/Path_Traversal
-	if !files.ValidateExerciseDir(resp.Dir) {
-		return nil, errors.Errorf("invalid NextExercise response: '%s' is not a valid exercise directory", resp.Dir)
-	}
-	if err := files.ValidateFilesToCreate(resp.FilesToCreate); err != nil {
-		return nil, errors.Wrap(err, "invalid NextExercise response")
-	}
-
 	return resp, nil
 }
 
 func (h *Handlers) calculateExerciseDir(resp *genproto.NextExerciseResponse, trainingRoot string) string {
+	// We should never trust the remote server.
+	// Writing files based on external name is a vector for Path Traversal attack.
+	// For more info please check: https://owasp.org/www-community/attacks/Path_Traversal
+	//
+	// Fortunately, path.Join is protecting us from that by calling path.Clean().
 	return path.Join(trainingRoot, resp.Dir)
 }
 
