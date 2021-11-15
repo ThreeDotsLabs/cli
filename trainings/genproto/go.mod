@@ -1,4 +1,4 @@
-module github.com/ThreeDotsLabs/cli/tdl/trainings/genproto
+module github.com/ThreeDotsLabs/cli/trainings/genproto
 
 go 1.17
 
