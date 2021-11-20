@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ThreeDotsLabs/cli/tdl/trainings/files"
-	"github.com/ThreeDotsLabs/cli/tdl/trainings/genproto"
+	"github.com/ThreeDotsLabs/cli/trainings/files"
+	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )
 
 func TestFiles_WriteExerciseFiles(t *testing.T) {

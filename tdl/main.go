@@ -11,8 +11,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 
-	"github.com/ThreeDotsLabs/cli/tdl/trainings"
-	"github.com/ThreeDotsLabs/cli/tdl/trainings/web"
+	"github.com/ThreeDotsLabs/cli/trainings"
+	"github.com/ThreeDotsLabs/cli/trainings/web"
 )
 
 func main() {

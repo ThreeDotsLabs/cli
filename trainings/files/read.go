@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 
-	"github.com/ThreeDotsLabs/cli/tdl/trainings/genproto"
+	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )
 
 func (f Files) ReadSolutionFiles(dir string) ([]*genproto.File, error) {

@@ -13,8 +13,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 
-	"github.com/ThreeDotsLabs/cli/tdl/internal"
-	"github.com/ThreeDotsLabs/cli/tdl/trainings/genproto"
+	"github.com/ThreeDotsLabs/cli/internal"
+	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )
 
 type Files struct {

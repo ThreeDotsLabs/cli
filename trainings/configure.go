@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/ThreeDotsLabs/cli/tdl/trainings/config"
-	"github.com/ThreeDotsLabs/cli/tdl/trainings/genproto"
+	"github.com/ThreeDotsLabs/cli/trainings/config"
+	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )
 
 func (h *Handlers) ConfigureGlobally(ctx context.Context, token, serverAddr string, override bool) error {

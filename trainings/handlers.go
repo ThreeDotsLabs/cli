@@ -2,12 +2,14 @@ package trainings
 
 import (
 	"context"
+	"crypto/tls"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 
-	"github.com/ThreeDotsLabs/cli/tdl/trainings/config"
-	"github.com/ThreeDotsLabs/cli/tdl/trainings/files"
-	"github.com/ThreeDotsLabs/cli/tdl/trainings/genproto"
+	"github.com/ThreeDotsLabs/cli/trainings/config"
+	"github.com/ThreeDotsLabs/cli/trainings/files"
+	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )
 
 type Handlers struct {

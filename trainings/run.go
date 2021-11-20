@@ -11,9 +11,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/ThreeDotsLabs/cli/tdl/internal"
-	"github.com/ThreeDotsLabs/cli/tdl/trainings/config"
-	"github.com/ThreeDotsLabs/cli/tdl/trainings/genproto"
+	"github.com/ThreeDotsLabs/cli/internal"
+	"github.com/ThreeDotsLabs/cli/trainings/config"
+	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )
 
 func (h *Handlers) Run(ctx context.Context) (bool, error) {

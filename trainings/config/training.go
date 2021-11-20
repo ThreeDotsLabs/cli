@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/ThreeDotsLabs/cli/tdl/internal"
+	"github.com/ThreeDotsLabs/cli/internal"
 )
 
 const trainingConfigFile = ".tdl-training"

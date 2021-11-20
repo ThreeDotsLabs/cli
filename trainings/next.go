@@ -13,10 +13,10 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/ThreeDotsLabs/cli/tdl/internal"
-	"github.com/ThreeDotsLabs/cli/tdl/trainings/config"
-	"github.com/ThreeDotsLabs/cli/tdl/trainings/genproto"
-	"github.com/ThreeDotsLabs/cli/tdl/trainings/web"
+	"github.com/ThreeDotsLabs/cli/internal"
+	"github.com/ThreeDotsLabs/cli/trainings/config"
+	"github.com/ThreeDotsLabs/cli/trainings/genproto"
+	"github.com/ThreeDotsLabs/cli/trainings/web"
 )
 
 func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string, dir string) error {

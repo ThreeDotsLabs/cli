@@ -9,8 +9,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/ThreeDotsLabs/cli/tdl/internal"
-	"github.com/ThreeDotsLabs/cli/tdl/trainings/web"
+	"github.com/ThreeDotsLabs/cli/internal"
+	"github.com/ThreeDotsLabs/cli/trainings/web"
 )
 
 type GlobalConfig struct {
