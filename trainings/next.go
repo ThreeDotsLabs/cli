@@ -20,9 +20,13 @@ import (
 )
 
 func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string, dir string) error {
-	resp, err := h.getNextExercise(ctx, currentExerciseID, dir)
+	finished, resp, err := h.getNextExercise(ctx, currentExerciseID, dir)
 	if err != nil {
 		return err
+	}
+	if finished {
+		trainingFinished()
+		return nil
 	}
 
 	trainingRoot, err := h.config.FindTrainingRoot(dir)
@@ -39,22 +43,21 @@ func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string, d
 	return h.showExerciseTips(exerciseDir)
 }
 
-func (h *Handlers) getNextExercise(ctx context.Context, currentExerciseID string, dir string) (*genproto.NextExerciseResponse, error) {
-	resp, err := h.newGrpcClient(ctx).NextExercise(context.Background(), &genproto.NextExerciseRequest{
+func (h *Handlers) getNextExercise(ctx context.Context, currentExerciseID string, dir string) (finished bool, resp *genproto.NextExerciseResponse, err error) {
+	resp, err = h.newGrpcClient(ctx).NextExercise(context.Background(), &genproto.NextExerciseRequest{
 		TrainingName:      h.config.TrainingConfig(dir).TrainingName,
 		CurrentExerciseId: currentExerciseID,
 		Token:             h.config.GlobalConfig().Token,
 	})
 	if status.Code(err) == codes.NotFound {
-		trainingFinished()
-		return nil, nil
+		return true, nil, nil
 	} else if err != nil {
-		return nil, errors.Wrap(err, "Can't get next exercise")
+		return false, nil, errors.Wrap(err, "Can't get next exercise")
 	}
 
 	logrus.WithFields(logrus.Fields{"resp": resp}).Debug("Received exercise from server")
 
-	return resp, nil
+	return false, resp, nil
 }
 
 func (h *Handlers) calculateExerciseDir(resp *genproto.NextExerciseResponse, trainingRoot string) string {
