@@ -2,10 +2,8 @@ package trainings
 
 import (
 	"context"
-	"crypto/tls"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 
 	"github.com/ThreeDotsLabs/cli/trainings/config"
 	"github.com/ThreeDotsLabs/cli/trainings/files"
