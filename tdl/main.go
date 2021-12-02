@@ -71,6 +71,11 @@ var app = &cli.App{
 							Hidden: true,
 						},
 						&cli.BoolFlag{
+							Name:   "insecure",
+							Usage:  "do not verify certificate",
+							Hidden: true,
+						},
+						&cli.BoolFlag{
 							Name:  "override",
 							Usage: "if config already exists, it will be overridden",
 						},
@@ -87,6 +92,7 @@ var app = &cli.App{
 							token,
 							c.String("server"),
 							c.Bool("override"),
+							c.Bool("insecure"),
 						)
 					},
 				},

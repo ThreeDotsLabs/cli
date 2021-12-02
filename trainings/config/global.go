@@ -16,6 +16,7 @@ import (
 type GlobalConfig struct {
 	Token      string `toml:"token"`
 	ServerAddr string `toml:"server_addr"`
+	Insecure   bool   `toml:"insecure"`
 }
 
 func globalConfigPath() string {

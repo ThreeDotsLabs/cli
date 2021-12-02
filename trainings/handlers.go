@@ -3,7 +3,9 @@ package trainings
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 
+	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
@@ -29,12 +31,31 @@ func NewHandlers() *Handlers {
 }
 
 func (h *Handlers) newGrpcClient(ctx context.Context) genproto.ServerClient {
-	return h.newGrpcClientWithAddr(ctx, h.config.GlobalConfig().ServerAddr)
+	globalConfig := h.config.GlobalConfig()
+
+	return h.newGrpcClientWithAddr(ctx, globalConfig.ServerAddr, globalConfig.Insecure)
 }
 
-func (h *Handlers) newGrpcClientWithAddr(ctx context.Context, addr string) genproto.ServerClient {
+func (h *Handlers) newGrpcClientWithAddr(ctx context.Context, addr string, insecure bool) genproto.ServerClient {
 	if h.grpcClient == nil {
-		conn, err := grpc.DialContext(ctx, addr, grpc.WithInsecure())
+		var opts []grpc.DialOption
+
+		if insecure {
+			opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})))
+		} else {
+			systemRoots, err := x509.SystemCertPool()
+			if err != nil {
+				panic(errors.Wrap(err, "cannot load root CA cert"))
+			}
+			creds := credentials.NewTLS(&tls.Config{
+				RootCAs:    systemRoots,
+				MinVersion: tls.VersionTLS12,
+			})
+			opts = append(opts, grpc.WithTransportCredentials(creds))
+		}
+
+		conn, err := grpc.DialContext(ctx, addr, opts...)
+
 		if err != nil {
 			panic(err)
 		}
