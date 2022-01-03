@@ -72,6 +72,7 @@ func (h *Handlers) runExercise(ctx context.Context, dir string) (bool, error) {
 
 	successful := false
 	finished := false
+	receivedFirstResponse := false
 
 	for {
 		response, err := stream.Recv()
@@ -97,6 +98,11 @@ func (h *Handlers) runExercise(ctx context.Context, dir string) (bool, error) {
 			}
 
 			fmt.Println(msg)
+		}
+
+		if !receivedFirstResponse {
+			receivedFirstResponse = true
+			logrus.WithField("verification_id", response.VerificationId).Debug("Verification started")
 		}
 
 		if len(response.Stdout) > 0 {

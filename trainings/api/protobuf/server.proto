@@ -71,4 +71,6 @@ message VerifyExerciseResponse {
   string stderr = 4;
 
   bool last_exercise = 5;
+
+  string verification_id = 6;
 }
