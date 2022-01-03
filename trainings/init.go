@@ -3,6 +3,7 @@ package trainings
 import (
 	"context"
 	"fmt"
+	"github.com/fatih/color"
 	"os"
 
 	"github.com/pkg/errors"
@@ -38,17 +39,27 @@ func (h *Handlers) Init(ctx context.Context, trainingName string) error {
 var ErrInterrupted = errors.New("interrupted")
 
 func (h *Handlers) startTraining(ctx context.Context, trainingName string, dir string) error {
-	started, err := h.checkIfTrainingWasAlreadyStarted(trainingName, dir)
-	if err != nil {
-		return err
-	}
-	if started {
-		// we don't need to write training config, but let's check if files are up-to-date
-		return nil
-	}
-
 	if err := h.showTrainingStartPrompt(); err != nil {
 		return err
+	}
+
+	alreadyExistingTrainingRoot, err := h.config.FindTrainingRoot(dir)
+	if err != nil {
+		if errors.Is(err, config.TrainingRootNotFoundError) {
+			logrus.Debug("No training root yet")
+		} else {
+			return errors.Wrap(err, "can't check if training root exists")
+		}
+	} else {
+		fmt.Println(color.BlueString("Training was already started. Training root:" + alreadyExistingTrainingRoot))
+
+		cfg := h.config.TrainingConfig(dir)
+		if cfg.TrainingName != trainingName {
+			return fmt.Errorf("training %s was already started in this directory", cfg.TrainingName)
+		}
+
+		// training root already exists, let's use it
+		dir = alreadyExistingTrainingRoot
 	}
 
 	_, err = h.newGrpcClient(ctx).StartTraining(context.Background(), &genproto.StartTrainingRequest{
