@@ -8,9 +8,15 @@ import (
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )
 
+const defaultTrainingsServer = "academy-grpc.threedots.tech:443"
+
 func (h *Handlers) ConfigureGlobally(ctx context.Context, token, serverAddr string, override, insecure bool) error {
 	if !override && h.config.ConfiguredGlobally() {
 		return errors.New("trainings are already configured. Please pass --override flag to configure again")
+	}
+
+	if serverAddr == "" {
+		serverAddr = defaultTrainingsServer
 	}
 
 	if _, err := h.newGrpcClientWithAddr(ctx, serverAddr, insecure).Init(
