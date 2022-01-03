@@ -38,15 +38,20 @@ func (h *Handlers) Init(ctx context.Context, trainingName string) error {
 var ErrInterrupted = errors.New("interrupted")
 
 func (h *Handlers) startTraining(ctx context.Context, trainingName string, dir string) error {
-	if err := h.checkIfTrainingWasAlreadyStarted(trainingName, dir); err != nil {
+	started, err := h.checkIfTrainingWasAlreadyStarted(trainingName, dir)
+	if err != nil {
 		return err
+	}
+	if started {
+		// we don't need to write training config, but let's check if files are up-to-date
+		return nil
 	}
 
 	if err := h.showTrainingStartPrompt(); err != nil {
 		return err
 	}
 
-	_, err := h.newGrpcClient(ctx).StartTraining(context.Background(), &genproto.StartTrainingRequest{
+	_, err = h.newGrpcClient(ctx).StartTraining(context.Background(), &genproto.StartTrainingRequest{
 		TrainingName: trainingName,
 		Token:        h.config.GlobalConfig().Token,
 	})
@@ -57,20 +62,21 @@ func (h *Handlers) startTraining(ctx context.Context, trainingName string, dir s
 	return h.config.WriteTrainingConfig(config.TrainingConfig{TrainingName: trainingName}, dir)
 }
 
-func (h *Handlers) checkIfTrainingWasAlreadyStarted(trainingName string, dir string) error {
+func (h *Handlers) checkIfTrainingWasAlreadyStarted(trainingName string, dir string) (bool, error) {
 	if trainingRoot, err := h.config.FindTrainingRoot(dir); err == nil {
 		fmt.Println("Training was already started. Training root:", trainingRoot)
 
 		cfg := h.config.TrainingConfig(dir)
 		if cfg.TrainingName != trainingName {
-			return fmt.Errorf("training %s was already started in this directory", cfg.TrainingName)
+			return true, fmt.Errorf("training %s was already started in this directory", cfg.TrainingName)
 		}
 
-		return nil
+		return true, nil
 	} else if !errors.Is(err, config.TrainingRootNotFoundError) {
-		return errors.Wrap(err, "can't check if training root exists")
+		return false, errors.Wrap(err, "can't check if training root exists")
 	}
-	return nil
+
+	return false, nil
 }
 
 func (h *Handlers) showTrainingStartPrompt() error {
