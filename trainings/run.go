@@ -72,7 +72,7 @@ func (h *Handlers) runExercise(ctx context.Context, dir string) (bool, error) {
 
 	successful := false
 	finished := false
-	receivedFirstResponse := false
+	verificationID := ""
 
 	for {
 		response, err := stream.Recv()
@@ -80,7 +80,7 @@ func (h *Handlers) runExercise(ctx context.Context, dir string) (bool, error) {
 			break
 		}
 		if err != nil {
-			panic(err)
+			logrus.WithError(err).WithField("verification_id", verificationID).Panic("Internal error.")
 		}
 
 		if response.Finished {
@@ -100,9 +100,9 @@ func (h *Handlers) runExercise(ctx context.Context, dir string) (bool, error) {
 			fmt.Println(msg)
 		}
 
-		if !receivedFirstResponse {
-			receivedFirstResponse = true
-			logrus.WithField("verification_id", response.VerificationId).Debug("Verification started")
+		if verificationID == "" && response.VerificationId != "" {
+			verificationID = response.VerificationId
+			logrus.WithField("verification_id", verificationID).Debug("Verification started")
 		}
 
 		if len(response.Stdout) > 0 {
