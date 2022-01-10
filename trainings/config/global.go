@@ -65,7 +65,10 @@ func (c Config) GlobalConfig() GlobalConfig {
 		panic(fmt.Sprintf("empty token in %s", configPath))
 	}
 
-	logrus.WithField("training_config", config).Debug("Global config")
+	logrus.
+		WithField("server_addr", config.ServerAddr).
+		WithField("insecure", config.Insecure).
+		Debug("Global config")
 
 	return config
 }
