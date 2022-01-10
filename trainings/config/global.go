@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 	"github.com/pkg/errors"
@@ -65,10 +66,8 @@ func (c Config) GlobalConfig() GlobalConfig {
 		panic(fmt.Sprintf("empty token in %s", configPath))
 	}
 
-	logrus.
-		WithField("server_addr", config.ServerAddr).
-		WithField("insecure", config.Insecure).
-		Debug("Global config")
+	configStr := strings.ReplaceAll(fmt.Sprintf("%#v", config), config.Token, "[token]")
+	logrus.WithField("training_config", configStr).Debug("Global config")
 
 	return config
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/fatih/color"
@@ -60,7 +61,9 @@ func (h *Handlers) runExercise(ctx context.Context, dir string) (bool, error) {
 		Files:      files,
 		Token:      h.config.GlobalConfig().Token,
 	}
-	logrus.WithField("req", req).Info("Request prepared")
+
+	reqStr := strings.ReplaceAll(fmt.Sprintf("%s", req.String()), h.config.GlobalConfig().Token, "[token]")
+	logrus.WithField("req", reqStr).Info("Request prepared")
 
 	runCtx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
