@@ -102,7 +102,10 @@ func (h *Handlers) runExercise(ctx context.Context, dir string) (bool, error) {
 
 		if verificationID == "" && response.VerificationId != "" {
 			verificationID = response.VerificationId
-			logrus.WithField("verification_id", verificationID).Debug("Verification started")
+			logrus.
+				WithField("verification_id", verificationID).
+				WithField("metadata", response.Metadata).
+				Debug("Verification started")
 		}
 
 		if len(response.Stdout) > 0 {

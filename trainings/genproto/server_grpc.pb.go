@@ -4,10 +4,10 @@ package genproto
 
 import (
 	context "context"
+	empty "github.com/golang/protobuf/ptypes/empty"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -19,9 +19,9 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ServerClient interface {
-	Init(ctx context.Context, in *InitRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	GetTrainings(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetTrainingsResponse, error)
-	StartTraining(ctx context.Context, in *StartTrainingRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	Init(ctx context.Context, in *InitRequest, opts ...grpc.CallOption) (*empty.Empty, error)
+	GetTrainings(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*GetTrainingsResponse, error)
+	StartTraining(ctx context.Context, in *StartTrainingRequest, opts ...grpc.CallOption) (*empty.Empty, error)
 	NextExercise(ctx context.Context, in *NextExerciseRequest, opts ...grpc.CallOption) (*NextExerciseResponse, error)
 	VerifyExercise(ctx context.Context, in *VerifyExerciseRequest, opts ...grpc.CallOption) (Server_VerifyExerciseClient, error)
 }
@@ -34,8 +34,8 @@ func NewServerClient(cc grpc.ClientConnInterface) ServerClient {
 	return &serverClient{cc}
 }
 
-func (c *serverClient) Init(ctx context.Context, in *InitRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
+func (c *serverClient) Init(ctx context.Context, in *InitRequest, opts ...grpc.CallOption) (*empty.Empty, error) {
+	out := new(empty.Empty)
 	err := c.cc.Invoke(ctx, "/Server/Init", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -43,7 +43,7 @@ func (c *serverClient) Init(ctx context.Context, in *InitRequest, opts ...grpc.C
 	return out, nil
 }
 
-func (c *serverClient) GetTrainings(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetTrainingsResponse, error) {
+func (c *serverClient) GetTrainings(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*GetTrainingsResponse, error) {
 	out := new(GetTrainingsResponse)
 	err := c.cc.Invoke(ctx, "/Server/GetTrainings", in, out, opts...)
 	if err != nil {
@@ -52,8 +52,8 @@ func (c *serverClient) GetTrainings(ctx context.Context, in *emptypb.Empty, opts
 	return out, nil
 }
 
-func (c *serverClient) StartTraining(ctx context.Context, in *StartTrainingRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	out := new(emptypb.Empty)
+func (c *serverClient) StartTraining(ctx context.Context, in *StartTrainingRequest, opts ...grpc.CallOption) (*empty.Empty, error) {
+	out := new(empty.Empty)
 	err := c.cc.Invoke(ctx, "/Server/StartTraining", in, out, opts...)
 	if err != nil {
 		return nil, err
@@ -106,9 +106,9 @@ func (x *serverVerifyExerciseClient) Recv() (*VerifyExerciseResponse, error) {
 // All implementations should embed UnimplementedServerServer
 // for forward compatibility
 type ServerServer interface {
-	Init(context.Context, *InitRequest) (*emptypb.Empty, error)
-	GetTrainings(context.Context, *emptypb.Empty) (*GetTrainingsResponse, error)
-	StartTraining(context.Context, *StartTrainingRequest) (*emptypb.Empty, error)
+	Init(context.Context, *InitRequest) (*empty.Empty, error)
+	GetTrainings(context.Context, *empty.Empty) (*GetTrainingsResponse, error)
+	StartTraining(context.Context, *StartTrainingRequest) (*empty.Empty, error)
 	NextExercise(context.Context, *NextExerciseRequest) (*NextExerciseResponse, error)
 	VerifyExercise(*VerifyExerciseRequest, Server_VerifyExerciseServer) error
 }
@@ -117,13 +117,13 @@ type ServerServer interface {
 type UnimplementedServerServer struct {
 }
 
-func (UnimplementedServerServer) Init(context.Context, *InitRequest) (*emptypb.Empty, error) {
+func (UnimplementedServerServer) Init(context.Context, *InitRequest) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Init not implemented")
 }
-func (UnimplementedServerServer) GetTrainings(context.Context, *emptypb.Empty) (*GetTrainingsResponse, error) {
+func (UnimplementedServerServer) GetTrainings(context.Context, *empty.Empty) (*GetTrainingsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetTrainings not implemented")
 }
-func (UnimplementedServerServer) StartTraining(context.Context, *StartTrainingRequest) (*emptypb.Empty, error) {
+func (UnimplementedServerServer) StartTraining(context.Context, *StartTrainingRequest) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StartTraining not implemented")
 }
 func (UnimplementedServerServer) NextExercise(context.Context, *NextExerciseRequest) (*NextExerciseResponse, error) {
@@ -163,7 +163,7 @@ func _Server_Init_Handler(srv interface{}, ctx context.Context, dec func(interfa
 }
 
 func _Server_GetTrainings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
+	in := new(empty.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -175,7 +175,7 @@ func _Server_GetTrainings_Handler(srv interface{}, ctx context.Context, dec func
 		FullMethod: "/Server/GetTrainings",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerServer).GetTrainings(ctx, req.(*emptypb.Empty))
+		return srv.(ServerServer).GetTrainings(ctx, req.(*empty.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
