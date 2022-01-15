@@ -112,10 +112,10 @@ func (h *Handlers) runExercise(ctx context.Context, dir string) (bool, error) {
 		}
 
 		if len(response.Stdout) > 0 {
-			fmt.Println(response.Stdout)
+			fmt.Print(response.Stdout)
 		}
 		if len(response.Stderr) > 0 {
-			_, _ = fmt.Fprintln(os.Stderr, response.Stderr)
+			_, _ = fmt.Fprint(os.Stderr, response.Stderr)
 		}
 		// todo - support stderr and commands
 	}
