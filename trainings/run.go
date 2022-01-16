@@ -112,6 +112,9 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs afero.Fs) (bo
 				Debug("Verification started")
 		}
 
+		if len(response.Command) > 0 {
+			fmt.Print(color.CyanString(fmt.Sprintf("𑗘 %s ➜ ", "/")) + response.Command)
+		}
 		if len(response.Stdout) > 0 {
 			fmt.Print(response.Stdout)
 		}

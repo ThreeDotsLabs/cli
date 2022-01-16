@@ -67,6 +67,7 @@ message VerifyExerciseResponse {
   bool finished = 1;
   bool successful = 2;
 
+  string command = 8;
   string stdout = 3;
   string stderr = 4;
 
