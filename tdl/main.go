@@ -7,12 +7,12 @@ import (
 	"os"
 	"time"
 
+	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 
 	"github.com/ThreeDotsLabs/cli/trainings"
-	"github.com/ThreeDotsLabs/cli/trainings/web"
 )
 
 func main() {
@@ -58,12 +58,12 @@ var app = &cli.App{
 		{
 			Name:    "training",
 			Aliases: []string{"tr"},
-			Usage:   fmt.Sprintf("commands for %s commands", web.Website),
+			Usage:   fmt.Sprintf("commands for %s commands", internal.WebsiteAddress),
 			Subcommands: []*cli.Command{
 				{
 					Name:      "configure",
 					Usage:     "connect your environment with platform account",
-					ArgsUsage: fmt.Sprintf("[token from %s]", web.Website),
+					ArgsUsage: fmt.Sprintf("[token from %s]", internal.WebsiteAddress),
 					Flags: []cli.Flag{
 						&cli.StringFlag{
 							Name:   "server",
@@ -98,7 +98,7 @@ var app = &cli.App{
 				},
 				{
 					Name:      "init",
-					ArgsUsage: fmt.Sprintf("[trainingID from %s]", web.Website),
+					ArgsUsage: fmt.Sprintf("[trainingID from %s]", internal.WebsiteAddress),
 					Usage:     "initialise training files in your current directory",
 					Action: func(c *cli.Context) error {
 						trainingID := c.Args().First()

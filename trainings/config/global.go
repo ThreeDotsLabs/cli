@@ -11,10 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/ThreeDotsLabs/cli/internal"
-	"github.com/ThreeDotsLabs/cli/trainings/web"
 )
-
-const defaultTrainingsServer = "academy-grpc.threedots.tech:443"
 
 type GlobalConfig struct {
 	Token      string `toml:"token"`
@@ -50,7 +47,7 @@ func (c Config) GlobalConfig() GlobalConfig {
 	if !c.dirOrFileExists(c.osFs, configPath) {
 		panic(errors.Errorf(
 			"trainings are not configured, please visit %s to get credentials and run %s",
-			web.Website, internal.SprintCommand("tdl training configure"),
+			internal.WebsiteAddress, internal.SprintCommand("tdl training configure"),
 		))
 	}
 
@@ -60,7 +57,7 @@ func (c Config) GlobalConfig() GlobalConfig {
 	}
 
 	if config.ServerAddr == "" {
-		config.ServerAddr = defaultTrainingsServer
+		config.ServerAddr = internal.DefaultTrainingsServer
 	}
 	if config.Token == "" {
 		panic(fmt.Sprintf("empty token in %s", configPath))

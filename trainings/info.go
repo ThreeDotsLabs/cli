@@ -6,12 +6,12 @@ import (
 	"net/url"
 	"path"
 
+	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	"github.com/ThreeDotsLabs/cli/trainings/config"
-	"github.com/ThreeDotsLabs/cli/trainings/web"
 )
 
 func (h *Handlers) Info(ctx context.Context) error {
@@ -26,7 +26,7 @@ func (h *Handlers) Info(ctx context.Context) error {
 	trainingConfig := h.config.TrainingConfig(trainingRootFs)
 	exerciseConfig := h.config.ExerciseConfig(trainingRootFs)
 
-	exerciseURL, err := url.Parse(web.Website)
+	exerciseURL, err := url.Parse(internal.WebsiteAddress)
 	if err != nil {
 		logrus.WithError(err).Warn("Can't parse website URL")
 	}

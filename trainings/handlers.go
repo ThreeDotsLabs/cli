@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 
+	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"google.golang.org/grpc"
@@ -35,6 +36,10 @@ func (h *Handlers) newGrpcClient(ctx context.Context) genproto.ServerClient {
 }
 
 func (h *Handlers) newGrpcClientWithAddr(ctx context.Context, addr string, insecure bool) genproto.ServerClient {
+	if addr == "" {
+		addr = internal.DefaultTrainingsServer
+	}
+
 	if h.grpcClient == nil {
 		var opts []grpc.DialOption
 
