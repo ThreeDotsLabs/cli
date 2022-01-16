@@ -64,7 +64,7 @@ func (h *Handlers) newGrpcClientWithAddr(ctx context.Context, addr string, insec
 	return h.grpcClient
 }
 
-func newTrainingRootFs(trainingRoot string) afero.Fs {
+func newTrainingRootFs(trainingRoot string) *afero.BasePathFs {
 	// Privacy of your files is our priority.
 	//
 	// We should never trust the remote server.
@@ -72,6 +72,5 @@ func newTrainingRootFs(trainingRoot string) afero.Fs {
 	// For more info please check: https://owasp.org/www-community/attacks/Path_Traversal
 	//
 	// To avoid that we are using afero.BasePathFs with base on training root for all operations in trainings dir.
-	trainingRootFs := afero.NewBasePathFs(afero.NewOsFs(), trainingRoot)
-	return trainingRootFs
+	return afero.NewBasePathFs(afero.NewOsFs(), trainingRoot).(*afero.BasePathFs)
 }

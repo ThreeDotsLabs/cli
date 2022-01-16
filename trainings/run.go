@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/fatih/color"
@@ -49,13 +51,15 @@ func (h *Handlers) Run(ctx context.Context) (bool, error) {
 	return success, h.nextExercise(ctx, h.config.ExerciseConfig(trainingRootFs).ExerciseID, wd)
 }
 
-func (h *Handlers) runExercise(ctx context.Context, trainingRootFs afero.Fs) (bool, error) {
+func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePathFs) (bool, error) {
 	exerciseConfig := h.config.ExerciseConfig(trainingRootFs)
 
 	solutionFiles, err := files.NewFiles().ReadSolutionFiles(trainingRootFs, exerciseConfig.Directory)
 	if err != nil {
 		return false, err
 	}
+
+	terminalPath := h.generateRunTerminalPath(trainingRootFs, exerciseConfig)
 
 	req := &genproto.VerifyExerciseRequest{
 		ExerciseId: exerciseConfig.ExerciseID,
@@ -113,7 +117,7 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs afero.Fs) (bo
 		}
 
 		if len(response.Command) > 0 {
-			fmt.Print(color.CyanString(fmt.Sprintf("𑗘 %s ➜ ", "/")) + response.Command)
+			fmt.Print(color.CyanString(fmt.Sprintf("𑗘 %s ➜ ", terminalPath)) + response.Command)
 		}
 		if len(response.Stdout) > 0 {
 			fmt.Print(response.Stdout)
@@ -129,4 +133,30 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs afero.Fs) (bo
 	} else {
 		return successful, nil
 	}
+}
+
+func (h *Handlers) generateRunTerminalPath(trainingRootFs *afero.BasePathFs, exerciseConfig config.ExerciseConfig) string {
+	wd, err := syscall.Getwd()
+	if err != nil {
+		logrus.WithError(err).Warn("Can't get wd")
+		return "???"
+	}
+
+	exerciseDir, err := trainingRootFs.RealPath(exerciseConfig.Directory)
+	if err != nil {
+		logrus.WithError(err).Warn("Can't get exercise real path")
+		return "???"
+	}
+
+	terminalPath, err := filepath.Rel(wd, exerciseDir)
+	if err != nil {
+		logrus.WithError(err).Warn("Can't get relative exercise path")
+		return wd
+	}
+
+	if terminalPath == exerciseConfig.Directory {
+		terminalPath = "./" + terminalPath
+	}
+
+	return terminalPath
 }
