@@ -16,9 +16,9 @@ func TestFiles_ReadSolutionFiles(t *testing.T) {
 	fs := afero.NewBasePathFs(afero.NewOsFs(), testDataDir(t, "TestFiles_ReadSolutionFiles"))
 	wd := "/foo"
 
-	f := files.NewFiles(fs, os.Stdin, os.Stdout)
+	f := files.NewFilesWithStdOuts(os.Stdin, os.Stdout)
 
-	protoFiles, err := f.ReadSolutionFiles(wd)
+	protoFiles, err := f.ReadSolutionFiles(fs, wd)
 	require.NoError(t, err)
 
 	assert.Equal(t, []*genproto.File{

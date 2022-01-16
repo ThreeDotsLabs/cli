@@ -2,7 +2,6 @@ package files
 
 import (
 	"os"
-	"path"
 	"path/filepath"
 
 	"github.com/pkg/errors"
@@ -11,16 +10,16 @@ import (
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )
 
-func (f Files) ReadSolutionFiles(dir string) ([]*genproto.File, error) {
+func (f Files) ReadSolutionFiles(trainingRootFs afero.Fs, dir string) ([]*genproto.File, error) {
 	var filesPaths []string
 	err := afero.Walk(
-		f.fs,
+		trainingRootFs,
 		dir,
 		func(filePath string, info os.FileInfo, err error) error {
 			if info.IsDir() {
 				return nil
 			}
-			if path.Ext(info.Name()) != ".go" && info.Name() != "go.mod" {
+			if filepath.Ext(info.Name()) != ".go" && info.Name() != "go.mod" {
 				return nil
 			}
 
@@ -34,7 +33,7 @@ func (f Files) ReadSolutionFiles(dir string) ([]*genproto.File, error) {
 
 	var files []*genproto.File
 	for _, filePath := range filesPaths {
-		content, err := afero.ReadFile(f.fs, filePath)
+		content, err := afero.ReadFile(trainingRootFs, filePath)
 		if err != nil {
 			return nil, errors.Wrapf(err, "unable to read solution file %s", filePath)
 		}

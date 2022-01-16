@@ -11,9 +11,11 @@ import (
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
 
 	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings/config"
+	"github.com/ThreeDotsLabs/cli/trainings/files"
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )
 
@@ -23,20 +25,17 @@ func (h *Handlers) Run(ctx context.Context) (bool, error) {
 		return false, errors.WithStack(err)
 	}
 
-	if _, err := h.config.FindTrainingRoot(wd); errors.Is(err, config.TrainingRootNotFoundError) {
+	trainingRoot, err := h.config.FindTrainingRoot(wd)
+	if errors.Is(err, config.TrainingRootNotFoundError) {
 		fmt.Println("You are not in a training directory. If you already started the training, please go to the exercise directory.")
 		fmt.Printf("Please run %s if you didn't start training yet.\n", internal.SprintCommand("tdl training init"))
 		return false, nil
 	}
 
-	if !h.config.ExerciseConfigExists(wd) {
-		fmt.Println("You are not in an exercise directory.")
-		fmt.Println("Please go to the exercise directory.")
-		return false, nil
-	}
+	trainingRootFs := newTrainingRootFs(trainingRoot)
 
 	// todo - validate if exercise id == training exercise id? to ensure about consistency
-	success, err := h.runExercise(ctx, wd)
+	success, err := h.runExercise(ctx, trainingRootFs)
 	if !success || err != nil {
 		return success, err
 	}
@@ -47,18 +46,20 @@ func (h *Handlers) Run(ctx context.Context) (bool, error) {
 	}
 
 	// todo - is this assumption always valid about training dir?
-	return success, h.nextExercise(ctx, h.config.ExerciseConfig(wd).ExerciseID, wd)
+	return success, h.nextExercise(ctx, h.config.ExerciseConfig(trainingRootFs).ExerciseID, wd)
 }
 
-func (h *Handlers) runExercise(ctx context.Context, dir string) (bool, error) {
-	files, err := h.files.ReadSolutionFiles(dir)
+func (h *Handlers) runExercise(ctx context.Context, trainingRootFs afero.Fs) (bool, error) {
+	exerciseConfig := h.config.ExerciseConfig(trainingRootFs)
+
+	solutionFiles, err := files.NewFiles().ReadSolutionFiles(trainingRootFs, exerciseConfig.Directory)
 	if err != nil {
 		return false, err
 	}
 
 	req := &genproto.VerifyExerciseRequest{
-		ExerciseId: h.config.ExerciseConfig(dir).ExerciseID,
-		Files:      files,
+		ExerciseId: exerciseConfig.ExerciseID,
+		Files:      solutionFiles,
 		Token:      h.config.GlobalConfig().Token,
 	}
 

@@ -2,9 +2,8 @@ package files
 
 import (
 	"fmt"
-	"io"
 	"os"
-	"path"
+	"path/filepath"
 
 	"github.com/hexops/gotextdiff"
 	"github.com/hexops/gotextdiff/myers"
@@ -17,24 +16,6 @@ import (
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )
 
-type Files struct {
-	fs     afero.Fs
-	stdin  io.Reader
-	stdout io.Writer
-}
-
-func NewDefaultFiles() Files {
-	return NewFiles(afero.NewOsFs(), os.Stdin, os.Stdout)
-}
-
-func NewFiles(fs afero.Fs, stdin io.Reader, stdout io.Writer) Files {
-	return Files{
-		fs:     fs,
-		stdin:  stdin,
-		stdout: stdout,
-	}
-}
-
 type InvalidFilePathError struct {
 	pathValue string
 }
@@ -43,9 +24,9 @@ func (i InvalidFilePathError) Error() string {
 	return fmt.Sprintf("invalid file.Path '%s'", i.pathValue)
 }
 
-func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, exerciseDir string) error {
-	if !f.dirOrFileExists(exerciseDir) {
-		if err := f.fs.MkdirAll(exerciseDir, 0755); err != nil {
+func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, trainingRootFs afero.Fs, exerciseDir string) error {
+	if !f.dirOrFileExists(trainingRootFs, exerciseDir) {
+		if err := trainingRootFs.MkdirAll(exerciseDir, 0755); err != nil {
 			return errors.Wrapf(err, "can't create %s", exerciseDir)
 		}
 	}
@@ -55,10 +36,10 @@ func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, exerciseDir st
 		// Writing files based on external name is a vector for Path Traversal attack.
 		// For more info please check: https://owasp.org/www-community/attacks/Path_Traversal
 		//
-		// Fortunately, path.Join is protecting us from that by calling path.Clean().
-		fullFilePath := path.Join(exerciseDir, file.Path)
+		// To avoid that we are using afero.BasePathFs with base on training root.
+		fullFilePath := filepath.Join(exerciseDir, file.Path)
 
-		shouldWrite, err := f.shouldWriteFile(fullFilePath, file)
+		shouldWrite, err := f.shouldWriteFile(trainingRootFs, fullFilePath, file)
 		if err != nil {
 			return err
 		}
@@ -66,7 +47,7 @@ func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, exerciseDir st
 			continue
 		}
 
-		f, err := f.fs.Create(fullFilePath)
+		f, err := trainingRootFs.Create(fullFilePath)
 		if err != nil {
 			return errors.Wrapf(err, "can't create %s", fullFilePath)
 		}
@@ -83,12 +64,12 @@ func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, exerciseDir st
 	return nil
 }
 
-func (f Files) shouldWriteFile(filePath string, file *genproto.File) (bool, error) {
-	if !f.dirOrFileExists(filePath) {
+func (f Files) shouldWriteFile(fs afero.Fs, filePath string, file *genproto.File) (bool, error) {
+	if !f.dirOrFileExists(fs, filePath) {
 		return true, nil
 	}
 
-	actualContent, err := afero.ReadFile(f.fs, filePath)
+	actualContent, err := afero.ReadFile(fs, filePath)
 	if err != nil {
 		return false, errors.Wrapf(err, "can't read %s", filePath)
 	}
@@ -100,8 +81,8 @@ func (f Files) shouldWriteFile(filePath string, file *genproto.File) (bool, erro
 
 	_, _ = fmt.Fprintf(f.stdout, "\nFile %s already exists, diff:\n", filePath)
 
-	edits := myers.ComputeEdits(span.URIFromPath("local "+path.Base(file.Path)), string(actualContent), file.Content)
-	diff := fmt.Sprint(gotextdiff.ToUnified("local "+path.Base(file.Path), "remote "+path.Base(file.Path), string(actualContent), edits))
+	edits := myers.ComputeEdits(span.URIFromPath("local "+filepath.Base(file.Path)), string(actualContent), file.Content)
+	diff := fmt.Sprint(gotextdiff.ToUnified("local "+filepath.Base(file.Path), "remote "+filepath.Base(file.Path), string(actualContent), edits))
 	_, _ = fmt.Fprintln(f.stdout, diff)
 
 	if !internal.FConfirmPrompt("Should it be overridden?", f.stdin, f.stdout) {
@@ -112,8 +93,8 @@ func (f Files) shouldWriteFile(filePath string, file *genproto.File) (bool, erro
 	}
 }
 
-func (f Files) dirOrFileExists(path string) bool {
-	_, err := f.fs.Stat(path)
+func (f Files) dirOrFileExists(fs afero.Fs, path string) bool {
+	_, err := fs.Stat(path)
 	if err == nil {
 		return true
 	}

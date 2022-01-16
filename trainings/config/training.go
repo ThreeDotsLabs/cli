@@ -1,11 +1,12 @@
 package config
 
 import (
-	"path"
+	"path/filepath"
 
 	"github.com/BurntSushi/toml"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
 
 	"github.com/ThreeDotsLabs/cli/internal"
 )
@@ -16,23 +17,21 @@ type TrainingConfig struct {
 	TrainingName string `toml:"training_name"`
 }
 
-func (c Config) WriteTrainingConfig(config TrainingConfig, dir string) error {
-	logrus.WithField("training_root", dir).Debug("Creating training root")
+func (c Config) WriteTrainingConfig(config TrainingConfig, trainingRootFs afero.Fs) error {
+	logrus.Debug("Creating training root")
 
-	return c.writeConfigToml(path.Join(dir, trainingConfigFile), config)
+	return c.writeConfigToml(trainingRootFs, trainingConfigFile, config)
 }
 
-func (c Config) TrainingConfig(dir string) TrainingConfig {
-	trainingRoot, err := c.FindTrainingRoot(dir)
+func (c Config) TrainingConfig(trainingRootFs afero.Fs) TrainingConfig {
+	b, err := afero.ReadFile(trainingRootFs, ExerciseConfigFile)
 	if err != nil {
-		panic(err)
+		panic(errors.Wrap(err, "can't read training config"))
 	}
 
-	trainingConfigPath := path.Join(trainingRoot, trainingConfigFile)
-
 	config := TrainingConfig{}
-	if _, err := toml.DecodeFile(trainingConfigPath, &config); err != nil {
-		panic(errors.Wrapf(err, "can't decode %s", trainingConfigPath))
+	if _, err := toml.Decode(string(b), &config); err != nil {
+		panic(errors.Wrapf(err, "can't decode training config: %s", string(b)))
 	}
 
 	logrus.WithField("training_config", config).Debug("Training config")
@@ -45,11 +44,11 @@ var TrainingRootNotFoundError = errors.Errorf("training root not found, did you 
 
 func (c Config) FindTrainingRoot(dir string) (string, error) {
 	for {
-		if c.dirOrFileExists(path.Join(dir, trainingConfigFile)) {
+		if c.dirOrFileExists(c.osFs, filepath.Join(dir, trainingConfigFile)) {
 			return dir, nil
 		}
 
-		dir = path.Dir(dir)
+		dir = filepath.Dir(dir)
 		if dir == "/" {
 			break
 		}

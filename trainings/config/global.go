@@ -3,7 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -13,6 +13,8 @@ import (
 	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings/web"
 )
+
+const defaultTrainingsServer = "academy-grpc.threedots.tech:443"
 
 type GlobalConfig struct {
 	Token      string `toml:"token"`
@@ -26,20 +28,18 @@ func globalConfigPath() string {
 		panic(err)
 	}
 
-	configDir := path.Join(userConfigDir, "three-dots-labs")
-	configPath := path.Join(configDir, ".trainings-config")
+	configDir := filepath.Join(userConfigDir, "three-dots-labs")
+	configPath := filepath.Join(configDir, ".trainings-config")
 
 	return configPath
 }
 
-const defaultServer = "localhost:3000"
-
 func (c Config) ConfiguredGlobally() bool {
-	return c.dirOrFileExists(globalConfigPath())
+	return c.dirOrFileExists(c.osFs, globalConfigPath())
 }
 
 func (c Config) WriteGlobalConfig(cfg GlobalConfig) error {
-	return c.writeConfigToml(globalConfigPath(), cfg)
+	return c.writeConfigToml(c.osFs, globalConfigPath(), cfg)
 }
 
 func (c Config) GlobalConfig() GlobalConfig {
@@ -47,7 +47,7 @@ func (c Config) GlobalConfig() GlobalConfig {
 
 	logrus.WithField("path", configPath).Debug("Loading global config")
 
-	if !c.dirOrFileExists(configPath) {
+	if !c.dirOrFileExists(c.osFs, configPath) {
 		panic(errors.Errorf(
 			"trainings are not configured, please visit %s to get credentials and run %s",
 			web.Website, internal.SprintCommand("tdl training configure"),
@@ -60,7 +60,7 @@ func (c Config) GlobalConfig() GlobalConfig {
 	}
 
 	if config.ServerAddr == "" {
-		config.ServerAddr = defaultServer
+		config.ServerAddr = defaultTrainingsServer
 	}
 	if config.Token == "" {
 		panic(fmt.Sprintf("empty token in %s", configPath))

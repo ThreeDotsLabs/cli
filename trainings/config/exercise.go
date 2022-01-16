@@ -1,41 +1,38 @@
 package config
 
 import (
-	"path"
-
 	"github.com/BurntSushi/toml"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
 )
-
-type ExerciseConfig struct {
-	ExerciseID   string `toml:"exercise_id"`
-	TrainingName string `toml:"training_name"`
-}
 
 const ExerciseConfigFile = ".tdl-exercise"
 
-func (c Config) WriteExerciseConfig(dir string, cfg ExerciseConfig) error {
-	return c.writeConfigToml(path.Join(dir, ExerciseConfigFile), cfg)
+type ExerciseConfig struct {
+	ExerciseID string `toml:"exercise_id"`
+	Directory  string `toml:"directory"`
 }
 
-func (c Config) ExerciseConfig(dir string) ExerciseConfig {
+func (c Config) WriteExerciseConfig(trainingRootFs afero.Fs, cfg ExerciseConfig) error {
+	return c.writeConfigToml(trainingRootFs, ExerciseConfigFile, cfg)
+}
+
+func (c Config) ExerciseConfig(trainingRootFs afero.Fs) ExerciseConfig {
+	b, err := afero.ReadFile(trainingRootFs, ExerciseConfigFile)
+	if err != nil {
+		panic(errors.Wrap(err, "can't read exercise config"))
+	}
+
 	exerciseConfig := ExerciseConfig{}
-	if _, err := toml.DecodeFile(c.ExerciseConfigPath(dir), &exerciseConfig); err != nil {
-		panic(err)
+	if _, err := toml.Decode(string(b), &exerciseConfig); err != nil {
+		panic(errors.Wrapf(err, "can't decode exercise config: %s", string(b)))
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"training": exerciseConfig.TrainingName,
 		"exercise": exerciseConfig.ExerciseID,
+		"dir":      exerciseConfig.Directory,
 	}).Debug("Calculated training and exercise")
 
 	return exerciseConfig
-}
-
-func (c Config) ExerciseConfigPath(dir string) string {
-	return path.Join(dir, ExerciseConfigFile)
-}
-
-func (c Config) ExerciseConfigExists(dir string) bool {
-	return c.dirOrFileExists(c.ExerciseConfigPath(dir))
 }

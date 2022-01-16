@@ -2,21 +2,22 @@ package config
 
 import (
 	"os"
-	"path"
+	"path/filepath"
 
 	"github.com/BurntSushi/toml"
 	"github.com/pkg/errors"
+	"github.com/spf13/afero"
 )
 
-func (c Config) writeConfigToml(destPath string, v interface{}) error {
-	dir := path.Dir(destPath)
+func (c Config) writeConfigToml(fs afero.Fs, destPath string, v interface{}) error {
+	dir := filepath.Dir(destPath)
 
 	err := os.MkdirAll(dir, 0700)
 	if err != nil {
 		return errors.Wrapf(err, "can't create config dir %s", dir)
 	}
 
-	f, err := c.fs.OpenFile(destPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+	f, err := fs.OpenFile(destPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
 		return errors.Wrapf(err, "can't open config file %s", destPath)
 	}

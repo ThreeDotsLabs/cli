@@ -7,17 +7,17 @@ import (
 )
 
 type Config struct {
-	fs afero.Fs
+	osFs afero.Fs
 }
 
 func NewConfig() Config {
 	return Config{
-		fs: afero.NewOsFs(),
+		osFs: afero.NewOsFs(),
 	}
 }
 
-func (c Config) dirOrFileExists(path string) bool {
-	_, err := c.fs.Stat(path)
+func (c Config) dirOrFileExists(fs afero.Fs, path string) bool {
+	_, err := fs.Stat(path)
 	if err == nil {
 		return true
 	}

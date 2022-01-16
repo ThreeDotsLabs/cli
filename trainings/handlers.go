@@ -6,17 +6,16 @@ import (
 	"crypto/x509"
 
 	"github.com/pkg/errors"
+	"github.com/spf13/afero"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
 	"github.com/ThreeDotsLabs/cli/trainings/config"
-	"github.com/ThreeDotsLabs/cli/trainings/files"
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )
 
 type Handlers struct {
 	config config.Config
-	files  files.Files
 
 	grpcClient genproto.ServerClient
 }
@@ -26,7 +25,6 @@ func NewHandlers() *Handlers {
 
 	return &Handlers{
 		config: conf,
-		files:  files.NewDefaultFiles(),
 	}
 }
 
@@ -64,4 +62,16 @@ func (h *Handlers) newGrpcClientWithAddr(ctx context.Context, addr string, insec
 	}
 
 	return h.grpcClient
+}
+
+func newTrainingRootFs(trainingRoot string) afero.Fs {
+	// Privacy of your files is our priority.
+	//
+	// We should never trust the remote server.
+	// Writing files based on external name is a vector for Path Traversal attack.
+	// For more info please check: https://owasp.org/www-community/attacks/Path_Traversal
+	//
+	// To avoid that we are using afero.BasePathFs with base on training root for all operations in trainings dir.
+	trainingRootFs := afero.NewBasePathFs(afero.NewOsFs(), trainingRoot)
+	return trainingRootFs
 }

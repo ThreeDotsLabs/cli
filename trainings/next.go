@@ -4,14 +4,16 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/ThreeDotsLabs/cli/trainings/files"
 
 	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings/config"
@@ -20,7 +22,19 @@ import (
 )
 
 func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string, dir string) error {
-	finished, resp, err := h.getNextExercise(ctx, currentExerciseID, dir)
+	trainingRoot, err := h.config.FindTrainingRoot(dir)
+	if err != nil {
+		return err
+	}
+
+	// We should never trust the remote server.
+	// Writing files based on external name is a vector for Path Traversal attack.
+	// For more info please check: https://owasp.org/www-community/attacks/Path_Traversal
+	//
+	// To avoid that we are using afero.BasePathFs with base on training root for all operations in trainings dir.
+	trainingRootFs := afero.NewBasePathFs(afero.NewOsFs(), trainingRoot)
+
+	finished, resp, err := h.getNextExercise(ctx, currentExerciseID, trainingRootFs)
 	if err != nil {
 		return err
 	}
@@ -29,23 +43,16 @@ func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string, d
 		return nil
 	}
 
-	trainingRoot, err := h.config.FindTrainingRoot(dir)
-	if err != nil {
+	if err := h.writeExerciseFiles(resp, trainingRootFs); err != nil {
 		return err
 	}
 
-	exerciseDir := h.calculateExerciseDir(resp, trainingRoot)
-
-	if err := h.writeExerciseFiles(resp.ExerciseId, resp.FilesToCreate, exerciseDir); err != nil {
-		return err
-	}
-
-	return h.showExerciseTips(exerciseDir)
+	return h.showExerciseTips(trainingRoot, resp.Dir)
 }
 
-func (h *Handlers) getNextExercise(ctx context.Context, currentExerciseID string, dir string) (finished bool, resp *genproto.NextExerciseResponse, err error) {
-	resp, err = h.newGrpcClient(ctx).NextExercise(context.Background(), &genproto.NextExerciseRequest{
-		TrainingName:      h.config.TrainingConfig(dir).TrainingName,
+func (h *Handlers) getNextExercise(ctx context.Context, currentExerciseID string, trainingRootFs afero.Fs) (finished bool, resp *genproto.NextExerciseResponse, err error) {
+	resp, err = h.newGrpcClient(ctx).NextExercise(ctx, &genproto.NextExerciseRequest{
+		TrainingName:      h.config.TrainingConfig(trainingRootFs).TrainingName,
 		CurrentExerciseId: currentExerciseID,
 		Token:             h.config.GlobalConfig().Token,
 	})
@@ -60,36 +67,32 @@ func (h *Handlers) getNextExercise(ctx context.Context, currentExerciseID string
 	return false, resp, nil
 }
 
-func (h *Handlers) calculateExerciseDir(resp *genproto.NextExerciseResponse, trainingRoot string) string {
-	// We should never trust the remote server.
-	// Writing files based on external name is a vector for Path Traversal attack.
-	// For more info please check: https://owasp.org/www-community/attacks/Path_Traversal
-	//
-	// Fortunately, path.Join is protecting us from that by calling path.Clean().
-	return path.Join(trainingRoot, resp.Dir)
-}
-
-func (h *Handlers) writeExerciseFiles(exerciseID string, filesToCreate []*genproto.File, exerciseDir string) error {
-	if err := h.files.WriteExerciseFiles(filesToCreate, exerciseDir); err != nil {
+func (h *Handlers) writeExerciseFiles(resp *genproto.NextExerciseResponse, trainingRootFs afero.Fs) error {
+	if err := files.NewFiles().WriteExerciseFiles(resp.FilesToCreate, trainingRootFs, resp.Dir); err != nil {
 		return err
 	}
 
-	return h.config.WriteExerciseConfig(exerciseDir, config.ExerciseConfig{
-		ExerciseID:   exerciseID,
-		TrainingName: h.config.TrainingConfig(exerciseDir).TrainingName,
-	})
+	return h.config.WriteExerciseConfig(
+		trainingRootFs,
+		config.ExerciseConfig{
+			ExerciseID: resp.ExerciseId,
+			Directory:  resp.Dir,
+		},
+	)
 }
 
-func (h *Handlers) showExerciseTips(exerciseDir string) error {
+func (h *Handlers) showExerciseTips(exerciseDir string, trainingRoot string) error {
+	exerciseAbsDir := filepath.Join(trainingRoot, exerciseDir)
+
 	pwd, err := os.Getwd()
 	if err != nil {
 		return errors.Wrap(err, "can't get working directory")
 	}
-	cdRequired := pwd != exerciseDir
+	cdRequired := pwd != exerciseAbsDir
 
-	relExpectedDir, err := filepath.Rel(pwd, exerciseDir)
+	relExpectedDir, err := filepath.Rel(pwd, exerciseAbsDir)
 	if err != nil {
-		return errors.Wrapf(err, "can't generate rel path for %s and %s", pwd, exerciseDir)
+		return errors.Wrapf(err, "can't generate rel path for %s and %s", pwd, exerciseAbsDir)
 	}
 
 	if cdRequired {

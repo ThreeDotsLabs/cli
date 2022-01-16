@@ -2,7 +2,7 @@ package files_test
 
 import (
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -17,7 +17,7 @@ func testDataDir(t *testing.T, testName string) string {
 	wd, err := os.Getwd()
 	require.NoError(t, err)
 
-	return path.Join(wd, "testdata", testName)
+	return filepath.Join(wd, "testdata", testName)
 }
 
 type fsDecorator struct {
@@ -93,7 +93,7 @@ func assertFilesCreated(t *testing.T, fs *fsDecorator, dir string, filesToCreate
 	assert.Len(t, fs.CreatedFiles, len(filesToCreate))
 
 	for _, file := range filesToCreate {
-		expectedPath := path.Join(dir, file.Path)
+		expectedPath := filepath.Join(dir, file.Path)
 
 		_, ok := fs.CreatedFiles[expectedPath]
 		if !assert.True(t, ok, "file %s doesn't exist", expectedPath) {

@@ -22,10 +22,10 @@ func TestFiles_WriteExerciseFiles(t *testing.T) {
 	stdin := bytes.NewBufferString("")
 	stdout := bytes.NewBuffer(nil)
 
-	f := files.NewFiles(fs, stdin, stdout)
+	f := files.NewFilesWithStdOuts(stdin, stdout)
 	dir := "dir"
 
-	err := f.WriteExerciseFiles(filesToCreate, dir)
+	err := f.WriteExerciseFiles(filesToCreate, fs, dir)
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{dir}, fs.CreatedDirs)
@@ -34,7 +34,7 @@ func TestFiles_WriteExerciseFiles(t *testing.T) {
 	assertFilesCreated(t, fs, dir, filesToCreate)
 
 	// check idempotency
-	err = f.WriteExerciseFiles(filesToCreate, dir)
+	err = f.WriteExerciseFiles(filesToCreate, fs, dir)
 	require.NoError(t, err)
 	assert.Equal(t, []string{dir}, fs.CreatedDirs)
 	assert.Len(t, fs.CreatedFiles, len(filesToCreate))
@@ -49,7 +49,7 @@ func TestFiles_WriteExerciseFiles_accept_override_existing(t *testing.T) {
 	stdin := bytes.NewBufferString(strings.Repeat("y\n", 3)) // this will accept diff
 	stdout := bytes.NewBuffer(nil)
 
-	f := files.NewFiles(fs, stdin, stdout)
+	f := files.NewFilesWithStdOuts(stdin, stdout)
 	dir := "bar"
 
 	err := f.WriteExerciseFiles([]*genproto.File{
@@ -69,7 +69,7 @@ func main() {
 			Path:    "baz/baz.go",
 			Content: "package bar\n",
 		},
-	}, dir)
+	}, fs, dir)
 	require.NoError(t, err)
 
 	// let's ignore current files
@@ -94,7 +94,7 @@ func main() {
 			Content: "package baz\n",
 		},
 	}
-	err = f.WriteExerciseFiles(filesToUpdate, dir)
+	err = f.WriteExerciseFiles(filesToUpdate, fs, dir)
 	require.NoError(t, err)
 
 	assertFilesCreated(t, fs, dir, filesToUpdate)
@@ -114,7 +114,7 @@ func TestFiles_WriteExerciseFiles_reject_override_existing(t *testing.T) {
 	stdin := bytes.NewBufferString(strings.Repeat("n\n", 3)) // this will reject diff
 	stdout := bytes.NewBuffer(nil)
 
-	f := files.NewFiles(fs, stdin, stdout)
+	f := files.NewFilesWithStdOuts(stdin, stdout)
 	dir := "bar"
 
 	err := f.WriteExerciseFiles([]*genproto.File{
@@ -134,7 +134,7 @@ func main() {
 			Path:    "baz/baz.go",
 			Content: "package bar\n",
 		},
-	}, dir)
+	}, fs, dir)
 	require.NoError(t, err)
 
 	// let's ignore current files
@@ -159,7 +159,7 @@ func main() {
 			Content: "package baz\n",
 		},
 	}
-	err = f.WriteExerciseFiles(filesToUpdate, dir)
+	err = f.WriteExerciseFiles(filesToUpdate, fs, dir)
 	require.NoError(t, err)
 
 	assert.Empty(t, fs.CreatedDirs)
@@ -211,7 +211,7 @@ func TestWriteExerciseFiles_path_traversal(t *testing.T) {
 			err := afero.WriteFile(fs, "/secret.txt", []byte(originalFileContent), 0755)
 			require.NoError(t, err)
 
-			f := files.NewFiles(fs, bytes.NewBufferString(strings.Repeat("y\n", 2)), os.Stdout)
+			f := files.NewFilesWithStdOuts(bytes.NewBufferString(strings.Repeat("y\n", 2)), os.Stdout)
 
 			err = f.WriteExerciseFiles(
 				[]*genproto.File{
@@ -220,7 +220,7 @@ func TestWriteExerciseFiles_path_traversal(t *testing.T) {
 						Content: "modified",
 					},
 				},
-				"dir",
+				fs, "dir",
 			)
 			require.NoError(t, err)
 

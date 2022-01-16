@@ -3,8 +3,9 @@ package trainings
 import (
 	"context"
 	"fmt"
-	"github.com/fatih/color"
 	"os"
+
+	"github.com/fatih/color"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -38,31 +39,34 @@ func (h *Handlers) Init(ctx context.Context, trainingName string) error {
 
 var ErrInterrupted = errors.New("interrupted")
 
-func (h *Handlers) startTraining(ctx context.Context, trainingName string, dir string) error {
+func (h *Handlers) startTraining(ctx context.Context, trainingName string, trainingRoot string) error {
 	if err := h.showTrainingStartPrompt(); err != nil {
 		return err
 	}
 
-	alreadyExistingTrainingRoot, err := h.config.FindTrainingRoot(dir)
-	if err != nil {
-		if errors.Is(err, config.TrainingRootNotFoundError) {
-			logrus.Debug("No training root yet")
-		} else {
-			return errors.Wrap(err, "can't check if training root exists")
-		}
-	} else {
+	alreadyExistingTrainingRoot, err := h.config.FindTrainingRoot(trainingRoot)
+	if err == nil {
 		fmt.Println(color.BlueString("Training was already started. Training root:" + alreadyExistingTrainingRoot))
-
-		cfg := h.config.TrainingConfig(dir)
-		if cfg.TrainingName != trainingName {
-			return fmt.Errorf("training %s was already started in this directory", cfg.TrainingName)
-		}
-
-		// training root already exists, let's use it
-		dir = alreadyExistingTrainingRoot
+		trainingRoot = alreadyExistingTrainingRoot
+	} else if !errors.Is(err, config.TrainingRootNotFoundError) {
+		return errors.Wrap(err, "can't check if training root exists")
+	} else {
+		logrus.Debug("No training root yet")
 	}
 
-	_, err = h.newGrpcClient(ctx).StartTraining(context.Background(), &genproto.StartTrainingRequest{
+	trainingRootFs := newTrainingRootFs(trainingRoot)
+
+	if alreadyExistingTrainingRoot != "" {
+		cfg := h.config.TrainingConfig(trainingRootFs)
+		if cfg.TrainingName != trainingName {
+			return fmt.Errorf(
+				"training %s was already started in this directory, please go to other directory and run `tdl training init`",
+				cfg.TrainingName,
+			)
+		}
+	}
+
+	_, err = h.newGrpcClient(ctx).StartTraining(ctx, &genproto.StartTrainingRequest{
 		TrainingName: trainingName,
 		Token:        h.config.GlobalConfig().Token,
 	})
@@ -70,24 +74,7 @@ func (h *Handlers) startTraining(ctx context.Context, trainingName string, dir s
 		return errors.Wrap(err, "start training gRPC call failed")
 	}
 
-	return h.config.WriteTrainingConfig(config.TrainingConfig{TrainingName: trainingName}, dir)
-}
-
-func (h *Handlers) checkIfTrainingWasAlreadyStarted(trainingName string, dir string) (bool, error) {
-	if trainingRoot, err := h.config.FindTrainingRoot(dir); err == nil {
-		fmt.Println("Training was already started. Training root:", trainingRoot)
-
-		cfg := h.config.TrainingConfig(dir)
-		if cfg.TrainingName != trainingName {
-			return true, fmt.Errorf("training %s was already started in this directory", cfg.TrainingName)
-		}
-
-		return true, nil
-	} else if !errors.Is(err, config.TrainingRootNotFoundError) {
-		return false, errors.Wrap(err, "can't check if training root exists")
-	}
-
-	return false, nil
+	return h.config.WriteTrainingConfig(config.TrainingConfig{TrainingName: trainingName}, trainingRootFs)
 }
 
 func (h *Handlers) showTrainingStartPrompt() error {
