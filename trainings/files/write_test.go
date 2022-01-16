@@ -25,11 +25,16 @@ func TestFiles_WriteExerciseFiles(t *testing.T) {
 	f := files.NewFilesWithStdOuts(stdin, stdout)
 	dir := "dir"
 
+	expectedOutput := `+ dir/baz/baz.go (2 lines)
++ dir/go.mod (4 lines)
++ dir/main.go (6 lines)
+3 files saved` + "\n\n"
+
 	err := f.WriteExerciseFiles(filesToCreate, fs, dir)
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{dir}, fs.CreatedDirs)
-	assert.Empty(t, stdout.String())
+	assert.Equal(t, expectedOutput, stdout.String())
 
 	assertFilesCreated(t, fs, dir, filesToCreate)
 
@@ -38,7 +43,7 @@ func TestFiles_WriteExerciseFiles(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{dir}, fs.CreatedDirs)
 	assert.Len(t, fs.CreatedFiles, len(filesToCreate))
-	assert.Empty(t, stdout.String())
+	assert.Equal(t, expectedOutput, stdout.String())
 }
 
 func TestFiles_WriteExerciseFiles_accept_override_existing(t *testing.T) {
