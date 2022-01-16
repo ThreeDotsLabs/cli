@@ -97,10 +97,17 @@ var app = &cli.App{
 					},
 				},
 				{
-					Name:  "list",
-					Usage: "list training",
+					Name:      "init",
+					ArgsUsage: fmt.Sprintf("[trainingID from %s]", web.Website),
+					Usage:     "initialise training files in your current directory",
 					Action: func(c *cli.Context) error {
-						return trainings.NewHandlers().List(c.Context)
+						trainingID := c.Args().First()
+
+						if trainingID == "" {
+							return missingArgumentError{"Missing trainingID argument"}
+						}
+
+						return trainings.NewHandlers().Init(c.Context, trainingID)
 					},
 				},
 				{
@@ -120,17 +127,18 @@ var app = &cli.App{
 					},
 				},
 				{
-					Name:      "init",
-					ArgsUsage: fmt.Sprintf("[trainingID from %s]", web.Website),
-					Usage:     "initialise training files in your current directory",
+					Name:    "info",
+					Aliases: []string{"i"},
+					Usage:   "print information about current training",
 					Action: func(c *cli.Context) error {
-						trainingID := c.Args().First()
-
-						if trainingID == "" {
-							return missingArgumentError{"Missing trainingID argument"}
-						}
-
-						return trainings.NewHandlers().Init(c.Context, trainingID)
+						return trainings.NewHandlers().Info(c.Context)
+					},
+				},
+				{
+					Name:  "list",
+					Usage: "list training",
+					Action: func(c *cli.Context) error {
+						return trainings.NewHandlers().List(c.Context)
 					},
 				},
 			},

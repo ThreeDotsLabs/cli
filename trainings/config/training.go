@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"path/filepath"
 
 	"github.com/BurntSushi/toml"
@@ -42,7 +43,13 @@ func (c Config) TrainingConfig(trainingRootFs afero.Fs) TrainingConfig {
 // todo - check if it's printing properly
 var TrainingRootNotFoundError = errors.Errorf("training root not found, did you run %s?", internal.SprintCommand("tdl trainings init"))
 
-func (c Config) FindTrainingRoot(dir string) (string, error) {
+func (c Config) FindTrainingRoot() (string, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", errors.WithStack(err)
+	}
+
+	dir := wd
 	for {
 		if c.dirOrFileExists(c.osFs, filepath.Join(dir, trainingConfigFile)) {
 			return dir, nil

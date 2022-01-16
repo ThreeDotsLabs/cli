@@ -18,8 +18,8 @@ import (
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )
 
-func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string, dir string) error {
-	trainingRoot, err := h.config.FindTrainingRoot(dir)
+func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string) error {
+	trainingRoot, err := h.config.FindTrainingRoot()
 	if err != nil {
 		return err
 	}

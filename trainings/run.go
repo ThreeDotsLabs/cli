@@ -22,12 +22,7 @@ import (
 )
 
 func (h *Handlers) Run(ctx context.Context) (bool, error) {
-	wd, err := os.Getwd()
-	if err != nil {
-		return false, errors.WithStack(err)
-	}
-
-	trainingRoot, err := h.config.FindTrainingRoot(wd)
+	trainingRoot, err := h.config.FindTrainingRoot()
 	if errors.Is(err, config.TrainingRootNotFoundError) {
 		fmt.Println("You are not in a training directory. If you already started the training, please go to the exercise directory.")
 		fmt.Printf("Please run %s if you didn't start training yet.\n", internal.SprintCommand("tdl training init"))
@@ -48,7 +43,7 @@ func (h *Handlers) Run(ctx context.Context) (bool, error) {
 	}
 
 	// todo - is this assumption always valid about training dir?
-	return success, h.nextExercise(ctx, h.config.ExerciseConfig(trainingRootFs).ExerciseID, wd)
+	return success, h.nextExercise(ctx, h.config.ExerciseConfig(trainingRootFs).ExerciseID)
 }
 
 func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePathFs) (bool, error) {
@@ -59,7 +54,7 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 		return false, err
 	}
 
-	terminalPath := h.generateRunTerminalPath(trainingRootFs, exerciseConfig)
+	terminalPath := h.generateRunTerminalPath(trainingRootFs)
 
 	req := &genproto.VerifyExerciseRequest{
 		ExerciseId: exerciseConfig.ExerciseID,
@@ -135,7 +130,9 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 	}
 }
 
-func (h *Handlers) generateRunTerminalPath(trainingRootFs *afero.BasePathFs, exerciseConfig config.ExerciseConfig) string {
+func (h *Handlers) generateRunTerminalPath(trainingRootFs *afero.BasePathFs) string {
+	exerciseConfig := h.config.ExerciseConfig(trainingRootFs)
+
 	wd, err := syscall.Getwd()
 	if err != nil {
 		logrus.WithError(err).Warn("Can't get wd")

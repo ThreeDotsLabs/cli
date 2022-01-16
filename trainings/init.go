@@ -16,17 +16,11 @@ import (
 )
 
 func (h *Handlers) Init(ctx context.Context, trainingName string) error {
-	wd, err := os.Getwd()
-	if err != nil {
-		return errors.WithStack(err)
-	}
-
 	logrus.WithFields(logrus.Fields{
 		"training_name": trainingName,
-		"dir":           wd,
 	}).Debug("Starting training")
 
-	if err := h.startTraining(ctx, trainingName, wd); errors.Is(err, ErrInterrupted) {
+	if err := h.startTraining(ctx, trainingName); errors.Is(err, ErrInterrupted) {
 		fmt.Println("Interrupted")
 		return nil
 	} else if err != nil {
@@ -34,13 +28,15 @@ func (h *Handlers) Init(ctx context.Context, trainingName string) error {
 	}
 
 	// todo - handle situation when training was started but something failed here and someone is starting excersise again (because he have no local files)
-	return h.nextExercise(ctx, "", wd)
+	return h.nextExercise(ctx, "")
 }
 
 var ErrInterrupted = errors.New("interrupted")
 
-func (h *Handlers) startTraining(ctx context.Context, trainingName string, trainingRoot string) error {
-	alreadyExistingTrainingRoot, err := h.config.FindTrainingRoot(trainingRoot)
+func (h *Handlers) startTraining(ctx context.Context, trainingName string) error {
+	var trainingRoot string
+
+	alreadyExistingTrainingRoot, err := h.config.FindTrainingRoot()
 	if err == nil {
 		fmt.Println(color.BlueString("Training was already initialised. Training root:" + alreadyExistingTrainingRoot))
 		trainingRoot = alreadyExistingTrainingRoot
@@ -51,6 +47,13 @@ func (h *Handlers) startTraining(ctx context.Context, trainingName string, train
 			return err
 		}
 
+		wd, err := os.Getwd()
+		if err != nil {
+			return errors.WithStack(err)
+		}
+
+		// we will create training root in current working directory
+		trainingRoot = wd
 		logrus.Debug("No training root yet")
 	}
 
