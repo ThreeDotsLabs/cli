@@ -24,7 +24,7 @@ func (c Config) WriteTrainingConfig(config TrainingConfig, trainingRootFs afero.
 }
 
 func (c Config) TrainingConfig(trainingRootFs afero.Fs) TrainingConfig {
-	b, err := afero.ReadFile(trainingRootFs, ExerciseConfigFile)
+	b, err := afero.ReadFile(trainingRootFs, trainingConfigFile)
 	if err != nil {
 		panic(errors.Wrap(err, "can't read training config"))
 	}

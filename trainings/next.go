@@ -81,7 +81,7 @@ func (h *Handlers) writeExerciseFiles(resp *genproto.NextExerciseResponse, train
 	)
 }
 
-func (h *Handlers) showExerciseTips(exerciseDir string, trainingRoot string) error {
+func (h *Handlers) showExerciseTips(trainingRoot string, exerciseDir string) error {
 	exerciseAbsDir := filepath.Join(trainingRoot, exerciseDir)
 
 	pwd, err := os.Getwd()

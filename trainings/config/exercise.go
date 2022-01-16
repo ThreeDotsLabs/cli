@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/afero"
 )
 
-const ExerciseConfigFile = ".tdl-exercise"
+const exerciseConfigFile = ".tdl-exercise"
 
 type ExerciseConfig struct {
 	ExerciseID string `toml:"exercise_id"`
@@ -15,11 +15,11 @@ type ExerciseConfig struct {
 }
 
 func (c Config) WriteExerciseConfig(trainingRootFs afero.Fs, cfg ExerciseConfig) error {
-	return c.writeConfigToml(trainingRootFs, ExerciseConfigFile, cfg)
+	return c.writeConfigToml(trainingRootFs, exerciseConfigFile, cfg)
 }
 
 func (c Config) ExerciseConfig(trainingRootFs afero.Fs) ExerciseConfig {
-	b, err := afero.ReadFile(trainingRootFs, ExerciseConfigFile)
+	b, err := afero.ReadFile(trainingRootFs, exerciseConfigFile)
 	if err != nil {
 		panic(errors.Wrap(err, "can't read exercise config"))
 	}
