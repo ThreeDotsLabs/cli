@@ -40,17 +40,17 @@ func (h *Handlers) Init(ctx context.Context, trainingName string) error {
 var ErrInterrupted = errors.New("interrupted")
 
 func (h *Handlers) startTraining(ctx context.Context, trainingName string, trainingRoot string) error {
-	if err := h.showTrainingStartPrompt(); err != nil {
-		return err
-	}
-
 	alreadyExistingTrainingRoot, err := h.config.FindTrainingRoot(trainingRoot)
 	if err == nil {
-		fmt.Println(color.BlueString("Training was already started. Training root:" + alreadyExistingTrainingRoot))
+		fmt.Println(color.BlueString("Training was already initialised. Training root:" + alreadyExistingTrainingRoot))
 		trainingRoot = alreadyExistingTrainingRoot
 	} else if !errors.Is(err, config.TrainingRootNotFoundError) {
 		return errors.Wrap(err, "can't check if training root exists")
 	} else {
+		if err := h.showTrainingStartPrompt(); err != nil {
+			return err
+		}
+
 		logrus.Debug("No training root yet")
 	}
 

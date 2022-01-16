@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/hexops/gotextdiff"
 	"github.com/hexops/gotextdiff/myers"
@@ -24,6 +25,11 @@ func (i InvalidFilePathError) Error() string {
 	return fmt.Sprintf("invalid file.Path '%s'", i.pathValue)
 }
 
+type savedFile struct {
+	Name  string
+	Lines int
+}
+
 func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, trainingRootFs afero.Fs, exerciseDir string) error {
 	if !f.dirOrFileExists(trainingRootFs, exerciseDir) {
 		if err := trainingRootFs.MkdirAll(exerciseDir, 0755); err != nil {
@@ -31,15 +37,17 @@ func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, trainingRootFs
 		}
 	}
 
-	for _, file := range filesToCreate {
+	var savedFiles []savedFile
+
+	for _, fileFromServer := range filesToCreate {
 		// We should never trust the remote server.
 		// Writing files based on external name is a vector for Path Traversal attack.
 		// For more info please check: https://owasp.org/www-community/attacks/Path_Traversal
 		//
 		// To avoid that we are using afero.BasePathFs with base on training root.
-		fullFilePath := filepath.Join(exerciseDir, file.Path)
+		fullFilePath := filepath.Join(exerciseDir, fileFromServer.Path)
 
-		shouldWrite, err := f.shouldWriteFile(trainingRootFs, fullFilePath, file)
+		shouldWrite, err := f.shouldWriteFile(trainingRootFs, fullFilePath, fileFromServer)
 		if err != nil {
 			return err
 		}
@@ -47,18 +55,33 @@ func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, trainingRootFs
 			continue
 		}
 
-		f, err := trainingRootFs.Create(fullFilePath)
+		file, err := trainingRootFs.Create(fullFilePath)
 		if err != nil {
 			return errors.Wrapf(err, "can't create %s", fullFilePath)
 		}
 
-		if _, err := f.WriteString(file.Content); err != nil {
+		if _, err := file.WriteString(fileFromServer.Content); err != nil {
 			return errors.Wrapf(err, "can't write to %s", fullFilePath)
 		}
 
-		if err := f.Close(); err != nil {
+		if err := file.Close(); err != nil {
 			return errors.Wrapf(err, "can't close %s", fullFilePath)
 		}
+
+		linesAdded := len(strings.Split(fileFromServer.Content, "\n"))
+
+		savedFiles = append(savedFiles, savedFile{
+			Name:  fullFilePath,
+			Lines: linesAdded,
+		})
+	}
+
+	for _, file := range savedFiles {
+		fmt.Fprintf(f.stdout, "+ %s (%d lines)\n", file.Name, file.Lines)
+	}
+
+	if len(savedFiles) > 0 {
+		fmt.Fprintf(f.stdout, "%d files saved\n\n", len(savedFiles))
 	}
 
 	return nil

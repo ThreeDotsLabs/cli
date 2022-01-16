@@ -3,8 +3,6 @@ package trainings
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
@@ -18,7 +16,6 @@ import (
 	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings/config"
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
-	"github.com/ThreeDotsLabs/cli/trainings/web"
 )
 
 func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string, dir string) error {
@@ -47,7 +44,7 @@ func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string, d
 		return err
 	}
 
-	return h.showExerciseTips(trainingRoot, resp.Dir)
+	return h.showExerciseTips()
 }
 
 func (h *Handlers) getNextExercise(ctx context.Context, currentExerciseID string, trainingRootFs afero.Fs) (finished bool, resp *genproto.NextExerciseResponse, err error) {
@@ -81,30 +78,8 @@ func (h *Handlers) writeExerciseFiles(resp *genproto.NextExerciseResponse, train
 	)
 }
 
-func (h *Handlers) showExerciseTips(trainingRoot string, exerciseDir string) error {
-	exerciseAbsDir := filepath.Join(trainingRoot, exerciseDir)
-
-	pwd, err := os.Getwd()
-	if err != nil {
-		return errors.Wrap(err, "can't get working directory")
-	}
-	cdRequired := pwd != exerciseAbsDir
-
-	relExpectedDir, err := filepath.Rel(pwd, exerciseAbsDir)
-	if err != nil {
-		return errors.Wrapf(err, "can't generate rel path for %s and %s", pwd, exerciseAbsDir)
-	}
-
-	if cdRequired {
-		fmt.Printf("Exercise files were created in '%s' directory.\n", relExpectedDir)
-		fmt.Println("Please execute", internal.SprintCommand("cd "+relExpectedDir), "to get there.")
-	}
-
-	fmt.Printf("\nPlase go to %s see exercise content.\n", web.Website)
+func (h *Handlers) showExerciseTips() error {
 	fmt.Printf("To run solution, please execute " + internal.SprintCommand("tdl training run"))
-	if cdRequired {
-		fmt.Print(" in ", relExpectedDir)
-	}
 	fmt.Println()
 
 	return nil
