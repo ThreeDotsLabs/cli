@@ -2,9 +2,7 @@ package trainings
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
@@ -13,7 +11,6 @@ import (
 
 	"github.com/ThreeDotsLabs/cli/trainings/files"
 
-	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings/config"
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )
@@ -36,7 +33,7 @@ func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string) e
 		return err
 	}
 	if finished {
-		trainingFinished()
+		printFinished()
 		return nil
 	}
 
@@ -44,7 +41,9 @@ func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string) e
 		return err
 	}
 
-	return h.showExerciseTips()
+	h.printExerciseTips()
+
+	return nil
 }
 
 func (h *Handlers) getNextExercise(ctx context.Context, currentExerciseID string, trainingRootFs afero.Fs) (finished bool, resp *genproto.NextExerciseResponse, err error) {
@@ -76,15 +75,4 @@ func (h *Handlers) writeExerciseFiles(resp *genproto.NextExerciseResponse, train
 			Directory:  resp.Dir,
 		},
 	)
-}
-
-func (h *Handlers) showExerciseTips() error {
-	fmt.Printf("To run solution, please execute " + internal.SprintCommand("tdl training run"))
-	fmt.Println()
-
-	return nil
-}
-
-func trainingFinished() {
-	fmt.Println("Congratulations, you finished the training " + color.YellowString("🏆"))
 }

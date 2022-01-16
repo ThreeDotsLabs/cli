@@ -8,8 +8,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
-
-	"github.com/ThreeDotsLabs/cli/internal"
 )
 
 const trainingConfigFile = ".tdl-training"
@@ -40,8 +38,7 @@ func (c Config) TrainingConfig(trainingRootFs afero.Fs) TrainingConfig {
 	return config
 }
 
-// todo - check if it's printing properly
-var TrainingRootNotFoundError = errors.Errorf("training root not found, did you run %s?", internal.SprintCommand("tdl trainings init"))
+var TrainingRootNotFoundError = errors.Errorf("training root not found")
 
 func (c Config) FindTrainingRoot() (string, error) {
 	wd, err := os.Getwd()

@@ -24,8 +24,7 @@ import (
 func (h *Handlers) Run(ctx context.Context) (bool, error) {
 	trainingRoot, err := h.config.FindTrainingRoot()
 	if errors.Is(err, config.TrainingRootNotFoundError) {
-		fmt.Println("You are not in a training directory. If you already started the training, please go to the exercise directory.")
-		fmt.Printf("Please run %s if you didn't start training yet.\n", internal.SprintCommand("tdl training init"))
+		h.printNotInATrainingDirectory()
 		return false, nil
 	}
 

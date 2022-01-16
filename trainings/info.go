@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings/config"
 	"github.com/ThreeDotsLabs/cli/trainings/web"
 )
@@ -18,8 +17,7 @@ import (
 func (h *Handlers) Info(ctx context.Context) error {
 	trainingRoot, err := h.config.FindTrainingRoot()
 	if errors.Is(err, config.TrainingRootNotFoundError) {
-		fmt.Println("You are not in a training directory. If you already started the training, please go to the exercise directory.")
-		fmt.Printf("Please run %s if you didn't start training yet.\n", internal.SprintCommand("tdl training init"))
+		h.printNotInATrainingDirectory()
 		return nil
 	}
 
