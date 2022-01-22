@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"runtime"
 
 	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/pkg/errors"
@@ -47,8 +48,11 @@ func (h *Handlers) newGrpcClientWithAddr(ctx context.Context, addr string, insec
 			opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})))
 		} else {
 			systemRoots, err := x509.SystemCertPool()
-			if err != nil {
+			if err != nil && runtime.GOOS != "windows" {
 				panic(errors.Wrap(err, "cannot load root CA cert"))
+			}
+			if systemRoots == nil {
+				systemRoots = x509.NewCertPool()
 			}
 			creds := credentials.NewTLS(&tls.Config{
 				RootCAs:    systemRoots,
