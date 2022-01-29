@@ -15,10 +15,10 @@ import (
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )
 
-func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string) error {
+func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string) (bool, error) {
 	trainingRoot, err := h.config.FindTrainingRoot()
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	// We should never trust the remote server.
@@ -30,18 +30,18 @@ func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string) e
 
 	finished, resp, err := h.getNextExercise(ctx, currentExerciseID, trainingRootFs)
 	if err != nil {
-		return err
+		return finished, err
 	}
 	if finished {
 		printFinished()
-		return nil
+		return finished, nil
 	}
 
 	if err := h.writeExerciseFiles(resp, trainingRootFs); err != nil {
-		return err
+		return finished, err
 	}
 
-	return nil
+	return finished, nil
 }
 
 func (h *Handlers) getNextExercise(ctx context.Context, currentExerciseID string, trainingRootFs *afero.BasePathFs) (finished bool, resp *genproto.NextExerciseResponse, err error) {

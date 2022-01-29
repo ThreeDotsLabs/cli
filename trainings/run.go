@@ -41,12 +41,14 @@ func (h *Handlers) Run(ctx context.Context) (bool, error) {
 		return success, nil
 	}
 
-	// todo - is this assumption always valid about training dir?
-	if err := h.nextExercise(ctx, h.config.ExerciseConfig(trainingRootFs).ExerciseID); err != nil {
+	finished, err := h.nextExercise(ctx, h.config.ExerciseConfig(trainingRootFs).ExerciseID)
+	if err != nil {
 		return false, err
 	}
 
-	h.printExerciseTips()
+	if !finished {
+		h.printExerciseTips()
+	}
 
 	return success, err
 }

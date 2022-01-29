@@ -30,7 +30,8 @@ func (h *Handlers) Init(ctx context.Context, trainingName string) error {
 	fmt.Println("To see exercise content, please go back to " + color.CyanString(internal.WebsiteAddress))
 
 	// todo - handle situation when training was started but something failed here and someone is starting excersise again (because he have no local files)
-	return h.nextExercise(ctx, "")
+	_, err := h.nextExercise(ctx, "")
+	return err
 }
 
 var ErrInterrupted = errors.New("interrupted")
