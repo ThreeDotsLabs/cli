@@ -59,6 +59,7 @@ func (c Config) FindTrainingRoot() (string, error) {
 			// we are in root directory
 			break
 		}
+		previousDir = dir
 	}
 
 	return "", TrainingRootNotFoundError
