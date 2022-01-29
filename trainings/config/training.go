@@ -47,13 +47,16 @@ func (c Config) FindTrainingRoot() (string, error) {
 	}
 
 	dir := wd
+	previousDir := ""
+
 	for {
 		if c.dirOrFileExists(c.osFs, filepath.Join(dir, trainingConfigFile)) {
 			return dir, nil
 		}
 
 		dir = filepath.Dir(dir)
-		if dir == "/" {
+		if dir == previousDir {
+			// we are in root directory
 			break
 		}
 	}
