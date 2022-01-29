@@ -26,7 +26,7 @@ func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string) e
 	// For more info please check: https://owasp.org/www-community/attacks/Path_Traversal
 	//
 	// To avoid that we are using afero.BasePathFs with base on training root for all operations in trainings dir.
-	trainingRootFs := afero.NewBasePathFs(afero.NewOsFs(), trainingRoot)
+	trainingRootFs := afero.NewBasePathFs(afero.NewOsFs(), trainingRoot).(*afero.BasePathFs)
 
 	finished, resp, err := h.getNextExercise(ctx, currentExerciseID, trainingRootFs)
 	if err != nil {
@@ -46,7 +46,7 @@ func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string) e
 	return nil
 }
 
-func (h *Handlers) getNextExercise(ctx context.Context, currentExerciseID string, trainingRootFs afero.Fs) (finished bool, resp *genproto.NextExerciseResponse, err error) {
+func (h *Handlers) getNextExercise(ctx context.Context, currentExerciseID string, trainingRootFs *afero.BasePathFs) (finished bool, resp *genproto.NextExerciseResponse, err error) {
 	resp, err = h.newGrpcClient(ctx).NextExercise(ctx, &genproto.NextExerciseRequest{
 		TrainingName:      h.config.TrainingConfig(trainingRootFs).TrainingName,
 		CurrentExerciseId: currentExerciseID,
@@ -63,7 +63,7 @@ func (h *Handlers) getNextExercise(ctx context.Context, currentExerciseID string
 	return false, resp, nil
 }
 
-func (h *Handlers) writeExerciseFiles(resp *genproto.NextExerciseResponse, trainingRootFs afero.Fs) error {
+func (h *Handlers) writeExerciseFiles(resp *genproto.NextExerciseResponse, trainingRootFs *afero.BasePathFs) error {
 	if err := files.NewFiles().WriteExerciseFiles(resp.FilesToCreate, trainingRootFs, resp.Dir); err != nil {
 		return err
 	}

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/hexops/gotextdiff"
 	"github.com/hexops/gotextdiff/myers"
@@ -30,7 +31,7 @@ type savedFile struct {
 	Lines int
 }
 
-func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, trainingRootFs afero.Fs, exerciseDir string) error {
+func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, trainingRootFs *afero.BasePathFs, exerciseDir string) error {
 	if !f.dirOrFileExists(trainingRootFs, exerciseDir) {
 		if err := trainingRootFs.MkdirAll(exerciseDir, 0755); err != nil {
 			return errors.Wrapf(err, "can't create %s", exerciseDir)
@@ -77,7 +78,13 @@ func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, trainingRootFs
 	}
 
 	for _, file := range savedFiles {
-		fmt.Fprintf(f.stdout, "+ %s (%d lines)\n", file.Name, file.Lines)
+		savedFileRelativePath, err := calculateSavedFileRelativePath(trainingRootFs, file.Name)
+		if err != nil {
+			logrus.WithError(err).Warn("Can't calculate savedFileRelativePath")
+			savedFileRelativePath = file.Name
+		}
+
+		fmt.Fprintf(f.stdout, "+ %s (%d lines)\n", savedFileRelativePath, file.Lines)
 	}
 
 	if len(savedFiles) > 0 {
@@ -85,6 +92,25 @@ func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, trainingRootFs
 	}
 
 	return nil
+}
+
+func calculateSavedFileRelativePath(trainingRootFs *afero.BasePathFs, fileName string) (string, error) {
+	realPath, err := trainingRootFs.RealPath(fileName)
+	if err != nil {
+		return "", errors.Wrapf(err, "can't get real path of %s", fileName)
+	}
+
+	wd, err := syscall.Getwd()
+	if err != nil {
+		return "", err
+	}
+
+	terminalPath, err := filepath.Rel(wd, realPath)
+	if err != nil {
+		return "", err
+	}
+
+	return terminalPath, nil
 }
 
 func (f Files) shouldWriteFile(fs afero.Fs, filePath string, file *genproto.File) (bool, error) {
