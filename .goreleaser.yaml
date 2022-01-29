@@ -1,3 +1,5 @@
+project_name: tdl
+
 before:
   hooks:
     - go mod tidy
@@ -10,6 +12,24 @@ builds:
       - linux
       - windows
       - darwin
+      - freebsd
+    goarch:
+      - "amd64"
+      - "arm64"
+      - "arm"
+      - "386"
+    goarm:
+      - "6"
+      - "7"
+    ignore:
+      - goos: darwin
+        goarch: "386"
+      - goos: linux
+        goarch: arm
+        goarm: "7"
+    flags:
+      - -trimpath
+
 archives:
   - replacements:
       darwin: Darwin
@@ -17,6 +37,7 @@ archives:
       windows: Windows
       386: i386
       amd64: x86_64
+
 checksum:
   name_template: 'checksums.txt'
 snapshot:
