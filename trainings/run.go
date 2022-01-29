@@ -42,7 +42,13 @@ func (h *Handlers) Run(ctx context.Context) (bool, error) {
 	}
 
 	// todo - is this assumption always valid about training dir?
-	return success, h.nextExercise(ctx, h.config.ExerciseConfig(trainingRootFs).ExerciseID)
+	if err := h.nextExercise(ctx, h.config.ExerciseConfig(trainingRootFs).ExerciseID); err != nil {
+		return false, err
+	}
+
+	h.printExerciseTips()
+
+	return success, err
 }
 
 func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePathFs) (bool, error) {

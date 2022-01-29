@@ -41,8 +41,6 @@ func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string) e
 		return err
 	}
 
-	h.printExerciseTips()
-
 	return nil
 }
 
