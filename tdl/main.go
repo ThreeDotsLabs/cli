@@ -114,15 +114,22 @@ var app = &cli.App{
 					Name:    "run",
 					Aliases: []string{"r"},
 					Usage:   "run exercise",
+					Flags: []cli.Flag{
+						&cli.BoolFlag{
+							Name:    "detached",
+							Aliases: []string{"d"},
+							Usage:   "running in non-interactive mode",
+						},
+					},
 					Action: func(c *cli.Context) error {
-						success, err := trainings.NewHandlers().Run(c.Context)
+						success, err := trainings.NewHandlers().Run(c.Context, c.Bool("detached"))
 						if err != nil {
 							return err
 						}
-
 						if !success {
 							os.Exit(1)
 						}
+
 						return nil
 					},
 				},

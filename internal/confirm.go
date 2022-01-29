@@ -49,7 +49,7 @@ func FConfirmPromptDefaultYes(msg string, stdin io.Reader, stdout io.Writer) boo
 	}()
 
 	for {
-		_, _ = fmt.Fprintf(stdout, "%s [Y/n]: ", msg)
+		_, _ = fmt.Fprintf(stdout, "%s [y/n] (default: y): ", msg)
 
 		var input string
 		_, _ = fmt.Fscanln(stdin, &input)

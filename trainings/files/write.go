@@ -31,7 +31,7 @@ type savedFile struct {
 	Lines int
 }
 
-func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, trainingRootFs *afero.BasePathFs, exerciseDir string) error {
+func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, trainingRootFs afero.Fs, exerciseDir string) error {
 	if !f.dirOrFileExists(trainingRootFs, exerciseDir) {
 		if err := trainingRootFs.MkdirAll(exerciseDir, 0755); err != nil {
 			return errors.Wrapf(err, "can't create %s", exerciseDir)
@@ -94,8 +94,13 @@ func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, trainingRootFs
 	return nil
 }
 
-func calculateSavedFileRelativePath(trainingRootFs *afero.BasePathFs, fileName string) (string, error) {
-	realPath, err := trainingRootFs.RealPath(fileName)
+func calculateSavedFileRelativePath(trainingRootFs afero.Fs, fileName string) (string, error) {
+	trainingRootFsRelPather, ok := trainingRootFs.(RealPather)
+	if !ok {
+		return fileName, nil
+	}
+
+	realPath, err := trainingRootFsRelPather.RealPath(fileName)
 	if err != nil {
 		return "", errors.Wrapf(err, "can't get real path of %s", fileName)
 	}
