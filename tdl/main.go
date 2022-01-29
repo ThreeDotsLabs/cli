@@ -40,13 +40,13 @@ var app = &cli.App{
 	},
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
-			Name:    "debug",
-			Aliases: []string{"d"},
-			EnvVars: []string{"DEBUG"},
+			Name:    "verbose",
+			Aliases: []string{"v"},
+			EnvVars: []string{"VERBOSE"},
 		},
 	},
 	Before: func(c *cli.Context) error {
-		if debug := c.Bool("debug"); debug {
+		if verbose := c.Bool("verbose"); verbose {
 			logrus.SetLevel(logrus.DebugLevel)
 			logrus.SetFormatter(&logrus.TextFormatter{})
 		} else {
