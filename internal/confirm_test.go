@@ -103,7 +103,7 @@ func TestConfirmPromptDefaultYes(t *testing.T) {
 
 			ok := FConfirmPromptDefaultYes("some msg", stdin, stdout)
 			assert.Equal(t, tc.ExpectedResult, ok)
-			assert.Equal(t, "some msg [Y/n]: \n", stdout.String())
+			assert.Equal(t, "\nPress ENTER to some msg or q to quit \n", stdout.String())
 		})
 	}
 }

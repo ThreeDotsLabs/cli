@@ -21,36 +21,70 @@ import (
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )
 
-func (h *Handlers) Run(ctx context.Context) (bool, error) {
+func (h *Handlers) Run(ctx context.Context, detached bool) (bool, error) {
+	if detached {
+		successful, finished, err := h.run(ctx)
+
+		if !finished {
+			h.printExerciseTips()
+		}
+
+		return successful, err
+	} else {
+		return h.interactiveRun(ctx)
+	}
+}
+
+func (h *Handlers) interactiveRun(ctx context.Context) (successful bool, err error) {
+	for {
+		var finished bool
+		successful, finished, err = h.run(ctx)
+		if err != nil {
+			return
+		}
+
+		if finished {
+			return
+		}
+
+		if !successful {
+			if !internal.ConfirmPromptDefaultYes("run solution again") {
+				return
+			}
+		} else {
+			if !internal.ConfirmPromptDefaultYes("run your solution") {
+				return
+			}
+		}
+	}
+}
+
+func (h *Handlers) run(ctx context.Context) (success bool, finished bool, err error) {
 	trainingRoot, err := h.config.FindTrainingRoot()
 	if errors.Is(err, config.TrainingRootNotFoundError) {
 		h.printNotInATrainingDirectory()
-		return false, nil
+		return false, false, nil
 	}
 
 	trainingRootFs := newTrainingRootFs(trainingRoot)
 
 	// todo - validate if exercise id == training exercise id? to ensure about consistency
-	success, err := h.runExercise(ctx, trainingRootFs)
+	success, err = h.runExercise(ctx, trainingRootFs)
 	if !success || err != nil {
-		return success, err
+		return
 	}
 
 	fmt.Println()
-	if !internal.ConfirmPromptDefaultYes("Do you want to go to the next exercise?") {
-		return success, nil
+	if !internal.ConfirmPromptDefaultYes("go to the next exercise") {
+		return success, false, nil
 	}
 
-	finished, err := h.nextExercise(ctx, h.config.ExerciseConfig(trainingRootFs).ExerciseID)
+	finished, err = h.nextExercise(ctx, h.config.ExerciseConfig(trainingRootFs).ExerciseID)
 	if err != nil {
-		return false, err
+		return
 	}
 
-	if !finished {
-		h.printExerciseTips()
-	}
-
-	return success, err
+	return
 }
 
 func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePathFs) (bool, error) {

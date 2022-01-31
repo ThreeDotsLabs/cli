@@ -7,11 +7,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 
+	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings"
 )
 
@@ -40,13 +40,13 @@ var app = &cli.App{
 	},
 	Flags: []cli.Flag{
 		&cli.BoolFlag{
-			Name:    "debug",
-			Aliases: []string{"d"},
-			EnvVars: []string{"DEBUG"},
+			Name:    "verbose",
+			Aliases: []string{"v"},
+			EnvVars: []string{"VERBOSE"},
 		},
 	},
 	Before: func(c *cli.Context) error {
-		if debug := c.Bool("debug"); debug {
+		if verbose := c.Bool("verbose"); verbose {
 			logrus.SetLevel(logrus.DebugLevel)
 			logrus.SetFormatter(&logrus.TextFormatter{})
 		} else {
@@ -114,15 +114,22 @@ var app = &cli.App{
 					Name:    "run",
 					Aliases: []string{"r"},
 					Usage:   "run exercise",
+					Flags: []cli.Flag{
+						&cli.BoolFlag{
+							Name:    "detached",
+							Aliases: []string{"d"},
+							Usage:   "running in non-interactive mode",
+						},
+					},
 					Action: func(c *cli.Context) error {
-						success, err := trainings.NewHandlers().Run(c.Context)
+						success, err := trainings.NewHandlers().Run(c.Context, c.Bool("detached"))
 						if err != nil {
 							return err
 						}
-
 						if !success {
 							os.Exit(1)
 						}
+
 						return nil
 					},
 				},
