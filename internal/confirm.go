@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -52,13 +53,19 @@ func FConfirmPromptDefaultYes(action string, stdin io.Reader, stdout io.Writer) 
 		_, _ = fmt.Fprintln(stdout)
 	}()
 
-	_, _ = fmt.Fprintf(stdout, "\nPress ENTER to %s or q to quit ", action)
+	var msgFormat string
 
 	in, clean, err := NewRawTerminalReader(stdin)
-	if err != nil {
-		logrus.WithError(err).Fatal("Can't read char from terminal")
-	}
 	defer clean()
+	if err != nil {
+		logrus.WithError(err).Warn("Can't read char from terminal")
+		msgFormat = "\nPress ENTER to %s or q and ENTER to quit "
+		in = bufio.NewReader(stdin)
+	} else {
+		msgFormat = "\nPress ENTER to %s or q to quit "
+	}
+
+	_, _ = fmt.Fprintf(stdout, msgFormat, action)
 
 	for {
 		char, _, err := in.ReadRune()
@@ -71,7 +78,7 @@ func FConfirmPromptDefaultYes(action string, stdin io.Reader, stdout io.Writer) 
 
 		if input == "n" || input == "no" || input == "q" || input == endOfTextChar {
 			return false
-		} else if input == "\r" || input == "\n" {
+		} else if input == "\r" || input == "\n" || input == "" {
 			return true
 		} else {
 			continue

@@ -21,7 +21,7 @@ func NewRawTerminalReader(stdin io.Reader) (*bufio.Reader, func(), error) {
 
 	state, err := terminal.MakeRaw(stdinFileDescriptor)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "can't set stdin to raw")
+		return nil, func() {}, errors.Wrap(err, "can't set stdin to raw")
 	}
 
 	return bufio.NewReader(stdin), func() {
