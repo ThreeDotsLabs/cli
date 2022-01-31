@@ -76,7 +76,10 @@ func FConfirmPromptDefaultYes(action string, stdin io.Reader, stdout io.Writer) 
 
 		logrus.WithField("input", input).Debug("Received input")
 
-		if input == "n" || input == "no" || input == "q" || input == endOfTextChar {
+		if input == endOfTextChar {
+			clean()
+			os.Exit(0)
+		} else if input == "q" || input == "n" || input == "no" {
 			return false
 		} else if input == "\r" || input == "\n" || input == "" {
 			return true

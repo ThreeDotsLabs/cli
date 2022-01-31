@@ -89,12 +89,12 @@ func (h *Handlers) showTrainingStartPrompt() error {
 		return errors.Wrap(err, "can't get wd")
 	}
 
-	msg := fmt.Sprintf(
-		"This command will clone training source code to %s directory. Do you want to continue?",
+	fmt.Printf(
+		"This command will clone training source code to %s directory.\n",
 		pwd,
 	)
 
-	if !internal.ConfirmPromptDefaultYes(msg) {
+	if !internal.ConfirmPromptDefaultYes("continue") {
 		return ErrInterrupted
 	}
 

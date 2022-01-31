@@ -76,6 +76,7 @@ func (h *Handlers) run(ctx context.Context) (success bool, finished bool, err er
 
 	fmt.Println()
 	if !internal.ConfirmPromptDefaultYes("go to the next exercise") {
+		os.Exit(0)
 		return success, false, nil
 	}
 
