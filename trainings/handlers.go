@@ -6,12 +6,12 @@ import (
 	"crypto/x509"
 	"runtime"
 
-	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
+	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings/config"
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )

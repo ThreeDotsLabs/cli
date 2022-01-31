@@ -7,11 +7,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 
+	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings"
 )
 

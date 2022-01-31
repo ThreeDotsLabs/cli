@@ -23,7 +23,12 @@ import (
 
 func (h *Handlers) Run(ctx context.Context, detached bool) (bool, error) {
 	if detached {
-		successful, _, err := h.run(ctx)
+		successful, finished, err := h.run(ctx)
+
+		if !finished {
+			h.printExerciseTips()
+		}
+
 		return successful, err
 	} else {
 		return h.interactiveRun(ctx)
@@ -43,11 +48,11 @@ func (h *Handlers) interactiveRun(ctx context.Context) (successful bool, err err
 		}
 
 		if !successful {
-			if !internal.ConfirmPromptDefaultYes("Do you want to run solution again?") {
+			if !internal.ConfirmPromptDefaultYes("run solution again") {
 				return
 			}
 		} else {
-			if !internal.ConfirmPromptDefaultYes("Do you want to run your solution?") {
+			if !internal.ConfirmPromptDefaultYes("run your solution") {
 				return
 			}
 		}
@@ -70,17 +75,13 @@ func (h *Handlers) run(ctx context.Context) (success bool, finished bool, err er
 	}
 
 	fmt.Println()
-	if !internal.ConfirmPromptDefaultYes("Do you want to go to the next exercise?") {
+	if !internal.ConfirmPromptDefaultYes("go to the next exercise") {
 		return success, false, nil
 	}
 
 	finished, err = h.nextExercise(ctx, h.config.ExerciseConfig(trainingRootFs).ExerciseID)
 	if err != nil {
 		return
-	}
-
-	if !finished {
-		h.printExerciseTips()
 	}
 
 	return

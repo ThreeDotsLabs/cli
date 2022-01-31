@@ -5,6 +5,8 @@ import (
 	"io"
 	"os"
 	"strings"
+
+	"github.com/sirupsen/logrus"
 )
 
 func ConfirmPrompt(msg string) bool {
@@ -39,26 +41,40 @@ func FConfirmPrompt(msg string, stdin io.Reader, stdout io.Writer) bool {
 	}
 }
 
-func ConfirmPromptDefaultYes(msg string) bool {
-	return FConfirmPromptDefaultYes(msg, os.Stdin, os.Stdout)
+func ConfirmPromptDefaultYes(action string) bool {
+	return FConfirmPromptDefaultYes(action, os.Stdin, os.Stdout)
 }
 
-func FConfirmPromptDefaultYes(msg string, stdin io.Reader, stdout io.Writer) bool {
+const endOfTextChar = "\x03"
+
+func FConfirmPromptDefaultYes(action string, stdin io.Reader, stdout io.Writer) bool {
 	defer func() {
 		_, _ = fmt.Fprintln(stdout)
 	}()
 
+	_, _ = fmt.Fprintf(stdout, "\nPress ENTER to %s or q to quit ", action)
+
+	in, clean, err := NewRawTerminalReader(stdin)
+	if err != nil {
+		logrus.WithError(err).Fatal("Can't read char from terminal")
+	}
+	defer clean()
+
 	for {
-		_, _ = fmt.Fprintf(stdout, "%s [y/n] (default: y): ", msg)
+		char, _, err := in.ReadRune()
+		if err != nil {
+			logrus.WithError(err).Fatal("Can't read char from terminal")
+		}
+		input := strings.ToLower(string(char))
 
-		var input string
-		_, _ = fmt.Fscanln(stdin, &input)
+		logrus.WithField("input", input).Debug("Received input")
 
-		input = strings.ToLower(input)
-		if input == "n" || input == "no" {
+		if input == "n" || input == "no" || input == "q" || input == endOfTextChar {
 			return false
-		} else {
+		} else if input == "\r" || input == "\n" {
 			return true
+		} else {
+			continue
 		}
 	}
 }

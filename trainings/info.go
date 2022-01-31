@@ -6,11 +6,11 @@ import (
 	"net/url"
 	"path"
 
-	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
+	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings/config"
 )
 

@@ -3,8 +3,9 @@ package trainings
 import (
 	"fmt"
 
-	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/fatih/color"
+
+	"github.com/ThreeDotsLabs/cli/internal"
 )
 
 func (h *Handlers) printNotInATrainingDirectory() {
