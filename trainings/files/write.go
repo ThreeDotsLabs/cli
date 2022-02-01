@@ -7,6 +7,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/fatih/color"
 	"github.com/hexops/gotextdiff"
 	"github.com/hexops/gotextdiff/myers"
 	"github.com/hexops/gotextdiff/span"
@@ -84,11 +85,13 @@ func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, trainingRootFs
 			savedFileRelativePath = file.Name
 		}
 
-		fmt.Fprintf(f.stdout, "+ %s (%d lines)\n", savedFileRelativePath, file.Lines)
+		fmt.Fprintf(f.stdout, color.GreenString("+")+" %s (%d lines)\n", savedFileRelativePath, file.Lines)
 	}
 
 	if len(savedFiles) > 0 {
-		fmt.Fprintf(f.stdout, "%d files saved\n\n", len(savedFiles))
+		fmt.Fprintf(f.stdout, "Exercise ready, %d files saved.\n\n", len(savedFiles))
+	} else {
+		fmt.Fprintf(f.stdout, "Exercise ready.\n\n")
 	}
 
 	return nil
