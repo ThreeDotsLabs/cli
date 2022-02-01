@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
@@ -33,6 +34,14 @@ var app = &cli.App{
 		if errors.As(err, &missingArgumentError{}) {
 			fmt.Printf("%s. Usage:\n\n", err.Error())
 			cli.ShowSubcommandHelpAndExit(c, 1)
+		}
+
+		userFacingErr := trainings.UserFacingError{}
+		if errors.As(err, &userFacingErr) {
+			fmt.Printf(color.RedString("ERROR: ") + userFacingErr.Msg + "\n")
+			fmt.Printf(color.GreenString("\nHow to solve: \n") + userFacingErr.SolutionHint + "\n")
+			os.Exit(1)
+			return
 		}
 
 		fmt.Printf("%+v\n", err)
