@@ -4,7 +4,6 @@ package genproto
 
 import (
 	context "context"
-
 	empty "github.com/golang/protobuf/ptypes/empty"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
@@ -16,67 +15,67 @@ import (
 // Requires gRPC-Go v1.32.0 or later.
 const _ = grpc.SupportPackageIsVersion7
 
-// ServerClient is the client API for Server service.
+// TrainingsServerClient is the client API for TrainingsServer service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type ServerClient interface {
+type TrainingsServerClient interface {
 	Init(ctx context.Context, in *InitRequest, opts ...grpc.CallOption) (*empty.Empty, error)
 	GetTrainings(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*GetTrainingsResponse, error)
 	StartTraining(ctx context.Context, in *StartTrainingRequest, opts ...grpc.CallOption) (*empty.Empty, error)
 	NextExercise(ctx context.Context, in *NextExerciseRequest, opts ...grpc.CallOption) (*NextExerciseResponse, error)
-	VerifyExercise(ctx context.Context, in *VerifyExerciseRequest, opts ...grpc.CallOption) (Server_VerifyExerciseClient, error)
+	VerifyExercise(ctx context.Context, in *VerifyExerciseRequest, opts ...grpc.CallOption) (TrainingsServer_VerifyExerciseClient, error)
 }
 
-type serverClient struct {
+type trainingsServerClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewServerClient(cc grpc.ClientConnInterface) ServerClient {
-	return &serverClient{cc}
+func NewTrainingsServerClient(cc grpc.ClientConnInterface) TrainingsServerClient {
+	return &trainingsServerClient{cc}
 }
 
-func (c *serverClient) Init(ctx context.Context, in *InitRequest, opts ...grpc.CallOption) (*empty.Empty, error) {
+func (c *trainingsServerClient) Init(ctx context.Context, in *InitRequest, opts ...grpc.CallOption) (*empty.Empty, error) {
 	out := new(empty.Empty)
-	err := c.cc.Invoke(ctx, "/Server/Init", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/TrainingsServer/Init", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *serverClient) GetTrainings(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*GetTrainingsResponse, error) {
+func (c *trainingsServerClient) GetTrainings(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (*GetTrainingsResponse, error) {
 	out := new(GetTrainingsResponse)
-	err := c.cc.Invoke(ctx, "/Server/GetTrainings", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/TrainingsServer/GetTrainings", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *serverClient) StartTraining(ctx context.Context, in *StartTrainingRequest, opts ...grpc.CallOption) (*empty.Empty, error) {
+func (c *trainingsServerClient) StartTraining(ctx context.Context, in *StartTrainingRequest, opts ...grpc.CallOption) (*empty.Empty, error) {
 	out := new(empty.Empty)
-	err := c.cc.Invoke(ctx, "/Server/StartTraining", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/TrainingsServer/StartTraining", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *serverClient) NextExercise(ctx context.Context, in *NextExerciseRequest, opts ...grpc.CallOption) (*NextExerciseResponse, error) {
+func (c *trainingsServerClient) NextExercise(ctx context.Context, in *NextExerciseRequest, opts ...grpc.CallOption) (*NextExerciseResponse, error) {
 	out := new(NextExerciseResponse)
-	err := c.cc.Invoke(ctx, "/Server/NextExercise", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/TrainingsServer/NextExercise", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *serverClient) VerifyExercise(ctx context.Context, in *VerifyExerciseRequest, opts ...grpc.CallOption) (Server_VerifyExerciseClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Server_ServiceDesc.Streams[0], "/Server/VerifyExercise", opts...)
+func (c *trainingsServerClient) VerifyExercise(ctx context.Context, in *VerifyExerciseRequest, opts ...grpc.CallOption) (TrainingsServer_VerifyExerciseClient, error) {
+	stream, err := c.cc.NewStream(ctx, &TrainingsServer_ServiceDesc.Streams[0], "/TrainingsServer/VerifyExercise", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &serverVerifyExerciseClient{stream}
+	x := &trainingsServerVerifyExerciseClient{stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -86,16 +85,16 @@ func (c *serverClient) VerifyExercise(ctx context.Context, in *VerifyExerciseReq
 	return x, nil
 }
 
-type Server_VerifyExerciseClient interface {
+type TrainingsServer_VerifyExerciseClient interface {
 	Recv() (*VerifyExerciseResponse, error)
 	grpc.ClientStream
 }
 
-type serverVerifyExerciseClient struct {
+type trainingsServerVerifyExerciseClient struct {
 	grpc.ClientStream
 }
 
-func (x *serverVerifyExerciseClient) Recv() (*VerifyExerciseResponse, error) {
+func (x *trainingsServerVerifyExerciseClient) Recv() (*VerifyExerciseResponse, error) {
 	m := new(VerifyExerciseResponse)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -103,169 +102,169 @@ func (x *serverVerifyExerciseClient) Recv() (*VerifyExerciseResponse, error) {
 	return m, nil
 }
 
-// ServerServer is the server API for Server service.
-// All implementations should embed UnimplementedServerServer
+// TrainingsServerServer is the server API for TrainingsServer service.
+// All implementations should embed UnimplementedTrainingsServerServer
 // for forward compatibility
-type ServerServer interface {
+type TrainingsServerServer interface {
 	Init(context.Context, *InitRequest) (*empty.Empty, error)
 	GetTrainings(context.Context, *empty.Empty) (*GetTrainingsResponse, error)
 	StartTraining(context.Context, *StartTrainingRequest) (*empty.Empty, error)
 	NextExercise(context.Context, *NextExerciseRequest) (*NextExerciseResponse, error)
-	VerifyExercise(*VerifyExerciseRequest, Server_VerifyExerciseServer) error
+	VerifyExercise(*VerifyExerciseRequest, TrainingsServer_VerifyExerciseServer) error
 }
 
-// UnimplementedServerServer should be embedded to have forward compatible implementations.
-type UnimplementedServerServer struct {
+// UnimplementedTrainingsServerServer should be embedded to have forward compatible implementations.
+type UnimplementedTrainingsServerServer struct {
 }
 
-func (UnimplementedServerServer) Init(context.Context, *InitRequest) (*empty.Empty, error) {
+func (UnimplementedTrainingsServerServer) Init(context.Context, *InitRequest) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Init not implemented")
 }
-func (UnimplementedServerServer) GetTrainings(context.Context, *empty.Empty) (*GetTrainingsResponse, error) {
+func (UnimplementedTrainingsServerServer) GetTrainings(context.Context, *empty.Empty) (*GetTrainingsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetTrainings not implemented")
 }
-func (UnimplementedServerServer) StartTraining(context.Context, *StartTrainingRequest) (*empty.Empty, error) {
+func (UnimplementedTrainingsServerServer) StartTraining(context.Context, *StartTrainingRequest) (*empty.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StartTraining not implemented")
 }
-func (UnimplementedServerServer) NextExercise(context.Context, *NextExerciseRequest) (*NextExerciseResponse, error) {
+func (UnimplementedTrainingsServerServer) NextExercise(context.Context, *NextExerciseRequest) (*NextExerciseResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method NextExercise not implemented")
 }
-func (UnimplementedServerServer) VerifyExercise(*VerifyExerciseRequest, Server_VerifyExerciseServer) error {
+func (UnimplementedTrainingsServerServer) VerifyExercise(*VerifyExerciseRequest, TrainingsServer_VerifyExerciseServer) error {
 	return status.Errorf(codes.Unimplemented, "method VerifyExercise not implemented")
 }
 
-// UnsafeServerServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to ServerServer will
+// UnsafeTrainingsServerServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to TrainingsServerServer will
 // result in compilation errors.
-type UnsafeServerServer interface {
-	mustEmbedUnimplementedServerServer()
+type UnsafeTrainingsServerServer interface {
+	mustEmbedUnimplementedTrainingsServerServer()
 }
 
-func RegisterServerServer(s grpc.ServiceRegistrar, srv ServerServer) {
-	s.RegisterService(&Server_ServiceDesc, srv)
+func RegisterTrainingsServerServer(s grpc.ServiceRegistrar, srv TrainingsServerServer) {
+	s.RegisterService(&TrainingsServer_ServiceDesc, srv)
 }
 
-func _Server_Init_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _TrainingsServer_Init_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(InitRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ServerServer).Init(ctx, in)
+		return srv.(TrainingsServerServer).Init(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/Server/Init",
+		FullMethod: "/TrainingsServer/Init",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerServer).Init(ctx, req.(*InitRequest))
+		return srv.(TrainingsServerServer).Init(ctx, req.(*InitRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Server_GetTrainings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _TrainingsServer_GetTrainings_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(empty.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ServerServer).GetTrainings(ctx, in)
+		return srv.(TrainingsServerServer).GetTrainings(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/Server/GetTrainings",
+		FullMethod: "/TrainingsServer/GetTrainings",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerServer).GetTrainings(ctx, req.(*empty.Empty))
+		return srv.(TrainingsServerServer).GetTrainings(ctx, req.(*empty.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Server_StartTraining_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _TrainingsServer_StartTraining_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(StartTrainingRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ServerServer).StartTraining(ctx, in)
+		return srv.(TrainingsServerServer).StartTraining(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/Server/StartTraining",
+		FullMethod: "/TrainingsServer/StartTraining",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerServer).StartTraining(ctx, req.(*StartTrainingRequest))
+		return srv.(TrainingsServerServer).StartTraining(ctx, req.(*StartTrainingRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Server_NextExercise_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _TrainingsServer_NextExercise_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(NextExerciseRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ServerServer).NextExercise(ctx, in)
+		return srv.(TrainingsServerServer).NextExercise(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/Server/NextExercise",
+		FullMethod: "/TrainingsServer/NextExercise",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ServerServer).NextExercise(ctx, req.(*NextExerciseRequest))
+		return srv.(TrainingsServerServer).NextExercise(ctx, req.(*NextExerciseRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Server_VerifyExercise_Handler(srv interface{}, stream grpc.ServerStream) error {
+func _TrainingsServer_VerifyExercise_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(VerifyExerciseRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(ServerServer).VerifyExercise(m, &serverVerifyExerciseServer{stream})
+	return srv.(TrainingsServerServer).VerifyExercise(m, &trainingsServerVerifyExerciseServer{stream})
 }
 
-type Server_VerifyExerciseServer interface {
+type TrainingsServer_VerifyExerciseServer interface {
 	Send(*VerifyExerciseResponse) error
 	grpc.ServerStream
 }
 
-type serverVerifyExerciseServer struct {
+type trainingsServerVerifyExerciseServer struct {
 	grpc.ServerStream
 }
 
-func (x *serverVerifyExerciseServer) Send(m *VerifyExerciseResponse) error {
+func (x *trainingsServerVerifyExerciseServer) Send(m *VerifyExerciseResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-// Server_ServiceDesc is the grpc.ServiceDesc for Server service.
+// TrainingsServer_ServiceDesc is the grpc.ServiceDesc for TrainingsServer service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var Server_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "Server",
-	HandlerType: (*ServerServer)(nil),
+var TrainingsServer_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "TrainingsServer",
+	HandlerType: (*TrainingsServerServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "Init",
-			Handler:    _Server_Init_Handler,
+			Handler:    _TrainingsServer_Init_Handler,
 		},
 		{
 			MethodName: "GetTrainings",
-			Handler:    _Server_GetTrainings_Handler,
+			Handler:    _TrainingsServer_GetTrainings_Handler,
 		},
 		{
 			MethodName: "StartTraining",
-			Handler:    _Server_StartTraining_Handler,
+			Handler:    _TrainingsServer_StartTraining_Handler,
 		},
 		{
 			MethodName: "NextExercise",
-			Handler:    _Server_NextExercise_Handler,
+			Handler:    _TrainingsServer_NextExercise_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "VerifyExercise",
-			Handler:       _Server_VerifyExercise_Handler,
+			Handler:       _TrainingsServer_VerifyExercise_Handler,
 			ServerStreams: true,
 		},
 	},
