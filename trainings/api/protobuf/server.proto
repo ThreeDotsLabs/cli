@@ -3,7 +3,7 @@ syntax = "proto3";
 import "google/protobuf/empty.proto";
 option go_package = "github.com/ThreeDotsLabs/cli/tdl-cli/trainings/genproto";
 
-service TrainingsServer {
+service Trainings {
   rpc Init(InitRequest) returns (google.protobuf.Empty) {};
 
   rpc GetTrainings(google.protobuf.Empty) returns (GetTrainingsResponse) {};
