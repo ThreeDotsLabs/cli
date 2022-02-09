@@ -19,7 +19,7 @@ import (
 type Handlers struct {
 	config config.Config
 
-	grpcClient genproto.ServerClient
+	grpcClient genproto.TrainingsClient
 }
 
 func NewHandlers() *Handlers {
@@ -30,13 +30,13 @@ func NewHandlers() *Handlers {
 	}
 }
 
-func (h *Handlers) newGrpcClient(ctx context.Context) genproto.ServerClient {
+func (h *Handlers) newGrpcClient(ctx context.Context) genproto.TrainingsClient {
 	globalConfig := h.config.GlobalConfig()
 
 	return h.newGrpcClientWithAddr(ctx, globalConfig.ServerAddr, globalConfig.Insecure)
 }
 
-func (h *Handlers) newGrpcClientWithAddr(ctx context.Context, addr string, insecure bool) genproto.ServerClient {
+func (h *Handlers) newGrpcClientWithAddr(ctx context.Context, addr string, insecure bool) genproto.TrainingsClient {
 	if addr == "" {
 		addr = internal.DefaultTrainingsServer
 	}
@@ -67,7 +67,7 @@ func (h *Handlers) newGrpcClientWithAddr(ctx context.Context, addr string, insec
 			panic(err)
 		}
 
-		h.grpcClient = genproto.NewServerClient(conn)
+		h.grpcClient = genproto.NewTrainingsClient(conn)
 	}
 
 	return h.grpcClient
