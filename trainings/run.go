@@ -167,7 +167,7 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 		}
 
 		if len(response.Command) > 0 {
-			fmt.Print(color.CyanString(fmt.Sprintf("𑗘 %s ➜ ", terminalPath)) + response.Command)
+			fmt.Print(color.CyanString(fmt.Sprintf("••• %s ➜ ", terminalPath)) + response.Command)
 		}
 		if len(response.Stdout) > 0 {
 			fmt.Print(response.Stdout)
