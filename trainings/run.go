@@ -3,6 +3,8 @@ package trainings
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"io"
 	"os"
 	"path/filepath"
@@ -70,6 +72,17 @@ func (h *Handlers) run(ctx context.Context) (success bool, finished bool, err er
 
 	// todo - validate if exercise id == training exercise id? to ensure about consistency
 	success, err = h.runExercise(ctx, trainingRootFs)
+
+	if isExerciseNoLongerAvailable(err) {
+		fmt.Println(color.YellowString("We did update of the exercise code. Your local workspace is out of sync."))
+
+		if !internal.ConfirmPromptDefaultYes("update your local workspace") {
+			os.Exit(0)
+		}
+
+		finished, err = h.nextExercise(ctx, "")
+		return
+	}
 	if !success || err != nil {
 		return
 	}
@@ -77,7 +90,6 @@ func (h *Handlers) run(ctx context.Context) (success bool, finished bool, err er
 	fmt.Println()
 	if !internal.ConfirmPromptDefaultYes("go to the next exercise") {
 		os.Exit(0)
-		return success, false, nil
 	}
 
 	finished, err = h.nextExercise(ctx, h.config.ExerciseConfig(trainingRootFs).ExerciseID)
@@ -86,6 +98,10 @@ func (h *Handlers) run(ctx context.Context) (success bool, finished bool, err er
 	}
 
 	return
+}
+
+func isExerciseNoLongerAvailable(err error) bool {
+	return status.Code(errors.Cause(err)) == codes.NotFound
 }
 
 func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePathFs) (bool, error) {
@@ -138,7 +154,7 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 			break
 		}
 		if err != nil {
-			logrus.WithError(err).WithField("verification_id", verificationID).Panic("Internal error.")
+			return false, errors.Wrap(err, "error response from server")
 		}
 
 		if response.Finished {
