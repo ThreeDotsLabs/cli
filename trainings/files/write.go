@@ -48,6 +48,7 @@ func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, trainingRootFs
 		//
 		// To avoid that we are using afero.BasePathFs with base on training root.
 		fullFilePath := filepath.Join(exerciseDir, fileFromServer.Path)
+		fullFileDir := filepath.Dir(fullFilePath)
 
 		shouldWrite, err := f.shouldWriteFile(trainingRootFs, fullFilePath, fileFromServer)
 		if err != nil {
@@ -55,6 +56,10 @@ func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, trainingRootFs
 		}
 		if !shouldWrite {
 			continue
+		}
+
+		if err := trainingRootFs.MkdirAll(fullFileDir, 0755); err != nil {
+			return errors.Wrapf(err, "can't create %s dir", fileFromServer.Path)
 		}
 
 		file, err := trainingRootFs.Create(fullFilePath)
