@@ -58,7 +58,7 @@ func FConfirmPromptDefaultYes(action string, stdin io.Reader, stdout io.Writer) 
 	in, clean, err := NewRawTerminalReader(stdin)
 	defer clean()
 	if err != nil {
-		logrus.WithError(err).Warn("Can't read char from terminal")
+		logrus.WithError(err).Info("Can't read char from terminal, fallback to standard stdin reader")
 		msgFormat = "\nPress ENTER to %s or q and ENTER to quit "
 		in = bufio.NewReader(stdin)
 	} else {
