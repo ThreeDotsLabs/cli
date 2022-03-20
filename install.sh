@@ -352,7 +352,7 @@ adjust_os
 
 adjust_arch
 
-NAME=${BINARY}_${VERSION}_${OS}_${ARCH}
+NAME=${BINARY}_${OS}_${ARCH}
 
 # adjust binary name based on OS
 adjust_binary
