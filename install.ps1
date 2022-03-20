@@ -14,7 +14,7 @@ if ($args.Length -eq 1) {
 
 $TdlInstall = $env:TDL_INSTALL
 $BinDir = if ($TdlInstall) {
-  "$TdlInstall\bin"
+  "$TdlInstall"
 } else {
   "$Home\ThreeDotsLabs\bin"
 }
