@@ -120,6 +120,13 @@ var app = &cli.App{
 					},
 				},
 				{
+					Name:  "reset-exercise",
+					Usage: "Reset exercise downloads files for the current exercise again",
+					Action: func(c *cli.Context) error {
+						return trainings.NewHandlers().Reset(c.Context)
+					},
+				},
+				{
 					Name:    "run",
 					Aliases: []string{"r"},
 					Usage:   "run exercise",
