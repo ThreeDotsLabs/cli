@@ -15,7 +15,7 @@ service Trainings {
 }
 
 message InitRequest {
-   string token = 1;
+  string token = 1;
 }
 
 message Training {
@@ -50,6 +50,7 @@ message NextExerciseResponse {
 message NextExercise {
   string dir = 1;
   repeated File files_to_create = 2;
+  bool payment_required = 3;
 }
 
 message VerifyExerciseRequest {
