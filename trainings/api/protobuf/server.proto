@@ -45,12 +45,12 @@ message NextExerciseResponse {
   string dir = 1;
   string exercise_id = 2;
   repeated File files_to_create = 3;
+  bool payment_required = 4;
 }
 
 message NextExercise {
   string dir = 1;
   repeated File files_to_create = 2;
-  bool payment_required = 3;
 }
 
 message VerifyExerciseRequest {
