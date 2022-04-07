@@ -42,10 +42,16 @@ message NextExerciseRequest {
 }
 
 message NextExerciseResponse {
+  enum TrainingStatus {
+    IN_PROGRESS = 0;
+    PAYMENT_REQUIRED = 1;
+    FINISHED = 2;
+  }
+  TrainingStatus training_status = 4;
+
   string dir = 1;
   string exercise_id = 2;
   repeated File files_to_create = 3;
-  bool payment_required = 4;
 }
 
 message NextExercise {
