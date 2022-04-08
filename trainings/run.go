@@ -128,7 +128,6 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 	terminalPath := h.generateRunTerminalPath(trainingRootFs)
 
 	req := &genproto.VerifyExerciseRequest{
-		Header:     newRequestHeader(h.cliMetadata),
 		ExerciseId: exerciseConfig.ExerciseID,
 		Files:      solutionFiles,
 		Token:      h.config.GlobalConfig().Token,
@@ -140,7 +139,7 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 	runCtx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
 
-	stream, err := h.newGrpcClient(ctx).VerifyExercise(runCtx, req)
+	stream, err := h.newGrpcClient(ctx).VerifyExercise(runCtx, req, newRequestHeader(h.cliMetadata))
 	if err != nil {
 		return false, err
 	}

@@ -1,13 +1,18 @@
 package trainings
 
-import "github.com/ThreeDotsLabs/cli/trainings/genproto"
+import (
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
+)
 
-func newRequestHeader(cliMetadata CliMetadata) *genproto.RequestHeader {
-	return &genproto.RequestHeader{
-		CliVersion:   cliMetadata.Version,
-		CliCommit:    cliMetadata.Commit,
-		Os:           cliMetadata.OS,
-		Architecture: cliMetadata.Architecture,
-		Command:      cliMetadata.ExecutedCommand,
-	}
+func newRequestHeader(cliMetadata CliMetadata) grpc.CallOption {
+	md := metadata.New(map[string]string{
+		"cli-version":  cliMetadata.Version,
+		"cli-commit":   cliMetadata.Commit,
+		"os":           cliMetadata.OS,
+		"architecture": cliMetadata.Architecture,
+		"command":      cliMetadata.ExecutedCommand,
+	})
+
+	return grpc.Header(&md)
 }

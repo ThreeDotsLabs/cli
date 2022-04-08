@@ -75,11 +75,13 @@ func (h *Handlers) startTraining(ctx context.Context, trainingName string) error
 		}
 	}
 
-	_, err = h.newGrpcClient(ctx).StartTraining(ctx, &genproto.StartTrainingRequest{
-		Header:       newRequestHeader(h.cliMetadata),
-		TrainingName: trainingName,
-		Token:        h.config.GlobalConfig().Token,
-	})
+	_, err = h.newGrpcClient(ctx).StartTraining(ctx,
+		&genproto.StartTrainingRequest{
+			TrainingName: trainingName,
+			Token:        h.config.GlobalConfig().Token,
+		},
+		newRequestHeader(h.cliMetadata),
+	)
 	if err != nil {
 		return errors.Wrap(err, "start training gRPC call failed")
 	}
