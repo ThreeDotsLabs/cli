@@ -19,14 +19,26 @@ import (
 type Handlers struct {
 	config config.Config
 
-	grpcClient genproto.TrainingsClient
+	grpcClient  genproto.TrainingsClient
+	cliMetadata CliMetadata
 }
 
-func NewHandlers() *Handlers {
+type CliMetadata struct {
+	Version string
+	Commit  string
+
+	Architecture string
+	OS           string
+
+	ExecutedCommand string
+}
+
+func NewHandlers(cliVersion CliMetadata) *Handlers {
 	conf := config.NewConfig()
 
 	return &Handlers{
-		config: conf,
+		config:      conf,
+		cliMetadata: cliVersion,
 	}
 }
 

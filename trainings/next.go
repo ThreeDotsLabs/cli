@@ -52,6 +52,7 @@ func (h *Handlers) getNextExercise(
 	trainingRootFs *afero.BasePathFs,
 ) (resp *genproto.NextExerciseResponse, err error) {
 	resp, err = h.newGrpcClient(ctx).NextExercise(ctx, &genproto.NextExerciseRequest{
+		Header:            newRequestHeader(h.cliMetadata),
 		TrainingName:      h.config.TrainingConfig(trainingRootFs).TrainingName,
 		CurrentExerciseId: currentExerciseID,
 		Token:             h.config.GlobalConfig().Token,

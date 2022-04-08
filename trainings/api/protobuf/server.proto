@@ -14,7 +14,17 @@ service Trainings {
   rpc VerifyExercise(VerifyExerciseRequest) returns (stream VerifyExerciseResponse) {};
 }
 
+message RequestHeader {
+  string cli_version = 1;
+  string cli_commit = 2;
+  string os = 3;
+  string architecture = 4;
+  string command = 5;
+}
+
 message InitRequest {
+  RequestHeader header = 2;
+
   string token = 1;
 }
 
@@ -27,6 +37,8 @@ message GetTrainingsResponse {
 }
 
 message StartTrainingRequest {
+  RequestHeader header = 3;
+
   string training_name = 1;
   string token = 2;
 }
@@ -36,6 +48,8 @@ message StartTrainingResponse {
 }
 
 message NextExerciseRequest {
+  RequestHeader header = 4;
+
   string training_name = 1;
   string current_exercise_id = 2;
   string token = 3;
@@ -60,6 +74,8 @@ message NextExercise {
 }
 
 message VerifyExerciseRequest {
+  RequestHeader header = 5;
+
   string exercise_id = 2;
   repeated File files = 3;
   string token = 4;

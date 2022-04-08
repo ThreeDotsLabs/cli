@@ -76,6 +76,7 @@ func (h *Handlers) startTraining(ctx context.Context, trainingName string) error
 	}
 
 	_, err = h.newGrpcClient(ctx).StartTraining(ctx, &genproto.StartTrainingRequest{
+		Header:       newRequestHeader(h.cliMetadata),
 		TrainingName: trainingName,
 		Token:        h.config.GlobalConfig().Token,
 	})

@@ -3,8 +3,6 @@ package trainings
 import (
 	"context"
 	"fmt"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"io"
 	"os"
 	"path/filepath"
@@ -16,6 +14,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings/config"
@@ -128,6 +128,7 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 	terminalPath := h.generateRunTerminalPath(trainingRootFs)
 
 	req := &genproto.VerifyExerciseRequest{
+		Header:     newRequestHeader(h.cliMetadata),
 		ExerciseId: exerciseConfig.ExerciseID,
 		Files:      solutionFiles,
 		Token:      h.config.GlobalConfig().Token,
