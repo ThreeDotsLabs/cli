@@ -3,13 +3,10 @@ package trainings
 import (
 	"context"
 
+	"github.com/ThreeDotsLabs/cli/trainings/files"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
-	"github.com/ThreeDotsLabs/cli/trainings/files"
 
 	"github.com/ThreeDotsLabs/cli/trainings/config"
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
@@ -28,40 +25,54 @@ func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string) (
 	// To avoid that we are using afero.BasePathFs with base on training root for all operations in trainings dir.
 	trainingRootFs := afero.NewBasePathFs(afero.NewOsFs(), trainingRoot).(*afero.BasePathFs)
 
-	finished, resp, err := h.getNextExercise(ctx, currentExerciseID, trainingRootFs)
+	resp, err := h.getNextExercise(ctx, currentExerciseID, trainingRootFs)
 	if err != nil {
-		return finished, err
+		return false, err
 	}
-	if finished {
+
+	if resp.TrainingStatus == genproto.NextExerciseResponse_FINISHED {
 		printFinished()
-		return finished, nil
+		return true, nil
+	}
+	if resp.TrainingStatus == genproto.NextExerciseResponse_PAYMENT_REQUIRED {
+		printPaymentRequired()
+		return true, nil
 	}
 
 	if err := h.writeExerciseFiles(resp, trainingRootFs); err != nil {
-		return finished, err
+		return false, err
 	}
 
-	return finished, nil
+	return false, nil
 }
 
-func (h *Handlers) getNextExercise(ctx context.Context, currentExerciseID string, trainingRootFs *afero.BasePathFs) (finished bool, resp *genproto.NextExerciseResponse, err error) {
+func (h *Handlers) getNextExercise(
+	ctx context.Context,
+	currentExerciseID string,
+	trainingRootFs *afero.BasePathFs,
+) (resp *genproto.NextExerciseResponse, err error) {
 	resp, err = h.newGrpcClient(ctx).NextExercise(ctx, &genproto.NextExerciseRequest{
 		TrainingName:      h.config.TrainingConfig(trainingRootFs).TrainingName,
 		CurrentExerciseId: currentExerciseID,
 		Token:             h.config.GlobalConfig().Token,
 	})
-	if status.Code(err) == codes.NotFound {
-		return true, nil, nil
-	} else if err != nil {
-		return false, nil, errors.Wrap(err, "Can't get next exercise")
-	}
 
-	logrus.WithFields(logrus.Fields{"resp": resp}).Debug("Received exercise from server")
+	logrus.WithFields(logrus.Fields{
+		"respp": resp,
+		"err":   err,
+	}).Debug("Received exercise from server")
 
-	return false, resp, nil
+	return resp, err
 }
 
 func (h *Handlers) writeExerciseFiles(resp *genproto.NextExerciseResponse, trainingRootFs *afero.BasePathFs) error {
+	if resp.Dir == "" {
+		return errors.New("exercise dir is empty")
+	}
+	if resp.ExerciseId == "" {
+		return errors.New("exercise id is empty")
+	}
+
 	if err := files.NewFiles().WriteExerciseFiles(resp.FilesToCreate, trainingRootFs, resp.Dir); err != nil {
 		return err
 	}

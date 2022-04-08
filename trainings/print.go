@@ -21,3 +21,7 @@ func (h *Handlers) printExerciseTips() {
 func printFinished() {
 	fmt.Println("Congratulations, you finished the training " + color.YellowString("🏆"))
 }
+
+func printPaymentRequired() {
+	fmt.Println(color.GreenString("You did finish the free part of the training. To continue, please go back to our website."))
+}
