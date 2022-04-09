@@ -51,13 +51,13 @@ func (h *Handlers) getNextExercise(
 	currentExerciseID string,
 	trainingRootFs *afero.BasePathFs,
 ) (resp *genproto.NextExerciseResponse, err error) {
-	resp, err = h.newGrpcClient(ctx).NextExercise(ctx,
+	resp, err = h.newGrpcClient(ctx).NextExercise(
+		ctxWithRequestHeader(ctx, h.cliMetadata),
 		&genproto.NextExerciseRequest{
 			TrainingName:      h.config.TrainingConfig(trainingRootFs).TrainingName,
 			CurrentExerciseId: currentExerciseID,
 			Token:             h.config.GlobalConfig().Token,
 		},
-		newRequestHeader(h.cliMetadata),
 	)
 
 	logrus.WithFields(logrus.Fields{

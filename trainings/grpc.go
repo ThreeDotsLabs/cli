@@ -1,11 +1,12 @@
 package trainings
 
 import (
-	"google.golang.org/grpc"
+	"context"
+
 	"google.golang.org/grpc/metadata"
 )
 
-func newRequestHeader(cliMetadata CliMetadata) grpc.CallOption {
+func ctxWithRequestHeader(ctx context.Context, cliMetadata CliMetadata) context.Context {
 	md := metadata.New(map[string]string{
 		"cli-version":  cliMetadata.Version,
 		"cli-commit":   cliMetadata.Commit,
@@ -14,5 +15,5 @@ func newRequestHeader(cliMetadata CliMetadata) grpc.CallOption {
 		"command":      cliMetadata.ExecutedCommand,
 	})
 
-	return grpc.Header(&md)
+	return metadata.NewOutgoingContext(ctx, md)
 }

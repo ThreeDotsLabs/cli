@@ -139,7 +139,7 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 	runCtx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
 
-	stream, err := h.newGrpcClient(ctx).VerifyExercise(runCtx, req, newRequestHeader(h.cliMetadata))
+	stream, err := h.newGrpcClient(ctxWithRequestHeader(ctx, h.cliMetadata)).VerifyExercise(runCtx, req)
 	if err != nil {
 		return false, err
 	}
