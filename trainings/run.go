@@ -3,8 +3,6 @@ package trainings
 import (
 	"context"
 	"fmt"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"io"
 	"os"
 	"path/filepath"
@@ -16,6 +14,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings/config"
@@ -139,7 +139,7 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 	runCtx, cancel := context.WithTimeout(context.Background(), time.Second*15)
 	defer cancel()
 
-	stream, err := h.newGrpcClient(ctx).VerifyExercise(runCtx, req)
+	stream, err := h.newGrpcClient(ctxWithRequestHeader(ctx, h.cliMetadata)).VerifyExercise(runCtx, req)
 	if err != nil {
 		return false, err
 	}

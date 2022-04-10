@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/fatih/color"
@@ -14,6 +15,11 @@ import (
 
 	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings"
+)
+
+var (
+	version = "dev"
+	commit  = "n/a"
 )
 
 func main() {
@@ -96,7 +102,7 @@ var app = &cli.App{
 							return missingArgumentError{"Missing token argument"}
 						}
 
-						return trainings.NewHandlers().ConfigureGlobally(
+						return newHandlers(c).ConfigureGlobally(
 							c.Context,
 							token,
 							c.String("server"),
@@ -116,14 +122,14 @@ var app = &cli.App{
 							return missingArgumentError{"Missing trainingID argument"}
 						}
 
-						return trainings.NewHandlers().Init(c.Context, trainingID)
+						return newHandlers(c).Init(c.Context, trainingID)
 					},
 				},
 				{
 					Name:  "reset-exercise",
 					Usage: "Reset exercise downloads files for the current exercise again",
 					Action: func(c *cli.Context) error {
-						return trainings.NewHandlers().Reset(c.Context)
+						return newHandlers(c).Reset(c.Context)
 					},
 				},
 				{
@@ -138,7 +144,7 @@ var app = &cli.App{
 						},
 					},
 					Action: func(c *cli.Context) error {
-						success, err := trainings.NewHandlers().Run(c.Context, c.Bool("detached"))
+						success, err := newHandlers(c).Run(c.Context, c.Bool("detached"))
 						if err != nil {
 							return err
 						}
@@ -154,19 +160,41 @@ var app = &cli.App{
 					Aliases: []string{"i"},
 					Usage:   "print information about current training",
 					Action: func(c *cli.Context) error {
-						return trainings.NewHandlers().Info(c.Context)
+						return newHandlers(c).Info(c.Context)
 					},
 				},
 				{
 					Name:  "list",
 					Usage: "list training",
 					Action: func(c *cli.Context) error {
-						return trainings.NewHandlers().List(c.Context)
+						return newHandlers(c).List(c.Context)
 					},
 				},
 			},
 		},
+		{
+			Name:    "version",
+			Aliases: []string{"v"},
+			Usage:   "Prints version of TDL CLI",
+			Action: func(c *cli.Context) error {
+				fmt.Println("Version:", version)
+				fmt.Println("Commit:", commit)
+				fmt.Println("Architecture:", runtime.GOARCH)
+				fmt.Println("OS:", runtime.GOOS)
+				return nil
+			},
+		},
 	},
+}
+
+func newHandlers(c *cli.Context) *trainings.Handlers {
+	return trainings.NewHandlers(trainings.CliMetadata{
+		Version:         version,
+		Commit:          commit,
+		Architecture:    runtime.GOARCH,
+		OS:              runtime.GOOS,
+		ExecutedCommand: c.Command.HelpName,
+	})
 }
 
 type missingArgumentError struct {
