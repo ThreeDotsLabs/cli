@@ -12,7 +12,7 @@ import (
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )
 
-func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string) (bool, error) {
+func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string) (finished bool, err error) {
 	trainingRoot, err := h.config.FindTrainingRoot()
 	if err != nil {
 		return false, err
@@ -36,7 +36,7 @@ func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string) (
 	}
 	if resp.TrainingStatus == genproto.NextExerciseResponse_PAYMENT_REQUIRED {
 		printPaymentRequired()
-		return true, nil
+		return false, nil
 	}
 
 	if err := h.writeExerciseFiles(resp, trainingRootFs); err != nil {
