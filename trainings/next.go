@@ -61,8 +61,8 @@ func (h *Handlers) getNextExercise(
 	)
 
 	logrus.WithFields(logrus.Fields{
-		"respp": resp,
-		"err":   err,
+		"resp": resp,
+		"err":  err,
 	}).Debug("Received exercise from server")
 
 	return resp, err
