@@ -136,7 +136,7 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 	reqStr := strings.ReplaceAll(fmt.Sprintf("%s", req.String()), h.config.GlobalConfig().Token, "[token]")
 	logrus.WithField("req", reqStr).Info("Request prepared")
 
-	runCtx, cancel := context.WithTimeout(context.Background(), time.Second*15)
+	runCtx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
 	stream, err := h.newGrpcClient(ctxWithRequestHeader(ctx, h.cliMetadata)).VerifyExercise(runCtx, req)
