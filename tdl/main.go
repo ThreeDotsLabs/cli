@@ -144,12 +144,9 @@ var app = &cli.App{
 						},
 					},
 					Action: func(c *cli.Context) error {
-						success, err := newHandlers(c).Run(c.Context, c.Bool("detached"))
+						err := newHandlers(c).Run(c.Context, c.Bool("detached"))
 						if err != nil {
 							return err
-						}
-						if !success {
-							os.Exit(1)
 						}
 
 						return nil

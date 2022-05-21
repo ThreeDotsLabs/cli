@@ -23,55 +23,102 @@ import (
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )
 
-func (h *Handlers) Run(ctx context.Context, detached bool) (bool, error) {
-	if detached {
-		successful, finished, err := h.run(ctx)
-
-		if !finished {
-			h.printExerciseTips()
-		}
-
-		return successful, err
-	} else {
-		return h.interactiveRun(ctx)
-	}
-}
-
-func (h *Handlers) interactiveRun(ctx context.Context) (successful bool, err error) {
-	for {
-		var finished bool
-		successful, finished, err = h.run(ctx)
-		if err != nil {
-			return
-		}
-
-		if finished {
-			return
-		}
-
-		if !successful {
-			if !internal.ConfirmPromptDefaultYes("run solution again") {
-				return
-			}
-		} else {
-			if !internal.ConfirmPromptDefaultYes("run your solution") {
-				return
-			}
-		}
-	}
-}
-
-func (h *Handlers) run(ctx context.Context) (success bool, finished bool, err error) {
+func (h *Handlers) Run(ctx context.Context, detached bool) error {
 	trainingRoot, err := h.config.FindTrainingRoot()
 	if errors.Is(err, config.TrainingRootNotFoundError) {
 		h.printNotInATrainingDirectory()
-		return false, false, nil
+		return nil
 	}
 
 	trainingRootFs := newTrainingRootFs(trainingRoot)
 
+	if detached {
+		return h.detachedRun(ctx, trainingRootFs)
+	} else {
+		return h.interactiveRun(ctx, trainingRootFs)
+	}
+}
+
+func (h *Handlers) detachedRun(ctx context.Context, trainingRootFs *afero.BasePathFs) error {
+	successful, err := h.run(ctx, trainingRootFs)
+	if err != nil {
+		return err
+	}
+	if !successful {
+		os.Exit(1)
+	}
+
+	promptResult := internal.Prompt(
+		internal.Actions{
+			{Shortcut: '\n', Action: "go to the next exercise", ShortcutAliases: []rune{'\r'}},
+			{Shortcut: 'q', Action: "quit"},
+		},
+		os.Stdin,
+		os.Stdout,
+	)
+	if promptResult == 'q' {
+		os.Exit(0)
+	}
+
+	finished, err := h.nextExercise(ctx, h.config.ExerciseConfig(trainingRootFs).ExerciseID)
+	if err != nil {
+		return err
+	}
+	if finished {
+		return nil
+	}
+
+	return nil
+}
+
+func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.BasePathFs) error {
+	for {
+		successful, err := h.run(ctx, trainingRootFs)
+		if err != nil {
+			return err
+		}
+
+		if !successful {
+			if !internal.ConfirmPromptDefaultYes("run solution again") {
+				return nil
+			} else {
+				continue
+			}
+		}
+
+		promptResult := internal.Prompt(
+			internal.Actions{
+				{Shortcut: '\n', Action: "go to the next exercise", ShortcutAliases: []rune{'\r'}},
+				{Shortcut: 'r', Action: "re-run solution", ShortcutAliases: []rune{'\r'}},
+				{Shortcut: 'q', Action: "quit"},
+			},
+			os.Stdin,
+			os.Stdout,
+		)
+		if promptResult == 'q' {
+			os.Exit(0)
+		}
+		if promptResult == 'r' {
+			continue
+		}
+
+		finished, err := h.nextExercise(ctx, h.config.ExerciseConfig(trainingRootFs).ExerciseID)
+		if err != nil {
+			return err
+		}
+		if finished {
+			return nil
+		}
+
+		if !internal.ConfirmPromptDefaultYes("run your solution") {
+			return nil
+		}
+	}
+}
+
+func (h *Handlers) run(ctx context.Context, trainingRootFs *afero.BasePathFs) (bool, error) {
 	// todo - validate if exercise id == training exercise id? to ensure about consistency
-	success, err = h.runExercise(ctx, trainingRootFs)
+	success, err := h.runExercise(ctx, trainingRootFs)
 
 	if isExerciseNoLongerAvailable(err) {
 		fmt.Println(color.YellowString("We did update of the exercise code. Your local workspace is out of sync."))
@@ -80,24 +127,13 @@ func (h *Handlers) run(ctx context.Context) (success bool, finished bool, err er
 			os.Exit(0)
 		}
 
-		finished, err = h.nextExercise(ctx, "")
-		return
-	}
-	if !success || err != nil {
-		return
+		_, err = h.nextExercise(ctx, "")
+		return true, err
 	}
 
 	fmt.Println()
-	if !internal.ConfirmPromptDefaultYes("go to the next exercise") {
-		os.Exit(0)
-	}
 
-	finished, err = h.nextExercise(ctx, h.config.ExerciseConfig(trainingRootFs).ExerciseID)
-	if err != nil {
-		return
-	}
-
-	return
+	return success, err
 }
 
 func isExerciseNoLongerAvailable(err error) bool {

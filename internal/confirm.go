@@ -7,12 +7,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/fatih/color"
 	"github.com/sirupsen/logrus"
 )
-
-func ConfirmPrompt(msg string) bool {
-	return FConfirmPrompt(msg, os.Stdin, os.Stdout)
-}
 
 func FConfirmPrompt(msg string, stdin io.Reader, stdout io.Writer) bool {
 	defer func() {
@@ -42,30 +39,84 @@ func FConfirmPrompt(msg string, stdin io.Reader, stdout io.Writer) bool {
 	}
 }
 
+type Action struct {
+	Shortcut        rune
+	ShortcutAliases []rune
+
+	Action string
+}
+
+func (a Action) KeyString() string {
+	if a.Shortcut == '\n' {
+		return "ENTER"
+	}
+
+	return string(a.Shortcut)
+}
+
+type Actions []Action
+
+func (a Actions) ReadKeyFromInput(char rune) (rune, bool) {
+	for _, action := range a {
+		if action.Shortcut == char {
+			return action.Shortcut, true
+		}
+
+		for _, alias := range action.ShortcutAliases {
+			if alias == char {
+				return action.Shortcut, true
+			}
+		}
+	}
+
+	return rune(0), false
+}
+
 func ConfirmPromptDefaultYes(action string) bool {
-	return FConfirmPromptDefaultYes(action, os.Stdin, os.Stdout)
+	promptValue := Prompt(
+		Actions{
+			{Shortcut: '\n', Action: action, ShortcutAliases: []rune{'\r'}},
+			{Shortcut: 'q', Action: "quit"},
+		},
+		os.Stdin,
+		os.Stdout,
+	)
+	return promptValue == '\n'
 }
 
 const endOfTextChar = "\x03"
 
-func FConfirmPromptDefaultYes(action string, stdin io.Reader, stdout io.Writer) bool {
+func Prompt(actions Actions, stdin io.Reader, stdout io.Writer) rune {
 	defer func() {
 		_, _ = fmt.Fprintln(stdout)
 	}()
 
-	var msgFormat string
-
 	in, clean, err := NewRawTerminalReader(stdin)
 	defer clean()
+
+	enterRequired := false
+
 	if err != nil {
 		logrus.WithError(err).Info("Can't read char from terminal, fallback to standard stdin reader")
-		msgFormat = "\nPress ENTER to %s or q and ENTER to quit "
+		enterRequired = true
 		in = bufio.NewReader(stdin)
-	} else {
-		msgFormat = "\nPress ENTER to %s or q to quit "
 	}
 
-	_, _ = fmt.Fprintf(stdout, msgFormat, action)
+	var actionsStr []string
+	for _, action := range actions {
+		keyString := action.KeyString()
+		if enterRequired && action.Shortcut != '\n' {
+			keyString += " and ENTER"
+		}
+
+		actionsStr = append(actionsStr, fmt.Sprintf(
+			"%s to %s",
+			color.New(color.Bold).Sprint(keyString),
+			action.Action,
+		))
+	}
+
+	_, _ = fmt.Fprintf(stdout, "Press "+formatActionsMessage(actionsStr)+" ")
 
 	for {
 		char, _, err := in.ReadRune()
@@ -79,12 +130,21 @@ func FConfirmPromptDefaultYes(action string, stdin io.Reader, stdout io.Writer) 
 		if input == endOfTextChar {
 			clean()
 			os.Exit(0)
-		} else if input == "q" || input == "n" || input == "no" {
-			return false
-		} else if input == "\r" || input == "\n" || input == "" {
-			return true
-		} else {
-			continue
 		}
+
+		if key, ok := actions.ReadKeyFromInput(char); ok {
+			return key
+		}
+	}
+}
+
+func formatActionsMessage(actionsStr []string) string {
+	switch len(actionsStr) {
+	case 0:
+		return ""
+	case 1:
+		return actionsStr[0]
+	default:
+		return strings.Join(actionsStr[:len(actionsStr)-1], ", ") + " or " + actionsStr[len(actionsStr)-1]
 	}
 }
