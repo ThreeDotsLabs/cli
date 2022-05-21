@@ -28,22 +28,23 @@ func TestFiles_WriteExerciseFiles(t *testing.T) {
 	expectedOutput := `+ dir/baz/baz.go (2 lines)
 + dir/go.mod (4 lines)
 + dir/main.go (6 lines)
-3 files saved` + "\n\n"
+Exercise ready, 3 files saved.` + "\n\n"
 
 	err := f.WriteExerciseFiles(filesToCreate, fs, dir)
 	require.NoError(t, err)
 
-	assert.Equal(t, []string{dir}, fs.CreatedDirs)
+	assert.Equal(t, []string{"dir", "dir/baz", "dir", "dir"}, fs.CreatedDirs)
 	assert.Equal(t, expectedOutput, stdout.String())
 
 	assertFilesCreated(t, fs, dir, filesToCreate)
 
 	// check idempotency
+	stdout.Reset()
 	err = f.WriteExerciseFiles(filesToCreate, fs, dir)
 	require.NoError(t, err)
-	assert.Equal(t, []string{dir}, fs.CreatedDirs)
+	assert.Equal(t, []string{"dir", "dir/baz", "dir", "dir"}, fs.CreatedDirs)
 	assert.Len(t, fs.CreatedFiles, len(filesToCreate))
-	assert.Equal(t, expectedOutput, stdout.String())
+	assert.Equal(t, "Exercise ready.\n\n", stdout.String())
 }
 
 func TestFiles_WriteExerciseFiles_accept_override_existing(t *testing.T) {

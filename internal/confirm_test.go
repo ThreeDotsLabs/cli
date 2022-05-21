@@ -61,36 +61,108 @@ func TestConfirmPrompt(t *testing.T) {
 
 func TestConfirmPromptDefaultYes(t *testing.T) {
 	testCases := []struct {
-		Input          string
-		ExpectedResult bool
+		Input           string
+		Actions         Actions
+		ExpectedMessage string
+		ExpectedResult  rune
 	}{
 		{
-			Input:          "\n",
-			ExpectedResult: true,
+			Input: "\n",
+			Actions: Actions{
+				{
+					Shortcut:        '\n',
+					ShortcutAliases: nil,
+					Action:          "some msg",
+				},
+				{
+					Shortcut:        'q',
+					ShortcutAliases: nil,
+					Action:          "quit",
+				},
+			},
+			ExpectedMessage: "Press ENTER to some msg or q to quit \n",
+			ExpectedResult:  '\n',
 		},
 		{
-			Input:          "\ny\n",
-			ExpectedResult: true,
+			Input: "q",
+			Actions: Actions{
+				{
+					Shortcut:        '\n',
+					ShortcutAliases: nil,
+					Action:          "some msg",
+				},
+				{
+					Shortcut:        'q',
+					ShortcutAliases: nil,
+					Action:          "quit",
+				},
+			},
+			ExpectedMessage: "Press ENTER to some msg or q to quit \n",
+			ExpectedResult:  'q',
 		},
 		{
-			Input:          "\nn\n",
-			ExpectedResult: true,
+			Input: "na\n",
+			Actions: Actions{
+				{
+					Shortcut:        '\n',
+					ShortcutAliases: nil,
+					Action:          "some msg",
+				},
+				{
+					Shortcut:        'q',
+					ShortcutAliases: nil,
+					Action:          "quit",
+				},
+			},
+			ExpectedMessage: "Press ENTER to some msg or q to quit \n",
+			ExpectedResult:  '\n',
 		},
 		{
-			Input:          "y\n",
-			ExpectedResult: true,
+			Input: "\r",
+			Actions: Actions{
+				{
+					Shortcut:        '\n',
+					ShortcutAliases: []rune{'\r'},
+					Action:          "some msg",
+				},
+				{
+					Shortcut:        'q',
+					ShortcutAliases: nil,
+					Action:          "quit",
+				},
+			},
+			ExpectedMessage: "Press ENTER to some msg or q to quit \n",
+			ExpectedResult:  '\n',
 		},
 		{
-			Input:          "Y\n",
-			ExpectedResult: true,
+			Input: "\n",
+			Actions: Actions{
+				{
+					Shortcut: '\n',
+					Action:   "some msg",
+				},
+				{
+					Shortcut: 'r',
+					Action:   "retry",
+				},
+				{
+					Shortcut: 'q',
+					Action:   "quit",
+				},
+			},
+			ExpectedMessage: "Press ENTER to some msg, r to retry or q to quit \n",
+			ExpectedResult:  '\n',
 		},
 		{
-			Input:          "n\n",
-			ExpectedResult: false,
-		},
-		{
-			Input:          "N\n",
-			ExpectedResult: false,
+			Input: "\n",
+			Actions: Actions{
+				{
+					Shortcut: '\n',
+					Action:   "some msg",
+				},
+			},
+			ExpectedMessage: "Press ENTER to some msg \n",
+			ExpectedResult:  '\n',
 		},
 	}
 
@@ -101,9 +173,9 @@ func TestConfirmPromptDefaultYes(t *testing.T) {
 			stdin := bytes.NewBufferString(tc.Input)
 			stdout := bytes.NewBuffer(nil)
 
-			ok := FConfirmPromptDefaultYes("some msg", stdin, stdout)
+			ok := Prompt(tc.Actions, stdin, stdout)
 			assert.Equal(t, tc.ExpectedResult, ok)
-			assert.Equal(t, "\nPress ENTER to some msg or q to quit \n", stdout.String())
+			assert.Equal(t, tc.ExpectedMessage, stdout.String())
 		})
 	}
 }
