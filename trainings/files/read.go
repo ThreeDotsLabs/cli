@@ -32,7 +32,7 @@ func (f Files) ReadSolutionFiles(trainingRootFs afero.Fs, dir string) ([]*genpro
 	}
 
 	var files []*genproto.File
-	for _, filePath := range  {
+	for _, filePath := range filesPaths {
 		content, err := afero.ReadFile(trainingRootFs, filePath)
 		if err != nil {
 			return nil, errors.Wrapf(err, "unable to read solution file %s", filePath)
