@@ -23,7 +23,10 @@ func (f Files) ReadSolutionFiles(trainingRootFs afero.Fs, dir string) ([]*genpro
 				return nil
 			}
 
-			filesPaths = append(filesPaths, filePath)
+			// Normalize filepath to slashes
+			slashPath := filepath.ToSlash(filePath)
+
+			filesPaths = append(filesPaths, slashPath)
 			return nil
 		},
 	)
