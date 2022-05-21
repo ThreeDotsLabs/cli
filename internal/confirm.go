@@ -105,7 +105,7 @@ func Prompt(actions Actions, stdin io.Reader, stdout io.Writer) rune {
 	var actionsStr []string
 	for _, action := range actions {
 		keyString := action.KeyString()
-		if enterRequired && action.Shortcut == '\n' {
+		if enterRequired && action.Shortcut != '\n' {
 			keyString += " and ENTER"
 		}
 
