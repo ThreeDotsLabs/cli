@@ -23,10 +23,7 @@ func (f Files) ReadSolutionFiles(trainingRootFs afero.Fs, dir string) ([]*genpro
 				return nil
 			}
 
-			// Normalize filepath to slashes
-			slashPath := filepath.ToSlash(filePath)
-
-			filesPaths = append(filesPaths, slashPath)
+			filesPaths = append(filesPaths, filePath)
 			return nil
 		},
 	)
@@ -35,7 +32,7 @@ func (f Files) ReadSolutionFiles(trainingRootFs afero.Fs, dir string) ([]*genpro
 	}
 
 	var files []*genproto.File
-	for _, filePath := range filesPaths {
+	for _, filePath := range  {
 		content, err := afero.ReadFile(trainingRootFs, filePath)
 		if err != nil {
 			return nil, errors.Wrapf(err, "unable to read solution file %s", filePath)
@@ -46,8 +43,11 @@ func (f Files) ReadSolutionFiles(trainingRootFs afero.Fs, dir string) ([]*genpro
 			return nil, err
 		}
 
+		// Normalize filepath to slashes
+		slashPath := filepath.ToSlash(relPath)
+
 		files = append(files, &genproto.File{
-			Path:    relPath,
+			Path:    slashPath,
 			Content: string(content),
 		})
 	}
