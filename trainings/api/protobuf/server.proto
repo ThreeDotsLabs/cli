@@ -14,8 +14,6 @@ service Trainings {
   rpc VerifyExercise(VerifyExerciseRequest) returns (stream VerifyExerciseResponse) {};
 }
 
-
-
 message InitRequest {
   string token = 1;
 }
@@ -81,6 +79,7 @@ message VerifyExerciseResponse {
   string stderr = 4;
 
   bool last_exercise = 5;
+  bool solution_available = 9;
 
   string verification_id = 6;
 

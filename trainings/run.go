@@ -228,6 +228,10 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 			_, _ = fmt.Fprint(os.Stderr, response.Stderr)
 		}
 		// todo - support stderr and commands
+
+		if response.SolutionAvailable {
+			fmt.Println("Are you stuck? Switch to the website to see the solution.")
+		}
 	}
 
 	if !finished {
