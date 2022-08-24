@@ -23,5 +23,5 @@ func printFinished() {
 }
 
 func printPaymentRequired() {
-	fmt.Println(color.GreenString("You did finish the free part of the training. To continue, please go back to our website."))
+	fmt.Println(color.GreenString("You finished the free part of the training. To continue, please go back to our website."))
 }
