@@ -21,6 +21,8 @@ type Handlers struct {
 
 	grpcClient  genproto.TrainingsClient
 	cliMetadata CliMetadata
+
+	solutionHintDisplayed bool
 }
 
 type CliMetadata struct {

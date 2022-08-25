@@ -13,6 +13,8 @@ import (
 )
 
 func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string) (finished bool, err error) {
+	h.solutionHintDisplayed = false
+
 	trainingRoot, err := h.config.FindTrainingRoot()
 	if err != nil {
 		return false, err
