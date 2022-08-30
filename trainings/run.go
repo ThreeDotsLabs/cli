@@ -196,18 +196,15 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 		if response.Finished {
 			fmt.Println("--------")
 
-			var msg string
-
 			if response.Successful {
-				msg = color.GreenString("SUCCESS")
+				fmt.Println(color.GreenString("SUCCESS"))
+				fmt.Println("\nYou can now see an example solution on the website.")
 				successful = true
 				finished = true
 			} else {
-				msg = color.RedString("FAIL")
+				fmt.Println(color.RedString("FAIL"))
 				finished = true
 			}
-
-			fmt.Println(msg)
 		}
 
 		if verificationID == "" && response.VerificationId != "" {
