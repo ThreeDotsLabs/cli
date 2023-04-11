@@ -3,15 +3,11 @@ package trainings
 import (
 	"context"
 	"fmt"
-	"net/url"
-	"path"
-
-	"github.com/fatih/color"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 
 	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings/config"
+	"github.com/fatih/color"
+	"github.com/pkg/errors"
 )
 
 func (h *Handlers) Info(ctx context.Context) error {
@@ -26,12 +22,6 @@ func (h *Handlers) Info(ctx context.Context) error {
 	trainingConfig := h.config.TrainingConfig(trainingRootFs)
 	exerciseConfig := h.config.ExerciseConfig(trainingRootFs)
 
-	exerciseURL, err := url.Parse(internal.WebsiteAddress)
-	if err != nil {
-		logrus.WithError(err).Warn("Can't parse website URL")
-	}
-	exerciseURL.Path = path.Join("trainings/" + trainingConfig.TrainingName + "/exercise/" + exerciseConfig.ExerciseID)
-
 	fmt.Println("### Training")
 	fmt.Println("Name:", color.CyanString(trainingConfig.TrainingName))
 	fmt.Println("Root dir:", color.CyanString(trainingRoot))
@@ -40,7 +30,9 @@ func (h *Handlers) Info(ctx context.Context) error {
 	fmt.Println("### Current exercise")
 	fmt.Println("ID:", color.CyanString(exerciseConfig.ExerciseID))
 	fmt.Println("Files:", color.CyanString(h.generateRunTerminalPath(trainingRootFs)))
-	fmt.Println("Content:", color.CyanString(exerciseURL.String()))
+
+	exerciseURL := internal.ExerciseURL(trainingConfig.TrainingName, exerciseConfig.ExerciseID)
+	fmt.Println("Content:", color.CyanString(exerciseURL))
 
 	return nil
 }

@@ -45,6 +45,13 @@ func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string) (
 		return false, err
 	}
 
+	if resp.IsTextOnly {
+		printTextOnlyExerciseInfo(
+			h.config.TrainingConfig(trainingRootFs).TrainingName,
+			resp.ExerciseId,
+		)
+	}
+
 	return false, nil
 }
 
@@ -87,6 +94,7 @@ func (h *Handlers) writeExerciseFiles(resp *genproto.NextExerciseResponse, train
 		config.ExerciseConfig{
 			ExerciseID: resp.ExerciseId,
 			Directory:  resp.Dir,
+			IsTextOnly: resp.IsTextOnly,
 		},
 	)
 }

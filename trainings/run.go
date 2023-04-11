@@ -130,6 +130,13 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 			return nil
 		}
 
+		// this is refreshed config after nextExercise execution
+		currentExerciseConfig := h.config.ExerciseConfig(trainingRootFs)
+
+		if currentExerciseConfig.IsTextOnly {
+			continue
+		}
+
 		if !internal.ConfirmPromptDefaultYes("run your solution") {
 			return nil
 		}
@@ -166,7 +173,7 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 		return false, err
 	}
 
-	if len(solutionFiles) == 0 {
+	if len(solutionFiles) == 0 && !exerciseConfig.IsTextOnly {
 		solutionFilesRealPath, err := trainingRootFs.RealPath(exerciseConfig.Directory)
 		if err != nil {
 			logrus.WithField("exercise_dir", exerciseConfig.Directory).Warn("Can't get realpath of solution")
@@ -216,7 +223,9 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 
 			if response.Successful {
 				fmt.Println(color.GreenString("SUCCESS"))
-				fmt.Println("\nYou can now see an example solution on the website.")
+				if !exerciseConfig.IsTextOnly {
+					fmt.Println("\nYou can now see an example solution on the website.")
+				}
 				successful = true
 				finished = true
 			} else {

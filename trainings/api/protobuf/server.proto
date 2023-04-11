@@ -52,6 +52,8 @@ message NextExerciseResponse {
   string dir = 1;
   string exercise_id = 2;
   repeated File files_to_create = 3;
+
+  bool is_text_only = 5;
 }
 
 message NextExercise {
