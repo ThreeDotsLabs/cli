@@ -12,6 +12,7 @@ const exerciseConfigFile = ".tdl-exercise"
 type ExerciseConfig struct {
 	ExerciseID string `toml:"exercise_id"`
 	Directory  string `toml:"directory"`
+	IsTextOnly bool   `toml:"is_text_only"`
 }
 
 func (c Config) WriteExerciseConfig(trainingRootFs afero.Fs, cfg ExerciseConfig) error {
