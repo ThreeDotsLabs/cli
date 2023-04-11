@@ -48,6 +48,8 @@ func (h *Handlers) detachedRun(ctx context.Context, trainingRootFs *afero.BasePa
 		os.Exit(1)
 	}
 
+	fmt.Println()
+
 	promptResult := internal.Prompt(
 		internal.Actions{
 			{Shortcut: '\n', Action: "go to the next exercise", ShortcutAliases: []rune{'\r'}},
@@ -72,10 +74,28 @@ func (h *Handlers) detachedRun(ctx context.Context, trainingRootFs *afero.BasePa
 }
 
 func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.BasePathFs) error {
+	retries := 0
+
 	for {
 		successful, err := h.run(ctx, trainingRootFs)
+		if err != nil && retries < 3 {
+			retries++
+			time.Sleep(time.Duration(retries) * time.Millisecond * 50)
+			logrus.WithError(err).WithField("retry", retries).Info("execution failed, retrying")
+			continue
+		}
+		retries = 0
+
+		fmt.Println()
+
 		if err != nil {
-			return err
+			fmt.Println(color.RedString("Failed to execute solution: %s", err.Error()))
+
+			if !internal.ConfirmPromptDefaultYes("run solution again") {
+				return err
+			} else {
+				continue
+			}
 		}
 
 		if !successful {
@@ -130,8 +150,6 @@ func (h *Handlers) run(ctx context.Context, trainingRootFs *afero.BasePathFs) (b
 		_, err = h.nextExercise(ctx, "")
 		return true, err
 	}
-
-	fmt.Println()
 
 	return success, err
 }
