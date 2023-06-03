@@ -3,7 +3,7 @@ name: Tag version
 on:
   push:
     branches:
-      - main
+      - master
 
 jobs:
   build:
