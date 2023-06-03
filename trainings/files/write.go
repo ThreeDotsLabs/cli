@@ -97,7 +97,9 @@ func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, trainingRootFs
 		fmt.Fprintf(f.stdout, color.GreenString("+")+" %s (%d lines)\n", savedFileRelativePath, file.Lines)
 	}
 
-	if len(savedFiles) > 0 {
+	if len(savedFiles) == 1 {
+		fmt.Fprintf(f.stdout, "Exercise ready, 1 file saved.\n\n")
+	} else if len(savedFiles) > 0 {
 		fmt.Fprintf(f.stdout, "Exercise ready, %d files saved.\n\n", len(savedFiles))
 	} else {
 		fmt.Fprintf(f.stdout, "Exercise ready.\n\n")
