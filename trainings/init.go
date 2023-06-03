@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
+	"github.com/ThreeDotsLabs/cli/trainings/files"
 	"github.com/fatih/color"
+	"github.com/spf13/afero"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -86,7 +89,39 @@ func (h *Handlers) startTraining(ctx context.Context, trainingName string) error
 		return errors.Wrap(err, "start training gRPC call failed")
 	}
 
-	return h.config.WriteTrainingConfig(config.TrainingConfig{TrainingName: trainingName}, trainingRootFs)
+	if err := h.config.WriteTrainingConfig(config.TrainingConfig{TrainingName: trainingName}, trainingRootFs); err != nil {
+		return errors.Wrap(err, "can't write training config")
+	}
+
+	if err := writeGitignore(trainingRootFs); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+var gitignore = strings.Join(
+	[]string{
+		"# Exercise content is subject to Three Dots Labs' copyright.",
+		"**/" + files.ExerciseFile,
+		"",
+	},
+	"\n",
+)
+
+func writeGitignore(trainingRootFs *afero.BasePathFs) error {
+	if !files.DirOrFileExists(trainingRootFs, ".gitignore") {
+		f, err := trainingRootFs.Create(".gitignore")
+		if err != nil {
+			return errors.Wrap(err, "can't create .gitignore")
+		}
+
+		if _, err := f.Write([]byte(gitignore)); err != nil {
+			return errors.Wrap(err, "can't write .gitignore")
+		}
+	}
+
+	return nil
 }
 
 func (h *Handlers) showTrainingStartPrompt() error {

@@ -19,6 +19,10 @@ import (
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )
 
+const (
+	ExerciseFile = "exercise.md"
+)
+
 type InvalidFilePathError struct {
 	pathValue string
 }
@@ -141,6 +145,11 @@ func (f Files) shouldWriteFile(fs afero.Fs, filePath string, file *genproto.File
 		return false, nil
 	}
 
+	if strings.Contains(filePath, ExerciseFile) {
+		// always override exercise.md
+		return true, nil
+	}
+
 	_, _ = fmt.Fprintf(f.stdout, "\nFile %s already exists, diff:\n", filePath)
 
 	edits := myers.ComputeEdits(span.URIFromPath("local "+filepath.Base(file.Path)), string(actualContent), file.Content)
@@ -156,6 +165,10 @@ func (f Files) shouldWriteFile(fs afero.Fs, filePath string, file *genproto.File
 }
 
 func (f Files) dirOrFileExists(fs afero.Fs, path string) bool {
+	return DirOrFileExists(fs, path)
+}
+
+func DirOrFileExists(fs afero.Fs, path string) bool {
 	_, err := fs.Stat(path)
 	if err == nil {
 		return true
