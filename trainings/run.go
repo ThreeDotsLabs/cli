@@ -218,22 +218,6 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 			return false, errors.Wrap(err, "error response from server")
 		}
 
-		if response.Finished {
-			fmt.Println("--------")
-
-			if response.Successful {
-				fmt.Println(color.GreenString("SUCCESS"))
-				if !exerciseConfig.IsTextOnly {
-					fmt.Println("\nYou can now see an example solution on the website.")
-				}
-				successful = true
-				finished = true
-			} else {
-				fmt.Println(color.RedString("FAIL"))
-				finished = true
-			}
-		}
-
 		if verificationID == "" && response.VerificationId != "" {
 			verificationID = response.VerificationId
 			logrus.
@@ -252,6 +236,22 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 			_, _ = fmt.Fprint(os.Stderr, response.Stderr)
 		}
 		// todo - support stderr and commands
+
+		if response.Finished {
+			fmt.Println("--------")
+
+			if response.Successful {
+				fmt.Println(color.GreenString("SUCCESS"))
+				if !exerciseConfig.IsTextOnly {
+					fmt.Println("\nYou can now see an example solution on the website.")
+				}
+				successful = true
+				finished = true
+			} else {
+				fmt.Println(color.RedString("FAIL"))
+				finished = true
+			}
+		}
 
 		if !h.solutionHintDisplayed && response.Finished && !response.Successful && response.SolutionAvailable {
 			fmt.Println(color.HiYellowString("\nFeeling stuck? Don't give up! If you want to check the solution, you can now do it on the website."))
