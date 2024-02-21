@@ -91,15 +91,14 @@ var app = &cli.App{
 							Usage:  "custom server",
 							Hidden: true,
 						},
-						&cli.StringFlag{
-							Name:   "region",
-							Usage:  "the region to use (eu or us)",
-							Hidden: true,
-						},
 						&cli.BoolFlag{
 							Name:   "insecure",
 							Usage:  "do not verify certificate",
 							Hidden: true,
+						},
+						&cli.StringFlag{
+							Name:  "region",
+							Usage: "the region to use (eu or us)",
 						},
 						&cli.BoolFlag{
 							Name:  "override",
