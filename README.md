@@ -7,7 +7,7 @@ This is the `tdl` CLI tool used for running the interactive trainings on the [Th
 ### Script (macOS, Linux) - recommended
 
 ```sh
-sudo /bin/sh -c "$(curl -fsSL https://raw.githubusercontent.com/ThreeDotsLabs/cli/master/install.sh)" -- -b /usr/local/bin```
+sudo /bin/sh -c "$(curl -fsSL https://raw.githubusercontent.com/ThreeDotsLabs/cli/master/install.sh)" -- -b /usr/local/bin
 ```
 
 ### Script (Windows)
