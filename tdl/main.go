@@ -50,7 +50,10 @@ var app = &cli.App{
 			return
 		}
 
-		fmt.Printf("%+v\n", err)
+		if err != nil {
+			fmt.Printf("%+v\n", err)
+		}
+
 		os.Exit(1)
 	},
 	Flags: []cli.Flag{
@@ -67,6 +70,9 @@ var app = &cli.App{
 		} else {
 			logrus.SetLevel(logrus.WarnLevel)
 		}
+
+		internal.CheckForUpdate(version)
+
 		return nil
 	},
 	Commands: []*cli.Command{

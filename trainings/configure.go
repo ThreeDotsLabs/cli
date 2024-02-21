@@ -19,13 +19,18 @@ func (h *Handlers) ConfigureGlobally(ctx context.Context, token, serverAddr, reg
 		}
 	}
 
-	if _, err := h.newGrpcClientWithAddr(ctx, serverAddr, region, insecure).Init(
+	resp, err := h.newGrpcClientWithAddr(ctx, serverAddr, region, insecure).Init(
 		ctxWithRequestHeader(ctx, h.cliMetadata),
 		&genproto.InitRequest{
 			Token: token,
 		},
-	); err != nil {
+	)
+	if err != nil {
 		return err
+	}
+
+	if region == "" {
+		region = resp.Region
 	}
 
 	return h.config.WriteGlobalConfig(config.GlobalConfig{
