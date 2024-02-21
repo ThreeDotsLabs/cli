@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -21,15 +20,7 @@ type GlobalConfig struct {
 }
 
 func globalConfigPath() string {
-	userConfigDir, err := os.UserConfigDir()
-	if err != nil {
-		panic(err)
-	}
-
-	configDir := filepath.Join(userConfigDir, "three-dots-labs")
-	configPath := filepath.Join(configDir, ".trainings-config")
-
-	return configPath
+	return filepath.Join(internal.GlobalConfigDir(), ".trainings-config")
 }
 
 func (c Config) ConfiguredGlobally() bool {
