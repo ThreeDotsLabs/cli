@@ -15,7 +15,6 @@ const repoURL = "https://github.com/ThreeDotsLabs/cli"
 const releasesURL = "https://api.github.com/repos/ThreeDotsLabs/cli/releases/latest"
 
 func CheckForUpdate(currentVersion string) {
-	currentVersion = "v0.1.26"
 	if currentVersion == "" || currentVersion == "dev" {
 		return
 	}
