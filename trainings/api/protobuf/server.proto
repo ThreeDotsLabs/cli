@@ -12,6 +12,8 @@ service Trainings {
   rpc NextExercise(NextExerciseRequest) returns (NextExerciseResponse) {};
 
   rpc VerifyExercise(VerifyExerciseRequest) returns (stream VerifyExerciseResponse) {};
+
+  rpc GetSolutionFiles(GetSolutionFilesRequest) returns (GetSolutionFilesResponse) {};
 }
 
 message InitRequest {
@@ -90,4 +92,15 @@ message VerifyExerciseResponse {
   string verification_id = 6;
 
   map<string, string> metadata = 7;
+}
+
+message GetSolutionFilesRequest {
+  string execution_id = 1;
+}
+
+message GetSolutionFilesResponse {
+  string training_name = 1;
+  string dir = 2;
+  string exercise_id = 3;
+  repeated File files_to_create = 4;
 }

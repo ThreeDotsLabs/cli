@@ -43,6 +43,11 @@ func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, trainingRootFs
 		}
 	}
 
+	logrus.WithFields(logrus.Fields{
+		"exercise_dir": exerciseDir,
+		"files_num":    len(filesToCreate),
+	}).Debugf("Writing exercise files to %s", exerciseDir)
+
 	var savedFiles []savedFile
 
 	for _, fileFromServer := range filesToCreate {
