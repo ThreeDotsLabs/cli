@@ -28,7 +28,7 @@ jobs:
 
   goreleaser:
     runs-on: ubuntu-latest
-    container: golang:1.18beta1
+    container: golang:1.22
     needs: [ tag ]
     steps:
       - name: Checkout
