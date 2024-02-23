@@ -178,6 +178,22 @@ var app = &cli.App{
 						return newHandlers(c).List(c.Context)
 					},
 				},
+				{
+					Name:  "clone",
+					Usage: "clone solution files to current directory",
+					ArgsUsage: fmt.Sprintf(
+						"[executionID from 'Share your solution' in %s]",
+						internal.WebsiteAddress,
+					),
+					Action: func(c *cli.Context) error {
+						executionID := c.Args().First()
+						if executionID == "" {
+							return missingArgumentError{"Missing executionID argument"}
+						}
+
+						return newHandlers(c).Clone(c.Context, executionID)
+					},
+				},
 			},
 		},
 		{
