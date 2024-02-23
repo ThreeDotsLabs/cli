@@ -4,7 +4,7 @@ import "google/protobuf/empty.proto";
 option go_package = "github.com/ThreeDotsLabs/cli/tdl-cli/trainings/genproto";
 
 service Trainings {
-  rpc Init(InitRequest) returns (google.protobuf.Empty) {};
+  rpc Init(InitRequest) returns (InitResponse) {};
 
   rpc GetTrainings(google.protobuf.Empty) returns (GetTrainingsResponse) {};
   rpc StartTraining(StartTrainingRequest) returns (google.protobuf.Empty) {};
@@ -16,6 +16,10 @@ service Trainings {
 
 message InitRequest {
   string token = 1;
+}
+
+message InitResponse {
+  string region = 1;
 }
 
 message Training {
