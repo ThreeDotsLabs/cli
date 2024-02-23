@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"strings"
 	"time"
 )
 
@@ -54,7 +55,9 @@ func CheckForUpdate(currentVersion string) {
 		return
 	}
 
-	if release.TagName != currentVersion {
+	latestVersion := strings.TrimLeft(release.TagName, "v")
+
+	if latestVersion != currentVersion {
 		c := color.New(color.FgHiYellow)
 		_, _ = c.Printf("A new version is available: %s (current: %s)\n", release.TagName, currentVersion)
 		_, _ = c.Printf("Visit %v to update\n", repoURL)
