@@ -182,7 +182,7 @@ var app = &cli.App{
 					Name:  "clone",
 					Usage: "clone solution files to current directory",
 					ArgsUsage: fmt.Sprintf(
-						"[executionID from 'Share your solution' in %s]",
+						"[executionID from 'Share your solution' at %s]",
 						internal.WebsiteAddress,
 					),
 					Action: func(c *cli.Context) error {
