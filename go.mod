@@ -1,6 +1,6 @@
 module github.com/ThreeDotsLabs/cli
 
-go 1.22
+go 1.21
 
 require (
 	github.com/BurntSushi/toml v0.4.1
