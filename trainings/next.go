@@ -2,13 +2,13 @@ package trainings
 
 import (
 	"context"
+
+	"github.com/ThreeDotsLabs/cli/trainings/config"
 	"github.com/ThreeDotsLabs/cli/trainings/files"
+	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
-
-	"github.com/ThreeDotsLabs/cli/trainings/config"
-	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )
 
 func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string) (finished bool, err error) {
