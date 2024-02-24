@@ -3,13 +3,12 @@ package trainings
 import (
 	"context"
 
+	"github.com/ThreeDotsLabs/cli/trainings/config"
 	"github.com/ThreeDotsLabs/cli/trainings/files"
+	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
-
-	"github.com/ThreeDotsLabs/cli/trainings/config"
-	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )
 
 func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string) (finished bool, err error) {
@@ -50,6 +49,11 @@ func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string) (
 			h.config.TrainingConfig(trainingRootFs).TrainingName,
 			resp.ExerciseId,
 		)
+	} else {
+		err = addModuleToWorkspace(trainingRoot, resp.Dir)
+		if err != nil {
+			logrus.WithError(err).Warn("Failed to add module to workspace")
+		}
 	}
 
 	return false, nil
