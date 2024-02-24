@@ -45,6 +45,8 @@ func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string) (
 		return false, err
 	}
 
+	_ = addModuleToWorkspace(trainingRoot, resp.Dir)
+
 	if resp.IsTextOnly {
 		printTextOnlyExerciseInfo(
 			h.config.TrainingConfig(trainingRootFs).TrainingName,

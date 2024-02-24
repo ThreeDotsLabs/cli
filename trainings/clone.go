@@ -40,6 +40,8 @@ func (h *Handlers) Clone(ctx context.Context, executionID string) error {
 		return errors.Wrap(err, "can't write training config")
 	}
 
+	_ = addModuleToWorkspace(pwd, resp.Dir)
+
 	files := &genproto.NextExerciseResponse{
 		TrainingStatus: genproto.NextExerciseResponse_IN_PROGRESS,
 		Dir:            resp.Dir,

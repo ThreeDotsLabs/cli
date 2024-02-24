@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
+	"path"
 	"strings"
 
 	"github.com/ThreeDotsLabs/cli/trainings/files"
@@ -76,6 +78,8 @@ func (h *Handlers) startTraining(ctx context.Context, trainingName string) error
 				cfg.TrainingName,
 			)
 		}
+	} else {
+		_ = createGoWorkspace(trainingRoot)
 	}
 
 	_, err = h.newGrpcClient(ctx).StartTraining(
@@ -119,6 +123,37 @@ func writeGitignore(trainingRootFs *afero.BasePathFs) error {
 		if _, err := f.Write([]byte(gitignore)); err != nil {
 			return errors.Wrap(err, "can't write .gitignore")
 		}
+	}
+
+	return nil
+}
+
+func createGoWorkspace(trainingRoot string) error {
+	cmd := exec.Command("go", "work", "init")
+	cmd.Dir = trainingRoot
+
+	if err := cmd.Run(); err != nil {
+		return errors.Wrap(err, "can't run go work init")
+	}
+
+	return nil
+}
+
+func hasGoWorkspace(trainingRoot string) bool {
+	_, err := os.Stat(path.Join(trainingRoot, "go.work"))
+	return err == nil
+}
+
+func addModuleToWorkspace(trainingRoot string, modulePath string) error {
+	if !hasGoWorkspace(trainingRoot) {
+		return nil
+	}
+
+	cmd := exec.Command("go", "work", "use", ".")
+	cmd.Dir = path.Join(trainingRoot, modulePath)
+
+	if err := cmd.Run(); err != nil {
+		return errors.Wrap(err, "can't run go work use")
 	}
 
 	return nil
