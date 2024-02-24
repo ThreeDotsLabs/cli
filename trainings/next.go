@@ -2,7 +2,6 @@ package trainings
 
 import (
 	"context"
-
 	"github.com/ThreeDotsLabs/cli/trainings/files"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -45,13 +44,13 @@ func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string) (
 		return false, err
 	}
 
-	_ = addModuleToWorkspace(trainingRoot, resp.Dir)
-
 	if resp.IsTextOnly {
 		printTextOnlyExerciseInfo(
 			h.config.TrainingConfig(trainingRootFs).TrainingName,
 			resp.ExerciseId,
 		)
+	} else {
+		_ = addModuleToWorkspace(trainingRoot, resp.Dir)
 	}
 
 	return false, nil
