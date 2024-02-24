@@ -50,7 +50,10 @@ func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string) (
 			resp.ExerciseId,
 		)
 	} else {
-		_ = addModuleToWorkspace(trainingRoot, resp.Dir)
+		err = addModuleToWorkspace(trainingRoot, resp.Dir)
+		if err != nil {
+			logrus.WithError(err).Warn("Failed to add module to workspace")
+		}
 	}
 
 	return false, nil

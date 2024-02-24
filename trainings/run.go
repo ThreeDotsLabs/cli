@@ -227,7 +227,7 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 		}
 
 		if len(response.Command) > 0 {
-			fmt.Print(color.CyanString(fmt.Sprintf("••• %s ➜ ", terminalPath)) + response.Command)
+			printCommand(terminalPath, response.Command)
 		}
 		if len(response.Stdout) > 0 {
 			fmt.Print(response.Stdout)
@@ -264,6 +264,14 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 	} else {
 		return successful, nil
 	}
+}
+
+func printCommand(root string, command string) {
+	fmt.Print(color.CyanString(fmt.Sprintf("••• %s ➜ ", root)) + command)
+}
+
+func printlnCommand(root string, command string) {
+	printCommand(root, command+"\n")
 }
 
 func (h *Handlers) generateRunTerminalPath(trainingRootFs *afero.BasePathFs) string {
