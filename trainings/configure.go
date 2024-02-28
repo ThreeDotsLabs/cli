@@ -8,11 +8,7 @@ import (
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )
 
-func (h *Handlers) ConfigureGlobally(ctx context.Context, token, serverAddr, region string, override, insecure bool) error {
-	if !override && h.config.ConfiguredGlobally() {
-		return errors.New("trainings are already configured. Please pass --override flag to configure again")
-	}
-
+func (h *Handlers) ConfigureGlobally(ctx context.Context, token, serverAddr, region string, insecure bool) error {
 	if region != "" {
 		if region != "eu" && region != "us" {
 			return errors.New("region can be only eu or us")
