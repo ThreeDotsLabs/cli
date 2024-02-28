@@ -103,6 +103,8 @@ var app = &cli.App{
 						&cli.BoolFlag{
 							Name:  "override",
 							Usage: "if config already exists, it will be overridden",
+							// deprecated, backward compatibility
+							Hidden: true,
 						},
 					},
 					Action: func(c *cli.Context) error {
@@ -117,7 +119,6 @@ var app = &cli.App{
 							token,
 							c.String("server"),
 							c.String("region"),
-							c.Bool("override"),
 							c.Bool("insecure"),
 						)
 					},
