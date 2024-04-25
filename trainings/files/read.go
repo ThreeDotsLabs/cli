@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
@@ -16,6 +17,11 @@ func (f Files) ReadSolutionFiles(trainingRootFs afero.Fs, dir string) ([]*genpro
 		trainingRootFs,
 		dir,
 		func(filePath string, info os.FileInfo, err error) error {
+			if err != nil {
+				logrus.WithError(err).Warn("Error while reading solution files")
+				return nil
+			}
+
 			if info.IsDir() {
 				return nil
 			}
