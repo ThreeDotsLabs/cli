@@ -62,5 +62,5 @@ func (c Config) FindTrainingRoot() (string, error) {
 		previousDir = dir
 	}
 
-	return "", TrainingRootNotFoundError
+	return "", errors.WithStack(TrainingRootNotFoundError)
 }
