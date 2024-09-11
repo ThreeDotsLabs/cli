@@ -38,7 +38,7 @@ func (h *Handlers) Init(ctx context.Context, trainingName string) error {
 		return err
 	}
 
-	if isInTrainingRoot(trainingRoot) {
+	if !isInTrainingRoot(trainingRoot) {
 		fmt.Println("\nNow run " + color.CyanString("cd "+trainingName+"/") + " to enter the training workspace")
 	}
 
@@ -64,7 +64,7 @@ func isInTrainingRoot(trainingRoot string) bool {
 		return false
 	}
 
-	return absPwd != absTrainingRoot
+	return absPwd == absTrainingRoot
 }
 
 var ErrInterrupted = errors.New("interrupted")
