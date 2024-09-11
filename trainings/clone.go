@@ -30,7 +30,7 @@ func (h *Handlers) Clone(ctx context.Context, executionID string) error {
 		"err":  err,
 	}).Debug("Received exercise from server")
 
-	if err := h.startTraining(ctx, resp.TrainingName); err != nil {
+	if _, err := h.startTraining(ctx, resp.TrainingName, false); err != nil {
 		return err
 	}
 

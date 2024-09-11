@@ -62,7 +62,12 @@ func (h *Handlers) detachedRun(ctx context.Context, trainingRootFs *afero.BasePa
 		os.Exit(0)
 	}
 
-	finished, err := h.nextExercise(ctx, h.config.ExerciseConfig(trainingRootFs).ExerciseID)
+	trainingRoot, err := h.config.FindTrainingRoot()
+	if err != nil {
+		return err
+	}
+
+	finished, err := h.nextExercise(ctx, h.config.ExerciseConfig(trainingRootFs).ExerciseID, trainingRoot)
 	if err != nil {
 		return err
 	}
@@ -122,7 +127,12 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 			continue
 		}
 
-		finished, err := h.nextExercise(ctx, h.config.ExerciseConfig(trainingRootFs).ExerciseID)
+		trainingRoot, err := h.config.FindTrainingRoot()
+		if err != nil {
+			return err
+		}
+
+		finished, err := h.nextExercise(ctx, h.config.ExerciseConfig(trainingRootFs).ExerciseID, trainingRoot)
 		if err != nil {
 			return err
 		}
@@ -154,7 +164,12 @@ func (h *Handlers) run(ctx context.Context, trainingRootFs *afero.BasePathFs) (b
 			os.Exit(0)
 		}
 
-		_, err = h.nextExercise(ctx, "")
+		trainingRoot, err := h.config.FindTrainingRoot()
+		if err != nil {
+			return false, err
+		}
+
+		_, err = h.nextExercise(ctx, "", trainingRoot)
 		return true, err
 	}
 
@@ -271,7 +286,23 @@ func printCommand(root string, command string) {
 }
 
 func printlnCommand(root string, command string) {
-	printCommand(root, command+"\n")
+	pwd, err := os.Getwd()
+	if err != nil {
+		fmt.Println("Error getting current directory:", err)
+		return
+	}
+
+	relPath, err := filepath.Rel(pwd, root)
+	if err != nil {
+		fmt.Println("Error getting relative path:", err)
+		return
+	}
+
+	if relPath != "." && relPath != "" {
+		relPath = "./" + relPath
+	}
+
+	printCommand(relPath, command+"\n")
 }
 
 func (h *Handlers) generateRunTerminalPath(trainingRootFs *afero.BasePathFs) string {
