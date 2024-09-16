@@ -19,12 +19,19 @@ import (
 	"github.com/spf13/afero"
 )
 
-func (h *Handlers) Init(ctx context.Context, trainingName string) error {
+func (h *Handlers) Init(ctx context.Context, trainingName string, dir string) error {
 	logrus.WithFields(logrus.Fields{
 		"training_name": trainingName,
 	}).Debug("Starting training")
 
-	trainingRoot, err := h.startTraining(ctx, trainingName, true)
+	wd, err := os.Getwd()
+	if err != nil {
+		return errors.WithStack(err)
+	}
+	trainingRootDir := path.Join(wd, dir)
+
+	// trainingRootDir may be different when doing init in already existing workspace
+	trainingRootDir, err = h.startTraining(ctx, trainingName, trainingRootDir)
 	if errors.Is(err, ErrInterrupted) {
 		fmt.Println("Interrupted")
 		return nil
@@ -33,13 +40,18 @@ func (h *Handlers) Init(ctx context.Context, trainingName string) error {
 	}
 
 	// todo - handle situation when training was started but something failed here and someone is starting excersise again (because he have no local files)
-	_, err = h.nextExercise(ctx, "", trainingRoot)
+	_, err = h.nextExercise(ctx, "", trainingRootDir)
 	if err != nil {
 		return err
 	}
 
-	if !isInTrainingRoot(trainingRoot) {
-		fmt.Println("\nNow run " + color.CyanString("cd "+trainingName+"/") + " to enter the training workspace")
+	if !isInTrainingRoot(trainingRootDir) {
+		relDir, err := filepath.Rel(wd, trainingRootDir)
+		if err != nil {
+			return errors.Wrap(err, "can't get relative path")
+		}
+
+		fmt.Println("\nNow run " + color.CyanString("cd "+relDir+"/") + " to enter the training workspace")
 	}
 
 	return nil
@@ -72,29 +84,16 @@ var ErrInterrupted = errors.New("interrupted")
 func (h *Handlers) startTraining(
 	ctx context.Context,
 	trainingName string,
-	addTrainingNameToDir bool,
+	trainingRootDir string,
 ) (string, error) {
-	var trainingRoot string
-
 	alreadyExistingTrainingRoot, err := h.config.FindTrainingRoot()
 	if err == nil {
 		fmt.Println(color.BlueString("Training was already initialised. Training root:" + alreadyExistingTrainingRoot))
-		trainingRoot = alreadyExistingTrainingRoot
+		trainingRootDir = alreadyExistingTrainingRoot
 	} else if !errors.Is(err, config.TrainingRootNotFoundError) {
 		return "", errors.Wrap(err, "can't check if training root exists")
 	} else {
-		wd, err := os.Getwd()
-		if err != nil {
-			return "", errors.WithStack(err)
-		}
-
-		if addTrainingNameToDir {
-			trainingRoot = path.Join(wd, trainingName)
-		} else {
-			trainingRoot = wd
-		}
-
-		if err := h.showTrainingStartPrompt(trainingRoot); err != nil {
+		if err := h.showTrainingStartPrompt(trainingRootDir); err != nil {
 			return "", err
 		}
 
@@ -102,7 +101,7 @@ func (h *Handlers) startTraining(
 		logrus.Debug("No training root yet")
 	}
 
-	trainingRootFs := newTrainingRootFs(trainingRoot)
+	trainingRootFs := newTrainingRootFs(trainingRootDir)
 
 	if alreadyExistingTrainingRoot != "" {
 		cfg := h.config.TrainingConfig(trainingRootFs)
@@ -113,12 +112,12 @@ func (h *Handlers) startTraining(
 			)
 		}
 	} else {
-		err := os.MkdirAll(trainingRoot, 0755)
+		err := os.MkdirAll(trainingRootDir, 0755)
 		if err != nil {
 			return "", errors.Wrap(err, "can't create training root dir")
 		}
 
-		err = createGoWorkspace(trainingRoot, trainingName)
+		err = createGoWorkspace(trainingRootDir, trainingName)
 		if err != nil {
 			logrus.WithError(err).Warn("Could not create go workspace")
 		}
@@ -143,7 +142,7 @@ func (h *Handlers) startTraining(
 		return "", err
 	}
 
-	return trainingRoot, nil
+	return trainingRootDir, nil
 }
 
 var gitignore = strings.Join(

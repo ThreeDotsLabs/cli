@@ -84,7 +84,7 @@ var app = &cli.App{
 				{
 					Name:      "configure",
 					Usage:     "connect your environment with platform account",
-					ArgsUsage: fmt.Sprintf("[token from %s]", internal.WebsiteAddress),
+					ArgsUsage: fmt.Sprintf("<token from %s>", internal.WebsiteAddress),
 					Flags: []cli.Flag{
 						&cli.StringFlag{
 							Name:   "server",
@@ -124,9 +124,12 @@ var app = &cli.App{
 					},
 				},
 				{
-					Name:      "init",
-					ArgsUsage: fmt.Sprintf("[trainingID from %s]", internal.WebsiteAddress),
-					Usage:     "initialise training files in your current directory",
+					Name: "init",
+					ArgsUsage: fmt.Sprintf(
+						"<trainingID from %s> [directory, if empty defaults to trainingID]",
+						internal.WebsiteAddress,
+					),
+					Usage: "initialise training files in your current directory",
 					Action: func(c *cli.Context) error {
 						trainingID := c.Args().First()
 
@@ -134,7 +137,12 @@ var app = &cli.App{
 							return missingArgumentError{"Missing trainingID argument"}
 						}
 
-						return newHandlers(c).Init(c.Context, trainingID)
+						dir := c.Args().Get(1)
+						if dir == "" {
+							dir = trainingID
+						}
+
+						return newHandlers(c).Init(c.Context, trainingID, dir)
 					},
 				},
 				{
@@ -183,7 +191,7 @@ var app = &cli.App{
 					Name:  "clone",
 					Usage: "clone solution files to current directory",
 					ArgsUsage: fmt.Sprintf(
-						"[executionID from 'Share your solution' at %s]",
+						"<executionID from 'Share your solution' at %s>",
 						internal.WebsiteAddress,
 					),
 					Action: func(c *cli.Context) error {
