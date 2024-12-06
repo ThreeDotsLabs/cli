@@ -26,26 +26,30 @@ func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string, t
 		return false, err
 	}
 
-	if resp.TrainingStatus == genproto.NextExerciseResponse_FINISHED {
+	return h.setExercise(trainingRootFs, resp, trainingRoot)
+}
+
+func (h *Handlers) setExercise(fs *afero.BasePathFs, exercise *genproto.NextExerciseResponse, trainingRoot string) (finished bool, err error) {
+	if exercise.TrainingStatus == genproto.NextExerciseResponse_FINISHED {
 		printFinished()
 		return true, nil
 	}
-	if resp.TrainingStatus == genproto.NextExerciseResponse_PAYMENT_REQUIRED {
+	if exercise.TrainingStatus == genproto.NextExerciseResponse_PAYMENT_REQUIRED {
 		printPaymentRequired()
 		return false, nil
 	}
 
-	if err := h.writeExerciseFiles(resp, trainingRootFs); err != nil {
+	if err := h.writeExerciseFiles(exercise, fs); err != nil {
 		return false, err
 	}
 
-	if resp.IsTextOnly {
+	if exercise.IsTextOnly {
 		printTextOnlyExerciseInfo(
-			h.config.TrainingConfig(trainingRootFs).TrainingName,
-			resp.ExerciseId,
+			h.config.TrainingConfig(fs).TrainingName,
+			exercise.ExerciseId,
 		)
 	} else {
-		err = addModuleToWorkspace(trainingRoot, resp.Dir)
+		err = addModuleToWorkspace(trainingRoot, exercise.Dir)
 		if err != nil {
 			logrus.WithError(err).Warn("Failed to add module to workspace")
 		}
