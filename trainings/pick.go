@@ -2,10 +2,11 @@ package trainings
 
 import (
 	"context"
+	"errors"
 	"fmt"
+
 	"github.com/ThreeDotsLabs/cli/trainings/config"
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
-	"github.com/pkg/errors"
 )
 
 func (h *Handlers) SelectExercise(ctx context.Context) (string, error) {
@@ -24,6 +25,7 @@ func (h *Handlers) SelectExercise(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("failed to get solution files: %w", err)
 	}
 
+	// TODO TUI here
 	for _, m := range resp.Modules {
 		fmt.Println(m.Name)
 		for _, e := range m.Exercises {
