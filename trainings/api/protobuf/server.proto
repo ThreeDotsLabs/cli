@@ -14,6 +14,9 @@ service Trainings {
   rpc VerifyExercise(VerifyExerciseRequest) returns (stream VerifyExerciseResponse) {};
 
   rpc GetSolutionFiles(GetSolutionFilesRequest) returns (GetSolutionFilesResponse) {};
+
+  rpc GetExercises(GetExercisesRequest) returns (GetExercisesResponse) {};
+  rpc GetExercise(GetExerciseRequest) returns (NextExerciseResponse) {};
 }
 
 message InitRequest {
@@ -104,3 +107,30 @@ message GetSolutionFilesResponse {
   string exercise_id = 3;
   repeated File files_to_create = 4;
 }
+
+message GetExercisesRequest {
+  string training_name = 1;
+  string token = 2;
+}
+
+message GetExercisesResponse {
+  message Module {
+    string id = 1;
+    string name = 2;
+    repeated Exercise exercises = 3;
+  }
+
+  message Exercise {
+    string id = 1;
+    string name = 2;
+  }
+
+  repeated Module modules = 1;
+}
+
+message GetExerciseRequest {
+  string training_name = 1;
+  string token = 2;
+  string exercise_id = 3;
+}
+

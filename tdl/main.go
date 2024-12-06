@@ -203,6 +203,30 @@ var app = &cli.App{
 						return newHandlers(c).Clone(c.Context, executionID)
 					},
 				},
+				{
+					Name:  "pick",
+					Usage: "Pick the exercise to work on. Provide the ID or keep empty for interactive mode",
+					ArgsUsage: fmt.Sprintf(
+						"[exerciseID]",
+					),
+					Action: func(c *cli.Context) error {
+						handlers := newHandlers(c)
+
+						exerciseID := c.Args().First()
+						if exerciseID == "" {
+							var err error
+							exerciseID, err = handlers.SelectExercise(c.Context)
+							if err != nil {
+								return err
+							}
+							if exerciseID == "" {
+								return nil
+							}
+						}
+
+						return handlers.Pick(c.Context, exerciseID)
+					},
+				},
 			},
 		},
 		{
