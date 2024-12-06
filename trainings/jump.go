@@ -32,6 +32,10 @@ func (h *Handlers) SelectExercise(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("failed to get solution files: %w", err)
 	}
 
+	if len(resp.Modules) == 0 {
+		return "", nil
+	}
+
 	resp.Modules = append([]*genproto.GetExercisesResponse_Module{
 		{
 			Id:   "",
@@ -196,7 +200,7 @@ func parseNumber(number string) int {
 	return num
 }
 
-func (h *Handlers) Pick(ctx context.Context, exerciseID string) error {
+func (h *Handlers) Jump(ctx context.Context, exerciseID string) error {
 	trainingRoot, err := h.config.FindTrainingRoot()
 	if errors.Is(err, config.TrainingRootNotFoundError) {
 		h.printNotInATrainingDirectory()

@@ -204,8 +204,8 @@ var app = &cli.App{
 					},
 				},
 				{
-					Name:  "pick",
-					Usage: "Pick the exercise to work on. Provide the ID or keep empty for interactive mode",
+					Name:  "jump",
+					Usage: "Jump to the exercise to work on. Provide the ID or keep empty for interactive mode",
 					UsageText: `Provide one of:
   - exercise ID (e.g., 48cfc4c8-ceab-4438-8082-9ec6e322df58)
   - exercise name with module (e.g., 04-module/05-exercise)
@@ -213,7 +213,9 @@ var app = &cli.App{
   - just the numbers (e.g., 4/5, or 5)
   - latest - to go back to the last exercise
 
-Leave empty to pick interactively.`,
+Leave empty to pick interactively.
+
+Note: after completing this exercise, the next exercise will be the last one you didn't complete yet'.`,
 
 					ArgsUsage: fmt.Sprintf(
 						"[exerciseID or name]",
@@ -239,7 +241,7 @@ Leave empty to pick interactively.`,
 							return nil
 						}
 
-						return handlers.Pick(c.Context, exerciseID)
+						return handlers.Jump(c.Context, exerciseID)
 					},
 				},
 			},
