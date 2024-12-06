@@ -206,22 +206,36 @@ var app = &cli.App{
 				{
 					Name:  "pick",
 					Usage: "Pick the exercise to work on. Provide the ID or keep empty for interactive mode",
+					UsageText: `Provide one of:
+  - exercise ID (e.g., 48cfc4c8-ceab-4438-8082-9ec6e322df58)
+  - exercise name with module (e.g., 04-module/05-exercise)
+  - exercise name, assuming current module (e.g., 05-exercise)
+  - just the numbers (e.g., 4/5, or 5)
+
+Leave empty to pick interactively.`,
+
 					ArgsUsage: fmt.Sprintf(
-						"[exerciseID]",
+						"[exerciseID or name]",
 					),
 					Action: func(c *cli.Context) error {
 						handlers := newHandlers(c)
+						var err error
 
 						exerciseID := c.Args().First()
 						if exerciseID == "" {
-							var err error
 							exerciseID, err = handlers.SelectExercise(c.Context)
 							if err != nil {
 								return err
 							}
-							if exerciseID == "" {
-								return nil
+						} else {
+							exerciseID, err = handlers.FindExercise(c.Context, exerciseID)
+							if err != nil {
+								return err
 							}
+						}
+
+						if exerciseID == "" {
+							return nil
 						}
 
 						return handlers.Pick(c.Context, exerciseID)
