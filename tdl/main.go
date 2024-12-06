@@ -211,6 +211,7 @@ var app = &cli.App{
   - exercise name with module (e.g., 04-module/05-exercise)
   - exercise name, assuming current module (e.g., 05-exercise)
   - just the numbers (e.g., 4/5, or 5)
+  - latest - to go back to the last exercise
 
 Leave empty to pick interactively.`,
 
