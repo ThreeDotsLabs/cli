@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 
 	"github.com/ThreeDotsLabs/cli/trainings/config"
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
@@ -12,7 +13,7 @@ import (
 	"github.com/spf13/afero"
 )
 
-func (h *Handlers) Clone(ctx context.Context, executionID string) error {
+func (h *Handlers) Clone(ctx context.Context, executionID string, directory string) error {
 	pwd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("failed to get current working directory: %w", err)
@@ -30,12 +31,14 @@ func (h *Handlers) Clone(ctx context.Context, executionID string) error {
 		"err":  err,
 	}).Debug("Received exercise from server")
 
-	wd, err := os.Getwd()
+	absoluteDirToClone, err := os.Getwd()
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	if _, err := h.startTraining(ctx, resp.TrainingName, wd); err != nil {
+	absoluteDirToClone = path.Join(absoluteDirToClone, directory)
+
+	if _, err := h.startTraining(ctx, resp.TrainingName, absoluteDirToClone); err != nil {
 		return err
 	}
 

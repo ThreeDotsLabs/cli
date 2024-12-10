@@ -191,7 +191,7 @@ var app = &cli.App{
 					Name:  "clone",
 					Usage: "clone solution files to current directory",
 					ArgsUsage: fmt.Sprintf(
-						"<executionID from 'Share your solution' at %s>",
+						"<executionID from 'Share your solution' at %s> [directory, if empty defaults to current directory]",
 						internal.WebsiteAddress,
 					),
 					Action: func(c *cli.Context) error {
@@ -200,7 +200,9 @@ var app = &cli.App{
 							return missingArgumentError{"Missing executionID argument"}
 						}
 
-						return newHandlers(c).Clone(c.Context, executionID)
+						directory := c.Args().Get(1)
+
+						return newHandlers(c).Clone(c.Context, executionID, directory)
 					},
 				},
 				{
