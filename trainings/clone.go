@@ -14,11 +14,6 @@ import (
 )
 
 func (h *Handlers) Clone(ctx context.Context, executionID string, directory string) error {
-	pwd, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("failed to get current working directory: %w", err)
-	}
-
 	resp, err := h.newGrpcClient(ctx).GetSolutionFiles(ctx, &genproto.GetSolutionFilesRequest{
 		ExecutionId: executionID,
 	})
@@ -42,7 +37,7 @@ func (h *Handlers) Clone(ctx context.Context, executionID string, directory stri
 		return err
 	}
 
-	trainingRootFs := afero.NewBasePathFs(afero.NewOsFs(), pwd).(*afero.BasePathFs)
+	trainingRootFs := afero.NewBasePathFs(afero.NewOsFs(), absoluteDirToClone).(*afero.BasePathFs)
 
 	if err := h.config.WriteTrainingConfig(config.TrainingConfig{TrainingName: resp.TrainingName}, trainingRootFs); err != nil {
 		return errors.Wrap(err, "can't write training config")
@@ -60,7 +55,7 @@ func (h *Handlers) Clone(ctx context.Context, executionID string, directory stri
 		return err
 	}
 
-	err = addModuleToWorkspace(pwd, resp.Dir)
+	err = addModuleToWorkspace(absoluteDirToClone, resp.Dir)
 	if err != nil {
 		logrus.WithError(err).Warn("Failed to add module to workspace")
 	}
