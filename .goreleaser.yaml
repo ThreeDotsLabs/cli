@@ -45,6 +45,24 @@ archives:
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
 
+brews:
+  -
+    name: cli
+    url_template: "https://github.com/ThreeDotsLabs/cli/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+    homepage: "https://academy.threedots.tech/"
+    description: "This is the tdl CLI tool used for running the interactive trainings on the https://academy.threedots.tech/"
+    custom_block: |
+      head "https://github.com/ThreeDotsLabs/cli.git"
+    repository:
+      owner: ThreeDotsLabs
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.GITHUB_HOMEBREW_TAP_AUTH_TOKEN }}"
+
 checksum:
   name_template: 'checksums.txt'
 snapshot:
