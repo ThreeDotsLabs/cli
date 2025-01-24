@@ -49,4 +49,4 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_HOMEBREW_TAP_AUTH_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_AUTH_TOKEN }}
+          HOMEBREW_TAP_GITHUB_AUTH_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_AUTH_TOKEN }}
