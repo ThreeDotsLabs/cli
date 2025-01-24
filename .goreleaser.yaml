@@ -61,7 +61,7 @@ brews:
       owner: ThreeDotsLabs
       name: homebrew-tap
       branch: main
-      token: "{{ .Env.GITHUB_HOMEBREW_TAP_AUTH_TOKEN }}"
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_AUTH_TOKEN }}"
 
 checksum:
   name_template: 'checksums.txt'
