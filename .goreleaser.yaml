@@ -47,7 +47,7 @@ archives:
 
 brews:
   -
-    name: cli
+    name: tdl
     url_template: "https://github.com/ThreeDotsLabs/cli/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
     commit_author:
       name: goreleaserbot
