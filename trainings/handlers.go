@@ -24,6 +24,7 @@ type Handlers struct {
 	cliMetadata CliMetadata
 
 	solutionHintDisplayed bool
+	notifications         map[string]struct{}
 }
 
 type CliMetadata struct {
@@ -40,8 +41,9 @@ func NewHandlers(cliVersion CliMetadata) *Handlers {
 	conf := config.NewConfig()
 
 	return &Handlers{
-		config:      conf,
-		cliMetadata: cliVersion,
+		config:        conf,
+		cliMetadata:   cliVersion,
+		notifications: map[string]struct{}{},
 	}
 }
 

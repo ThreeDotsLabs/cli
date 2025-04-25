@@ -91,6 +91,7 @@ message VerifyExerciseResponse {
 
   bool last_exercise = 5;
   bool solution_available = 9;
+  string notification = 10;
 
   string verification_id = 6;
 
@@ -133,4 +134,3 @@ message GetExerciseRequest {
   string token = 2;
   string exercise_id = 3;
 }
-

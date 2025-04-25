@@ -268,9 +268,18 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 			}
 		}
 
-		if !h.solutionHintDisplayed && response.Finished && !response.Successful && response.SolutionAvailable {
-			fmt.Println(color.HiYellowString("\nFeeling stuck? Don't give up! If you want to check the solution, you can now do it on the website."))
-			h.solutionHintDisplayed = true
+		if !h.solutionHintDisplayed && response.Finished {
+			if response.Notification != "" {
+				_, ok := h.notifications[response.Notification]
+				if !ok {
+					h.notifications[response.Notification] = struct{}{}
+					fmt.Println(color.HiYellowString("\n%s", response.Notification))
+				}
+			} else if !response.Successful && response.SolutionAvailable {
+				// Legacy behavior
+				fmt.Println(color.HiYellowString("\nFeeling stuck? Don't give up! If you want to check the solution, you can now do it on the website."))
+				h.solutionHintDisplayed = true
+			}
 		}
 	}
 
