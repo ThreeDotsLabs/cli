@@ -13,6 +13,7 @@ import (
 
 func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string, trainingRoot string) (finished bool, err error) {
 	h.solutionHintDisplayed = false
+	clear(h.notifications)
 
 	// We should never trust the remote server.
 	// Writing files based on external name is a vector for Path Traversal attack.
