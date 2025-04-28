@@ -3,8 +3,6 @@ package trainings
 import (
 	"context"
 	"fmt"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"os"
 	"os/exec"
 	"path"
@@ -19,6 +17,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func (h *Handlers) Init(ctx context.Context, trainingName string, dir string) error {
