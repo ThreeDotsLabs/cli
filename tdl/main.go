@@ -40,6 +40,7 @@ var app = &cli.App{
 		if errors.As(err, &missingArgumentError{}) {
 			fmt.Printf("%s. Usage:\n\n", err.Error())
 			cli.ShowSubcommandHelpAndExit(c, 1)
+			return
 		}
 
 		userFacingErr := trainings.UserFacingError{}
