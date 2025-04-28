@@ -17,6 +17,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func (h *Handlers) Init(ctx context.Context, trainingName string, dir string) error {
@@ -131,6 +133,12 @@ func (h *Handlers) startTraining(
 		},
 	)
 	if err != nil {
+		if st, ok := status.FromError(err); ok && st.Code() == codes.NotFound {
+			return "", UserFacingError{
+				Msg:          fmt.Sprintf("Training '%v' not found", trainingName),
+				SolutionHint: "Please check the correct training name on the website.\n\nIf you wanted to init the training in a separate directory, use this format:\n\n\ttdl training init <name> <directory>",
+			}
+		}
 		return "", errors.Wrap(err, "start training gRPC call failed")
 	}
 
