@@ -3,6 +3,8 @@ package trainings
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"os"
 	"os/exec"
 	"path"
@@ -35,6 +37,8 @@ func (h *Handlers) Init(ctx context.Context, trainingName string, dir string) er
 	if errors.Is(err, ErrInterrupted) {
 		fmt.Println("Interrupted")
 		return nil
+	} else if errors.Is(err, ErrTrainingNotFound) {
+		fmt.Printf("Training '%v' not found.\nPlease check the valid training name on the website!\n", trainingName)
 	} else if err != nil {
 		return err
 	}
@@ -79,7 +83,10 @@ func isInTrainingRoot(trainingRoot string) bool {
 	return absPwd == absTrainingRoot
 }
 
-var ErrInterrupted = errors.New("interrupted")
+var (
+	ErrInterrupted      = errors.New("interrupted")
+	ErrTrainingNotFound = errors.New("training not found")
+)
 
 func (h *Handlers) startTraining(
 	ctx context.Context,
@@ -131,6 +138,9 @@ func (h *Handlers) startTraining(
 		},
 	)
 	if err != nil {
+		if st, ok := status.FromError(err); ok && st.Code() == codes.NotFound {
+			return "", ErrTrainingNotFound
+		}
 		return "", errors.Wrap(err, "start training gRPC call failed")
 	}
 
