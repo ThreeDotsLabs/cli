@@ -17,6 +17,8 @@ service Trainings {
 
   rpc GetExercises(GetExercisesRequest) returns (GetExercisesResponse) {};
   rpc GetExercise(GetExerciseRequest) returns (NextExerciseResponse) {};
+
+  rpc SkipExercise(SkipExerciseRequest) returns (SkipExerciseResponse) {};
 }
 
 message InitRequest {
@@ -134,3 +136,11 @@ message GetExerciseRequest {
   string token = 2;
   string exercise_id = 3;
 }
+
+message SkipExerciseRequest {
+  string training_name = 1;
+  string exercise_id = 2;
+  string token = 3;
+}
+
+message SkipExerciseResponse {}
