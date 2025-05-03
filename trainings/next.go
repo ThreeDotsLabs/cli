@@ -37,7 +37,7 @@ func (h *Handlers) setExercise(fs *afero.BasePathFs, exercise *genproto.NextExer
 	}
 	if exercise.TrainingStatus == genproto.NextExerciseResponse_PAYMENT_REQUIRED {
 		printPaymentRequired()
-		return true, nil
+		return false, nil
 	}
 
 	h.printCurrentExercise(
