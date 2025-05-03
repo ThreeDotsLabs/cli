@@ -67,12 +67,9 @@ func (h *Handlers) detachedRun(ctx context.Context, trainingRootFs *afero.BasePa
 		return err
 	}
 
-	finished, err := h.nextExercise(ctx, h.config.ExerciseConfig(trainingRootFs).ExerciseID, trainingRoot)
+	_, err = h.nextExercise(ctx, h.config.ExerciseConfig(trainingRootFs).ExerciseID, trainingRoot)
 	if err != nil {
 		return err
-	}
-	if finished {
-		return nil
 	}
 
 	return nil

@@ -65,6 +65,19 @@ message NextExerciseResponse {
   repeated File files_to_create = 3;
 
   bool is_text_only = 5;
+
+  message Module {
+    string id = 1;
+    string name = 2;
+  }
+
+  message Exercise {
+    string id = 1;
+    Module module = 2;
+    string name = 3;
+  }
+
+  Exercise exercise = 6;
 }
 
 message NextExercise {

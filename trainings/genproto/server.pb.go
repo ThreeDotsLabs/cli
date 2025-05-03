@@ -402,6 +402,7 @@ type NextExerciseResponse struct {
 	ExerciseId     string                              `protobuf:"bytes,2,opt,name=exercise_id,json=exerciseId,proto3" json:"exercise_id,omitempty"`
 	FilesToCreate  []*File                             `protobuf:"bytes,3,rep,name=files_to_create,json=filesToCreate,proto3" json:"files_to_create,omitempty"`
 	IsTextOnly     bool                                `protobuf:"varint,5,opt,name=is_text_only,json=isTextOnly,proto3" json:"is_text_only,omitempty"`
+	Exercise       *NextExerciseResponse_Exercise      `protobuf:"bytes,6,opt,name=exercise,proto3" json:"exercise,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -469,6 +470,13 @@ func (x *NextExerciseResponse) GetIsTextOnly() bool {
 		return x.IsTextOnly
 	}
 	return false
+}
+
+func (x *NextExerciseResponse) GetExercise() *NextExerciseResponse_Exercise {
+	if x != nil {
+		return x.Exercise
+	}
+	return nil
 }
 
 type NextExercise struct {
@@ -1115,6 +1123,118 @@ func (*SkipExerciseResponse) Descriptor() ([]byte, []int) {
 	return file_server_proto_rawDescGZIP(), []int{18}
 }
 
+type NextExerciseResponse_Module struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NextExerciseResponse_Module) Reset() {
+	*x = NextExerciseResponse_Module{}
+	mi := &file_server_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NextExerciseResponse_Module) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NextExerciseResponse_Module) ProtoMessage() {}
+
+func (x *NextExerciseResponse_Module) ProtoReflect() protoreflect.Message {
+	mi := &file_server_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NextExerciseResponse_Module.ProtoReflect.Descriptor instead.
+func (*NextExerciseResponse_Module) Descriptor() ([]byte, []int) {
+	return file_server_proto_rawDescGZIP(), []int{7, 0}
+}
+
+func (x *NextExerciseResponse_Module) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *NextExerciseResponse_Module) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type NextExerciseResponse_Exercise struct {
+	state         protoimpl.MessageState       `protogen:"open.v1"`
+	Id            string                       `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Module        *NextExerciseResponse_Module `protobuf:"bytes,2,opt,name=module,proto3" json:"module,omitempty"`
+	Name          string                       `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NextExerciseResponse_Exercise) Reset() {
+	*x = NextExerciseResponse_Exercise{}
+	mi := &file_server_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NextExerciseResponse_Exercise) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NextExerciseResponse_Exercise) ProtoMessage() {}
+
+func (x *NextExerciseResponse_Exercise) ProtoReflect() protoreflect.Message {
+	mi := &file_server_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NextExerciseResponse_Exercise.ProtoReflect.Descriptor instead.
+func (*NextExerciseResponse_Exercise) Descriptor() ([]byte, []int) {
+	return file_server_proto_rawDescGZIP(), []int{7, 1}
+}
+
+func (x *NextExerciseResponse_Exercise) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *NextExerciseResponse_Exercise) GetModule() *NextExerciseResponse_Module {
+	if x != nil {
+		return x.Module
+	}
+	return nil
+}
+
+func (x *NextExerciseResponse_Exercise) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
 type GetExercisesResponse_Module struct {
 	state         protoimpl.MessageState           `protogen:"open.v1"`
 	Id            string                           `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -1126,7 +1246,7 @@ type GetExercisesResponse_Module struct {
 
 func (x *GetExercisesResponse_Module) Reset() {
 	*x = GetExercisesResponse_Module{}
-	mi := &file_server_proto_msgTypes[20]
+	mi := &file_server_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1138,7 +1258,7 @@ func (x *GetExercisesResponse_Module) String() string {
 func (*GetExercisesResponse_Module) ProtoMessage() {}
 
 func (x *GetExercisesResponse_Module) ProtoReflect() protoreflect.Message {
-	mi := &file_server_proto_msgTypes[20]
+	mi := &file_server_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1185,7 +1305,7 @@ type GetExercisesResponse_Exercise struct {
 
 func (x *GetExercisesResponse_Exercise) Reset() {
 	*x = GetExercisesResponse_Exercise{}
-	mi := &file_server_proto_msgTypes[21]
+	mi := &file_server_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1197,7 +1317,7 @@ func (x *GetExercisesResponse_Exercise) String() string {
 func (*GetExercisesResponse_Exercise) ProtoMessage() {}
 
 func (x *GetExercisesResponse_Exercise) ProtoReflect() protoreflect.Message {
-	mi := &file_server_proto_msgTypes[21]
+	mi := &file_server_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1258,7 +1378,7 @@ var file_server_proto_rawDesc = string([]byte{
 	0x73, 0x65, 0x5f, 0x69, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x11, 0x63, 0x75, 0x72,
 	0x72, 0x65, 0x6e, 0x74, 0x45, 0x78, 0x65, 0x72, 0x63, 0x69, 0x73, 0x65, 0x49, 0x64, 0x12, 0x14,
 	0x0a, 0x05, 0x74, 0x6f, 0x6b, 0x65, 0x6e, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x74,
-	0x6f, 0x6b, 0x65, 0x6e, 0x22, 0xb0, 0x02, 0x0a, 0x14, 0x4e, 0x65, 0x78, 0x74, 0x45, 0x78, 0x65,
+	0x6f, 0x6b, 0x65, 0x6e, 0x22, 0x80, 0x04, 0x0a, 0x14, 0x4e, 0x65, 0x78, 0x74, 0x45, 0x78, 0x65,
 	0x72, 0x63, 0x69, 0x73, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x12, 0x4d, 0x0a,
 	0x0f, 0x74, 0x72, 0x61, 0x69, 0x6e, 0x69, 0x6e, 0x67, 0x5f, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73,
 	0x18, 0x04, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x24, 0x2e, 0x4e, 0x65, 0x78, 0x74, 0x45, 0x78, 0x65,
@@ -1273,6 +1393,19 @@ var file_server_proto_rawDesc = string([]byte{
 	0x0d, 0x66, 0x69, 0x6c, 0x65, 0x73, 0x54, 0x6f, 0x43, 0x72, 0x65, 0x61, 0x74, 0x65, 0x12, 0x20,
 	0x0a, 0x0c, 0x69, 0x73, 0x5f, 0x74, 0x65, 0x78, 0x74, 0x5f, 0x6f, 0x6e, 0x6c, 0x79, 0x18, 0x05,
 	0x20, 0x01, 0x28, 0x08, 0x52, 0x0a, 0x69, 0x73, 0x54, 0x65, 0x78, 0x74, 0x4f, 0x6e, 0x6c, 0x79,
+	0x12, 0x3a, 0x0a, 0x08, 0x65, 0x78, 0x65, 0x72, 0x63, 0x69, 0x73, 0x65, 0x18, 0x06, 0x20, 0x01,
+	0x28, 0x0b, 0x32, 0x1e, 0x2e, 0x4e, 0x65, 0x78, 0x74, 0x45, 0x78, 0x65, 0x72, 0x63, 0x69, 0x73,
+	0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x2e, 0x45, 0x78, 0x65, 0x72, 0x63, 0x69,
+	0x73, 0x65, 0x52, 0x08, 0x65, 0x78, 0x65, 0x72, 0x63, 0x69, 0x73, 0x65, 0x1a, 0x2c, 0x0a, 0x06,
+	0x4d, 0x6f, 0x64, 0x75, 0x6c, 0x65, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01,
+	0x28, 0x09, 0x52, 0x02, 0x69, 0x64, 0x12, 0x12, 0x0a, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x02,
+	0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x1a, 0x64, 0x0a, 0x08, 0x45, 0x78,
+	0x65, 0x72, 0x63, 0x69, 0x73, 0x65, 0x12, 0x0e, 0x0a, 0x02, 0x69, 0x64, 0x18, 0x01, 0x20, 0x01,
+	0x28, 0x09, 0x52, 0x02, 0x69, 0x64, 0x12, 0x34, 0x0a, 0x06, 0x6d, 0x6f, 0x64, 0x75, 0x6c, 0x65,
+	0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x1c, 0x2e, 0x4e, 0x65, 0x78, 0x74, 0x45, 0x78, 0x65,
+	0x72, 0x63, 0x69, 0x73, 0x65, 0x52, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65, 0x2e, 0x4d, 0x6f,
+	0x64, 0x75, 0x6c, 0x65, 0x52, 0x06, 0x6d, 0x6f, 0x64, 0x75, 0x6c, 0x65, 0x12, 0x12, 0x0a, 0x04,
+	0x6e, 0x61, 0x6d, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x6e, 0x61, 0x6d, 0x65,
 	0x22, 0x45, 0x0a, 0x0e, 0x54, 0x72, 0x61, 0x69, 0x6e, 0x69, 0x6e, 0x67, 0x53, 0x74, 0x61, 0x74,
 	0x75, 0x73, 0x12, 0x0f, 0x0a, 0x0b, 0x49, 0x4e, 0x5f, 0x50, 0x52, 0x4f, 0x47, 0x52, 0x45, 0x53,
 	0x53, 0x10, 0x00, 0x12, 0x14, 0x0a, 0x10, 0x50, 0x41, 0x59, 0x4d, 0x45, 0x4e, 0x54, 0x5f, 0x52,
@@ -1427,7 +1560,7 @@ func file_server_proto_rawDescGZIP() []byte {
 }
 
 var file_server_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_server_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_server_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_server_proto_goTypes = []any{
 	(NextExerciseResponse_TrainingStatus)(0), // 0: NextExerciseResponse.TrainingStatus
 	(*InitRequest)(nil),                      // 1: InitRequest
@@ -1449,44 +1582,48 @@ var file_server_proto_goTypes = []any{
 	(*GetExerciseRequest)(nil),               // 17: GetExerciseRequest
 	(*SkipExerciseRequest)(nil),              // 18: SkipExerciseRequest
 	(*SkipExerciseResponse)(nil),             // 19: SkipExerciseResponse
-	nil,                                      // 20: VerifyExerciseResponse.MetadataEntry
-	(*GetExercisesResponse_Module)(nil),      // 21: GetExercisesResponse.Module
-	(*GetExercisesResponse_Exercise)(nil),    // 22: GetExercisesResponse.Exercise
-	(*emptypb.Empty)(nil),                    // 23: google.protobuf.Empty
+	(*NextExerciseResponse_Module)(nil),      // 20: NextExerciseResponse.Module
+	(*NextExerciseResponse_Exercise)(nil),    // 21: NextExerciseResponse.Exercise
+	nil,                                      // 22: VerifyExerciseResponse.MetadataEntry
+	(*GetExercisesResponse_Module)(nil),      // 23: GetExercisesResponse.Module
+	(*GetExercisesResponse_Exercise)(nil),    // 24: GetExercisesResponse.Exercise
+	(*emptypb.Empty)(nil),                    // 25: google.protobuf.Empty
 }
 var file_server_proto_depIdxs = []int32{
 	3,  // 0: GetTrainingsResponse.trainings:type_name -> Training
 	0,  // 1: NextExerciseResponse.training_status:type_name -> NextExerciseResponse.TrainingStatus
 	11, // 2: NextExerciseResponse.files_to_create:type_name -> File
-	11, // 3: NextExercise.files_to_create:type_name -> File
-	11, // 4: VerifyExerciseRequest.files:type_name -> File
-	20, // 5: VerifyExerciseResponse.metadata:type_name -> VerifyExerciseResponse.MetadataEntry
-	11, // 6: GetSolutionFilesResponse.files_to_create:type_name -> File
-	21, // 7: GetExercisesResponse.modules:type_name -> GetExercisesResponse.Module
-	22, // 8: GetExercisesResponse.Module.exercises:type_name -> GetExercisesResponse.Exercise
-	1,  // 9: Trainings.Init:input_type -> InitRequest
-	23, // 10: Trainings.GetTrainings:input_type -> google.protobuf.Empty
-	5,  // 11: Trainings.StartTraining:input_type -> StartTrainingRequest
-	7,  // 12: Trainings.NextExercise:input_type -> NextExerciseRequest
-	10, // 13: Trainings.VerifyExercise:input_type -> VerifyExerciseRequest
-	13, // 14: Trainings.GetSolutionFiles:input_type -> GetSolutionFilesRequest
-	15, // 15: Trainings.GetExercises:input_type -> GetExercisesRequest
-	17, // 16: Trainings.GetExercise:input_type -> GetExerciseRequest
-	18, // 17: Trainings.SkipExercise:input_type -> SkipExerciseRequest
-	2,  // 18: Trainings.Init:output_type -> InitResponse
-	4,  // 19: Trainings.GetTrainings:output_type -> GetTrainingsResponse
-	23, // 20: Trainings.StartTraining:output_type -> google.protobuf.Empty
-	8,  // 21: Trainings.NextExercise:output_type -> NextExerciseResponse
-	12, // 22: Trainings.VerifyExercise:output_type -> VerifyExerciseResponse
-	14, // 23: Trainings.GetSolutionFiles:output_type -> GetSolutionFilesResponse
-	16, // 24: Trainings.GetExercises:output_type -> GetExercisesResponse
-	8,  // 25: Trainings.GetExercise:output_type -> NextExerciseResponse
-	19, // 26: Trainings.SkipExercise:output_type -> SkipExerciseResponse
-	18, // [18:27] is the sub-list for method output_type
-	9,  // [9:18] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	21, // 3: NextExerciseResponse.exercise:type_name -> NextExerciseResponse.Exercise
+	11, // 4: NextExercise.files_to_create:type_name -> File
+	11, // 5: VerifyExerciseRequest.files:type_name -> File
+	22, // 6: VerifyExerciseResponse.metadata:type_name -> VerifyExerciseResponse.MetadataEntry
+	11, // 7: GetSolutionFilesResponse.files_to_create:type_name -> File
+	23, // 8: GetExercisesResponse.modules:type_name -> GetExercisesResponse.Module
+	20, // 9: NextExerciseResponse.Exercise.module:type_name -> NextExerciseResponse.Module
+	24, // 10: GetExercisesResponse.Module.exercises:type_name -> GetExercisesResponse.Exercise
+	1,  // 11: Trainings.Init:input_type -> InitRequest
+	25, // 12: Trainings.GetTrainings:input_type -> google.protobuf.Empty
+	5,  // 13: Trainings.StartTraining:input_type -> StartTrainingRequest
+	7,  // 14: Trainings.NextExercise:input_type -> NextExerciseRequest
+	10, // 15: Trainings.VerifyExercise:input_type -> VerifyExerciseRequest
+	13, // 16: Trainings.GetSolutionFiles:input_type -> GetSolutionFilesRequest
+	15, // 17: Trainings.GetExercises:input_type -> GetExercisesRequest
+	17, // 18: Trainings.GetExercise:input_type -> GetExerciseRequest
+	18, // 19: Trainings.SkipExercise:input_type -> SkipExerciseRequest
+	2,  // 20: Trainings.Init:output_type -> InitResponse
+	4,  // 21: Trainings.GetTrainings:output_type -> GetTrainingsResponse
+	25, // 22: Trainings.StartTraining:output_type -> google.protobuf.Empty
+	8,  // 23: Trainings.NextExercise:output_type -> NextExerciseResponse
+	12, // 24: Trainings.VerifyExercise:output_type -> VerifyExerciseResponse
+	14, // 25: Trainings.GetSolutionFiles:output_type -> GetSolutionFilesResponse
+	16, // 26: Trainings.GetExercises:output_type -> GetExercisesResponse
+	8,  // 27: Trainings.GetExercise:output_type -> NextExerciseResponse
+	19, // 28: Trainings.SkipExercise:output_type -> SkipExerciseResponse
+	20, // [20:29] is the sub-list for method output_type
+	11, // [11:20] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_server_proto_init() }
@@ -1500,7 +1637,7 @@ func file_server_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_server_proto_rawDesc), len(file_server_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   22,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
