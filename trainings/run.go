@@ -156,7 +156,9 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 		}
 
 		if currentExerciseConfig.IsSkippable {
-			fmt.Printf("\nThis module is optional. You can skip it if you're already familiar with this topic.\n\n")
+			fmt.Println()
+			_, _ = color.New(color.Bold, color.FgCyan).Print("This module is optional.")
+			fmt.Printf(" You can skip it if you're already familiar with this topic.\n\n")
 
 			actions = append(actions, internal.Action{Shortcut: 's', Action: "skip"})
 		}
