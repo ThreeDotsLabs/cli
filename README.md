@@ -4,6 +4,12 @@ This is the `tdl` CLI tool used for running the interactive trainings on the [Th
 
 ## Install
 
+### Brew (macOS) - recommended
+
+```sh
+brew install ThreeDotsLabs/tap/tdl
+```
+
 ### Script (macOS, Linux) - recommended
 
 ```sh
