@@ -140,7 +140,7 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 		// this is refreshed config after nextExercise execution
 		currentExerciseConfig := h.config.ExerciseConfig(trainingRootFs)
 
-		if currentExerciseConfig.IsTextOnly && !currentExerciseConfig.IsSkippable {
+		if currentExerciseConfig.IsTextOnly && !currentExerciseConfig.IsOptional {
 			continue
 		}
 
@@ -155,7 +155,7 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 			{Shortcut: '\n', Action: continueText, ShortcutAliases: []rune{'\r'}},
 		}
 
-		if currentExerciseConfig.IsSkippable {
+		if currentExerciseConfig.IsOptional {
 			fmt.Println()
 			_, _ = color.New(color.Bold, color.FgCyan).Print("This module is optional.")
 			fmt.Printf(" You can skip it if you're already familiar with this topic.\n\n")

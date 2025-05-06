@@ -65,7 +65,7 @@ message NextExerciseResponse {
   repeated File files_to_create = 3;
 
   bool is_text_only = 5;
-  bool is_skippable = 6;
+  bool is_optional = 6;
 
   message Module {
     string id = 1;

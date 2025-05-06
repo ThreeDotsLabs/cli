@@ -101,10 +101,10 @@ func (h *Handlers) writeExerciseFiles(resp *genproto.NextExerciseResponse, train
 	return h.config.WriteExerciseConfig(
 		trainingRootFs,
 		config.ExerciseConfig{
-			ExerciseID:  resp.ExerciseId,
-			Directory:   resp.Dir,
-			IsTextOnly:  resp.IsTextOnly,
-			IsSkippable: resp.IsSkippable,
+			ExerciseID: resp.ExerciseId,
+			Directory:  resp.Dir,
+			IsTextOnly: resp.IsTextOnly,
+			IsOptional: resp.IsOptional,
 		},
 	)
 }
