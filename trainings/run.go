@@ -279,16 +279,16 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 		// todo - support stderr and commands
 
 		if response.Finished {
+			fmt.Println("--------")
+
 			if response.Successful {
 				if !exerciseConfig.IsTextOnly {
-					fmt.Println("--------")
 					fmt.Println(color.GreenString("SUCCESS"))
 					fmt.Println("\nYou can now see an example solution on the website.")
 				}
 				successful = true
 				finished = true
 			} else {
-				fmt.Println("--------")
 				fmt.Println(color.RedString("FAIL"))
 				finished = true
 			}
