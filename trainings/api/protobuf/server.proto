@@ -140,6 +140,7 @@ message GetExercisesResponse {
   message Exercise {
     string id = 1;
     string name = 2;
+    bool is_skipped = 3;
   }
 
   repeated Module modules = 1;
