@@ -253,6 +253,30 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 		// todo - support stderr and commands
 
 		if response.Finished {
+			if len(response.GetSuiteResult().GetScenarios()) > 0 {
+				fmt.Println()
+				fmt.Println("Scenarios:")
+
+				for _, s := range response.GetSuiteResult().GetScenarios() {
+					if s.Failed {
+						fmt.Println("        " + color.RedString("✗") + " " + s.Name)
+					} else {
+						fmt.Println("        " + color.GreenString("✓") + " " + s.Name)
+					}
+
+					if len(s.Logs) > 0 {
+						lines := strings.Split(s.Logs, "\n")
+						for _, line := range lines {
+							if strings.TrimSpace(line) != "" {
+								fmt.Println("                " + line)
+							}
+						}
+					}
+				}
+
+				fmt.Println()
+			}
+
 			fmt.Println("--------")
 
 			if response.Successful {
