@@ -13,11 +13,6 @@ func (h *Handlers) printNotInATrainingDirectory() {
 	fmt.Printf("Please run %s if you didn't start training yet.\n", internal.SprintCommand("tdl training init"))
 }
 
-func (h *Handlers) printExerciseTips() {
-	fmt.Printf("To run solution, please execute " + internal.SprintCommand("tdl training run"))
-	fmt.Println()
-}
-
 func printFinished() {
 	fmt.Println("Congratulations, you finished the training " + color.YellowString("🏆"))
 }

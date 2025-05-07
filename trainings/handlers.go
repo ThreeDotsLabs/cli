@@ -1,7 +1,6 @@
 package trainings
 
 import (
-	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -47,13 +46,13 @@ func NewHandlers(cliVersion CliMetadata) *Handlers {
 	}
 }
 
-func (h *Handlers) newGrpcClient(ctx context.Context) genproto.TrainingsClient {
+func (h *Handlers) newGrpcClient() genproto.TrainingsClient {
 	globalConfig := h.config.GlobalConfig()
 
-	return h.newGrpcClientWithAddr(ctx, globalConfig.ServerAddr, globalConfig.Region, globalConfig.Insecure)
+	return h.newGrpcClientWithAddr(globalConfig.ServerAddr, globalConfig.Region, globalConfig.Insecure)
 }
 
-func (h *Handlers) newGrpcClientWithAddr(ctx context.Context, addr string, region string, insecure bool) genproto.TrainingsClient {
+func (h *Handlers) newGrpcClientWithAddr(addr string, region string, insecure bool) genproto.TrainingsClient {
 	if addr == "" {
 		addr = internal.DefaultTrainingsServer
 	}
@@ -82,7 +81,7 @@ func (h *Handlers) newGrpcClientWithAddr(ctx context.Context, addr string, regio
 			opts = append(opts, grpc.WithTransportCredentials(creds))
 		}
 
-		conn, err := grpc.DialContext(ctx, addr, opts...)
+		conn, err := grpc.NewClient(addr, opts...)
 
 		if err != nil {
 			panic(err)

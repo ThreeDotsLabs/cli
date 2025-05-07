@@ -14,7 +14,7 @@ import (
 )
 
 func (h *Handlers) Clone(ctx context.Context, executionID string, directory string) error {
-	resp, err := h.newGrpcClient(ctx).GetSolutionFiles(ctx, &genproto.GetSolutionFilesRequest{
+	resp, err := h.newGrpcClient().GetSolutionFiles(ctx, &genproto.GetSolutionFilesRequest{
 		ExecutionId: executionID,
 	})
 	if err != nil {

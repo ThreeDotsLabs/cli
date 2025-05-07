@@ -155,7 +155,7 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 
 func (h *Handlers) run(ctx context.Context, trainingRootFs *afero.BasePathFs) (bool, error) {
 	// todo - validate if exercise id == training exercise id? to ensure about consistency
-	success, err := h.runExercise(ctx, trainingRootFs)
+	success, err := h.runExercise(trainingRootFs)
 
 	if isExerciseNoLongerAvailable(err) {
 		fmt.Println(color.YellowString("We did update of the exercise code. Your local workspace is out of sync."))
@@ -180,7 +180,7 @@ func isExerciseNoLongerAvailable(err error) bool {
 	return status.Code(errors.Cause(err)) == codes.NotFound
 }
 
-func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePathFs) (bool, error) {
+func (h *Handlers) runExercise(trainingRootFs *afero.BasePathFs) (bool, error) {
 	exerciseConfig := h.config.ExerciseConfig(trainingRootFs)
 
 	solutionFiles, err := files.NewFiles().ReadSolutionFiles(trainingRootFs, exerciseConfig.Directory)
@@ -209,13 +209,13 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 		Token:      h.config.GlobalConfig().Token,
 	}
 
-	reqStr := strings.ReplaceAll(fmt.Sprintf("%s", req.String()), h.config.GlobalConfig().Token, "[token]")
+	reqStr := strings.ReplaceAll(req.String(), h.config.GlobalConfig().Token, "[token]")
 	logrus.WithField("req", reqStr).Info("Request prepared")
 
 	runCtx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
-	stream, err := h.newGrpcClient(ctxWithRequestHeader(ctx, h.cliMetadata)).VerifyExercise(runCtx, req)
+	stream, err := h.newGrpcClient().VerifyExercise(runCtx, req)
 	if err != nil {
 		return false, err
 	}

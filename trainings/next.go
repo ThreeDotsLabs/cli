@@ -64,7 +64,7 @@ func (h *Handlers) getNextExercise(
 	currentExerciseID string,
 	trainingRootFs *afero.BasePathFs,
 ) (resp *genproto.NextExerciseResponse, err error) {
-	resp, err = h.newGrpcClient(ctx).NextExercise(
+	resp, err = h.newGrpcClient().NextExercise(
 		ctxWithRequestHeader(ctx, h.cliMetadata),
 		&genproto.NextExerciseRequest{
 			TrainingName:      h.config.TrainingConfig(trainingRootFs).TrainingName,
