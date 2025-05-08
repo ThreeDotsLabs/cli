@@ -34,7 +34,7 @@ func (h *Handlers) Skip(ctx context.Context) error {
 		return nil
 	}
 
-	_, err = h.newGrpcClient(ctx).SkipExercise(context.Background(), &genproto.SkipExerciseRequest{
+	_, err = h.newGrpcClient().SkipExercise(context.Background(), &genproto.SkipExerciseRequest{
 		TrainingName: h.config.TrainingConfig(trainingRootFs).TrainingName,
 		ExerciseId:   exerciseConfig.ExerciseID,
 		Token:        h.config.GlobalConfig().Token,
