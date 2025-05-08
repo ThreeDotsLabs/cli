@@ -2,10 +2,12 @@ package trainings
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/fatih/color"
 
 	"github.com/ThreeDotsLabs/cli/internal"
+	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )
 
 func (h *Handlers) printNotInATrainingDirectory() {
@@ -31,4 +33,38 @@ func printTextOnlyExerciseInfo(trainingName, exerciseID string) {
 		color.GreenString("This lesson is text-only.\nYou can read it in your browser:"),
 		internal.ExerciseURL(trainingName, exerciseID)+"\n",
 	)
+}
+
+func PrintScenarios(scenarios []*genproto.ScenarioResult) {
+	fmt.Println()
+	fmt.Println("--------")
+	fmt.Println()
+
+	for _, s := range scenarios {
+		parts := strings.Split(s.Name, " / ")
+		var name string
+		if len(parts) > 1 {
+			name = color.New(color.Bold).Sprint(strings.Join(parts[0:len(parts)-1], " / ")) + " / " + parts[len(parts)-1]
+		} else {
+			name = color.New(color.Bold).Sprint(parts[0])
+		}
+
+		if s.Failed {
+			fmt.Println(color.RedString("✗") + " " + name)
+		} else {
+			fmt.Println(color.GreenString("✓") + " " + name)
+		}
+
+		if len(s.Logs) > 0 {
+			lines := strings.Split(strings.TrimSpace(s.Logs), "\n")
+			for _, line := range lines {
+				if strings.TrimSpace(line) != "" {
+					fmt.Println(line)
+				}
+			}
+			fmt.Println()
+		}
+	}
+
+	fmt.Println()
 }

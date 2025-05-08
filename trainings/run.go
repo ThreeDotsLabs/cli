@@ -254,35 +254,7 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 
 		if response.Finished {
 			if len(response.GetSuiteResult().GetScenarios()) > 0 {
-				fmt.Println()
-				fmt.Println("Scenarios:")
-
-				for _, s := range response.GetSuiteResult().GetScenarios() {
-					parts := strings.Split(s.Name, " / ")
-					var name string
-					if len(parts) > 1 {
-						name = color.New(color.Bold).Sprint(strings.Join(parts[0:len(parts)-1], " / ")) + " / " + parts[len(parts)-1]
-					} else {
-						name = color.New(color.Bold).Sprint(parts[0])
-					}
-
-					if s.Failed {
-						fmt.Println("        " + color.RedString("✗") + " " + name)
-					} else {
-						fmt.Println("        " + color.GreenString("✓") + " " + name)
-					}
-
-					if len(s.Logs) > 0 {
-						lines := strings.Split(s.Logs, "\n")
-						for _, line := range lines {
-							if strings.TrimSpace(line) != "" {
-								fmt.Println("                " + line)
-							}
-						}
-					}
-				}
-
-				fmt.Println()
+				PrintScenarios(response.GetSuiteResult().GetScenarios())
 			}
 
 			fmt.Println("--------")
