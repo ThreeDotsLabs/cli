@@ -31,6 +31,31 @@ func main() {
 	}
 }
 
+var configureFlags = []cli.Flag{
+	&cli.StringFlag{
+		Name:   "server",
+		Usage:  "custom server",
+		Hidden: true,
+	},
+	&cli.BoolFlag{
+		Name:   "insecure",
+		Usage:  "do not verify certificate",
+		Hidden: true,
+	},
+	&cli.StringFlag{
+		Name:  "region",
+		Usage: "the region to use (eu or us)",
+	},
+	&cli.BoolFlag{
+		Name:  "override",
+		Usage: "if config already exists, it will be overridden",
+		// deprecated, backward compatibility
+		Hidden: true,
+	},
+}
+
+var tokenDocs = fmt.Sprintf("token from %s", internal.WebsiteAddress)
+
 var app = &cli.App{
 	Name:      "tdl",
 	Usage:     "https://threedots.tech/ CLI.",
@@ -84,30 +109,9 @@ var app = &cli.App{
 			Subcommands: []*cli.Command{
 				{
 					Name:      "configure",
-					Usage:     "connect your environment with platform account",
-					ArgsUsage: fmt.Sprintf("<token from %s>", internal.WebsiteAddress),
-					Flags: []cli.Flag{
-						&cli.StringFlag{
-							Name:   "server",
-							Usage:  "custom server",
-							Hidden: true,
-						},
-						&cli.BoolFlag{
-							Name:   "insecure",
-							Usage:  "do not verify certificate",
-							Hidden: true,
-						},
-						&cli.StringFlag{
-							Name:  "region",
-							Usage: "the region to use (eu or us)",
-						},
-						&cli.BoolFlag{
-							Name:  "override",
-							Usage: "if config already exists, it will be overridden",
-							// deprecated, backward compatibility
-							Hidden: true,
-						},
-					},
+					Usage:     "connect your environment with https://academy.threedots.tech/ account",
+					ArgsUsage: fmt.Sprintf("<%s>", tokenDocs),
+					Flags:     configureFlags,
 					Action: func(c *cli.Context) error {
 						token := c.Args().First()
 
@@ -130,6 +134,10 @@ var app = &cli.App{
 						"<trainingID from %s> [directory, if empty defaults to trainingID]",
 						internal.WebsiteAddress,
 					),
+					Flags: append(configureFlags, &cli.StringFlag{
+						Name:  "token",
+						Usage: tokenDocs,
+					}),
 					Usage: "initialise training files in your current directory",
 					Action: func(c *cli.Context) error {
 						trainingID := c.Args().First()
@@ -143,7 +151,22 @@ var app = &cli.App{
 							dir = trainingID
 						}
 
-						return newHandlers(c).Init(c.Context, trainingID, dir)
+						handlers := newHandlers(c)
+
+						if c.String("token") != "" {
+							err := handlers.ConfigureGlobally(
+								c.Context,
+								c.String("token"),
+								c.String("server"),
+								c.String("region"),
+								c.Bool("insecure"),
+							)
+							if err != nil {
+								return fmt.Errorf("could not configure training: %w", err)
+							}
+						}
+
+						return handlers.Init(c.Context, trainingID, dir)
 					},
 				},
 				{
