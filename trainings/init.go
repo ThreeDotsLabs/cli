@@ -119,13 +119,13 @@ func (h *Handlers) startTraining(
 			return "", errors.Wrap(err, "can't create training root dir")
 		}
 
-		err = createGoWorkspace(trainingRootDir, trainingName)
+		err = createGoWorkspace(trainingRootDir)
 		if err != nil {
 			logrus.WithError(err).Warn("Could not create go workspace")
 		}
 	}
 
-	_, err = h.newGrpcClient(ctx).StartTraining(
+	_, err = h.newGrpcClient().StartTraining(
 		ctxWithRequestHeader(ctx, h.cliMetadata),
 		&genproto.StartTrainingRequest{
 			TrainingName: trainingName,
@@ -177,7 +177,7 @@ func writeGitignore(trainingRootFs *afero.BasePathFs) error {
 	return nil
 }
 
-func createGoWorkspace(trainingRoot, trainingName string) error {
+func createGoWorkspace(trainingRoot string) error {
 	cmd := exec.Command("go", "work", "init")
 	cmd.Dir = trainingRoot
 

@@ -15,7 +15,7 @@ func (h *Handlers) ConfigureGlobally(ctx context.Context, token, serverAddr, reg
 		}
 	}
 
-	resp, err := h.newGrpcClientWithAddr(ctx, serverAddr, region, insecure).Init(
+	resp, err := h.newGrpcClientWithAddr(serverAddr, region, insecure).Init(
 		ctxWithRequestHeader(ctx, h.cliMetadata),
 		&genproto.InitRequest{
 			Token: token,
