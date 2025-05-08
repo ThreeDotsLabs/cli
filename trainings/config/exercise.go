@@ -13,6 +13,7 @@ type ExerciseConfig struct {
 	ExerciseID string `toml:"exercise_id"`
 	Directory  string `toml:"directory"`
 	IsTextOnly bool   `toml:"is_text_only"`
+	IsOptional bool   `toml:"is_optional"`
 }
 
 func (c Config) WriteExerciseConfig(trainingRootFs afero.Fs, cfg ExerciseConfig) error {

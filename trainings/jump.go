@@ -44,6 +44,14 @@ func (h *Handlers) SelectExercise(ctx context.Context) (string, error) {
 	}, resp.Modules...)
 
 	for i := range resp.Modules {
+		for j := range resp.Modules[i].Exercises {
+			if resp.Modules[i].Exercises[j].Id == currentExerciseID {
+				resp.Modules[i].Exercises[j].Name += " (current)"
+			} else if resp.Modules[i].Exercises[j].IsSkipped {
+				resp.Modules[i].Exercises[j].Name += " (skipped)"
+			}
+		}
+
 		resp.Modules[i].Exercises = append([]*genproto.GetExercisesResponse_Exercise{
 			{
 				Id:   "",

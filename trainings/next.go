@@ -40,6 +40,13 @@ func (h *Handlers) setExercise(fs *afero.BasePathFs, exercise *genproto.NextExer
 		return false, nil
 	}
 
+	if exercise.GetExercise() != nil {
+		h.printCurrentExercise(
+			exercise.GetExercise().GetModule().GetName(),
+			exercise.GetExercise().GetName(),
+		)
+	}
+
 	if err := h.writeExerciseFiles(exercise, fs); err != nil {
 		return false, err
 	}
@@ -99,6 +106,7 @@ func (h *Handlers) writeExerciseFiles(resp *genproto.NextExerciseResponse, train
 			ExerciseID: resp.ExerciseId,
 			Directory:  resp.Dir,
 			IsTextOnly: resp.IsTextOnly,
+			IsOptional: resp.IsOptional,
 		},
 	)
 }

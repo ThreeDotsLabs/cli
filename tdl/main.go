@@ -270,6 +270,14 @@ Note: after completing this exercise, the next exercise will be the last one you
 						return handlers.Jump(c.Context, exerciseID)
 					},
 				},
+				{
+					Name:      "skip",
+					Usage:     "Skip the current exercise and the rest of the module (only selected modules)",
+					ArgsUsage: "",
+					Action: func(c *cli.Context) error {
+						return newHandlers(c).Skip(c.Context)
+					},
+				},
 			},
 		},
 		{
