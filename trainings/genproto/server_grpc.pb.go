@@ -28,6 +28,7 @@ const (
 	Trainings_GetSolutionFiles_FullMethodName = "/Trainings/GetSolutionFiles"
 	Trainings_GetExercises_FullMethodName     = "/Trainings/GetExercises"
 	Trainings_GetExercise_FullMethodName      = "/Trainings/GetExercise"
+	Trainings_SkipExercise_FullMethodName     = "/Trainings/SkipExercise"
 )
 
 // TrainingsClient is the client API for Trainings service.
@@ -42,6 +43,7 @@ type TrainingsClient interface {
 	GetSolutionFiles(ctx context.Context, in *GetSolutionFilesRequest, opts ...grpc.CallOption) (*GetSolutionFilesResponse, error)
 	GetExercises(ctx context.Context, in *GetExercisesRequest, opts ...grpc.CallOption) (*GetExercisesResponse, error)
 	GetExercise(ctx context.Context, in *GetExerciseRequest, opts ...grpc.CallOption) (*NextExerciseResponse, error)
+	SkipExercise(ctx context.Context, in *SkipExerciseRequest, opts ...grpc.CallOption) (*SkipExerciseResponse, error)
 }
 
 type trainingsClient struct {
@@ -141,6 +143,16 @@ func (c *trainingsClient) GetExercise(ctx context.Context, in *GetExerciseReques
 	return out, nil
 }
 
+func (c *trainingsClient) SkipExercise(ctx context.Context, in *SkipExerciseRequest, opts ...grpc.CallOption) (*SkipExerciseResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SkipExerciseResponse)
+	err := c.cc.Invoke(ctx, Trainings_SkipExercise_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TrainingsServer is the server API for Trainings service.
 // All implementations should embed UnimplementedTrainingsServer
 // for forward compatibility.
@@ -153,6 +165,7 @@ type TrainingsServer interface {
 	GetSolutionFiles(context.Context, *GetSolutionFilesRequest) (*GetSolutionFilesResponse, error)
 	GetExercises(context.Context, *GetExercisesRequest) (*GetExercisesResponse, error)
 	GetExercise(context.Context, *GetExerciseRequest) (*NextExerciseResponse, error)
+	SkipExercise(context.Context, *SkipExerciseRequest) (*SkipExerciseResponse, error)
 }
 
 // UnimplementedTrainingsServer should be embedded to have
@@ -185,6 +198,9 @@ func (UnimplementedTrainingsServer) GetExercises(context.Context, *GetExercisesR
 }
 func (UnimplementedTrainingsServer) GetExercise(context.Context, *GetExerciseRequest) (*NextExerciseResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetExercise not implemented")
+}
+func (UnimplementedTrainingsServer) SkipExercise(context.Context, *SkipExerciseRequest) (*SkipExerciseResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SkipExercise not implemented")
 }
 func (UnimplementedTrainingsServer) testEmbeddedByValue() {}
 
@@ -343,6 +359,24 @@ func _Trainings_GetExercise_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Trainings_SkipExercise_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SkipExerciseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TrainingsServer).SkipExercise(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Trainings_SkipExercise_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TrainingsServer).SkipExercise(ctx, req.(*SkipExerciseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Trainings_ServiceDesc is the grpc.ServiceDesc for Trainings service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -377,6 +411,10 @@ var Trainings_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetExercise",
 			Handler:    _Trainings_GetExercise_Handler,
+		},
+		{
+			MethodName: "SkipExercise",
+			Handler:    _Trainings_SkipExercise_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

@@ -67,12 +67,9 @@ func (h *Handlers) detachedRun(ctx context.Context, trainingRootFs *afero.BasePa
 		return err
 	}
 
-	finished, err := h.nextExercise(ctx, h.config.ExerciseConfig(trainingRootFs).ExerciseID, trainingRoot)
+	_, err = h.nextExercise(ctx, h.config.ExerciseConfig(trainingRootFs).ExerciseID, trainingRoot)
 	if err != nil {
 		return err
-	}
-	if finished {
-		return nil
 	}
 
 	return nil
@@ -114,7 +111,7 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 		promptResult := internal.Prompt(
 			internal.Actions{
 				{Shortcut: '\n', Action: "go to the next exercise", ShortcutAliases: []rune{'\r'}},
-				{Shortcut: 'r', Action: "re-run solution", ShortcutAliases: []rune{'\r'}},
+				{Shortcut: 'r', Action: "re-run solution"},
 				{Shortcut: 'q', Action: "quit"},
 			},
 			os.Stdin,
@@ -143,19 +140,48 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 		// this is refreshed config after nextExercise execution
 		currentExerciseConfig := h.config.ExerciseConfig(trainingRootFs)
 
-		if currentExerciseConfig.IsTextOnly {
+		if currentExerciseConfig.IsTextOnly && !currentExerciseConfig.IsOptional {
 			continue
 		}
 
-		if !internal.ConfirmPromptDefaultYes("run your solution") {
-			return nil
+		var continueText string
+		if currentExerciseConfig.IsTextOnly {
+			continueText = "continue"
+		} else {
+			continueText = "run your solution"
+		}
+
+		actions := internal.Actions{
+			{Shortcut: '\n', Action: continueText, ShortcutAliases: []rune{'\r'}},
+		}
+
+		if currentExerciseConfig.IsOptional {
+			fmt.Println()
+			_, _ = color.New(color.Bold, color.FgCyan).Print("This module is optional.")
+			fmt.Printf(" You can skip it if you're already familiar with this topic.\n\n")
+
+			actions = append(actions, internal.Action{Shortcut: 's', Action: "skip"})
+		}
+
+		actions = append(actions, internal.Action{Shortcut: 'q', Action: "quit"})
+
+		promptResult = internal.Prompt(actions, os.Stdin, os.Stdout)
+		if promptResult == 'q' {
+			os.Exit(0)
+		}
+
+		if promptResult == 's' {
+			err = h.Skip(ctx)
+			if err != nil {
+				return err
+			}
 		}
 	}
 }
 
 func (h *Handlers) run(ctx context.Context, trainingRootFs *afero.BasePathFs) (bool, error) {
 	// todo - validate if exercise id == training exercise id? to ensure about consistency
-	success, err := h.runExercise(ctx, trainingRootFs)
+	success, err := h.runExercise(trainingRootFs)
 
 	if isExerciseNoLongerAvailable(err) {
 		fmt.Println(color.YellowString("We did update of the exercise code. Your local workspace is out of sync."))
@@ -180,7 +206,7 @@ func isExerciseNoLongerAvailable(err error) bool {
 	return status.Code(errors.Cause(err)) == codes.NotFound
 }
 
-func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePathFs) (bool, error) {
+func (h *Handlers) runExercise(trainingRootFs *afero.BasePathFs) (bool, error) {
 	exerciseConfig := h.config.ExerciseConfig(trainingRootFs)
 
 	solutionFiles, err := files.NewFiles().ReadSolutionFiles(trainingRootFs, exerciseConfig.Directory)
@@ -209,13 +235,13 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 		Token:      h.config.GlobalConfig().Token,
 	}
 
-	reqStr := strings.ReplaceAll(fmt.Sprintf("%s", req.String()), h.config.GlobalConfig().Token, "[token]")
+	reqStr := strings.ReplaceAll(req.String(), h.config.GlobalConfig().Token, "[token]")
 	logrus.WithField("req", reqStr).Info("Request prepared")
 
 	runCtx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
-	stream, err := h.newGrpcClient(ctxWithRequestHeader(ctx, h.cliMetadata)).VerifyExercise(runCtx, req)
+	stream, err := h.newGrpcClient().VerifyExercise(runCtx, req)
 	if err != nil {
 		return false, err
 	}
@@ -260,8 +286,8 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 			fmt.Println("--------")
 
 			if response.Successful {
-				fmt.Println(color.GreenString("SUCCESS"))
 				if !exerciseConfig.IsTextOnly {
+					fmt.Println(color.GreenString("SUCCESS"))
 					fmt.Println("\nYou can now see an example solution on the website.")
 				}
 				successful = true

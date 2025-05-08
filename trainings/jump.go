@@ -24,7 +24,7 @@ func (h *Handlers) SelectExercise(ctx context.Context) (string, error) {
 
 	currentExerciseID := h.config.ExerciseConfig(trainingRootFs).ExerciseID
 
-	resp, err := h.newGrpcClient(ctx).GetExercises(ctx, &genproto.GetExercisesRequest{
+	resp, err := h.newGrpcClient().GetExercises(ctx, &genproto.GetExercisesRequest{
 		TrainingName: h.config.TrainingConfig(trainingRootFs).TrainingName,
 		Token:        h.config.GlobalConfig().Token,
 	})
@@ -44,6 +44,14 @@ func (h *Handlers) SelectExercise(ctx context.Context) (string, error) {
 	}, resp.Modules...)
 
 	for i := range resp.Modules {
+		for j := range resp.Modules[i].Exercises {
+			if resp.Modules[i].Exercises[j].Id == currentExerciseID {
+				resp.Modules[i].Exercises[j].Name += " (current)"
+			} else if resp.Modules[i].Exercises[j].IsSkipped {
+				resp.Modules[i].Exercises[j].Name += " (skipped)"
+			}
+		}
+
 		resp.Modules[i].Exercises = append([]*genproto.GetExercisesResponse_Exercise{
 			{
 				Id:   "",
@@ -139,7 +147,7 @@ func (h *Handlers) FindExercise(ctx context.Context, exerciseID string) (string,
 
 	currentExerciseID := h.config.ExerciseConfig(trainingRootFs).ExerciseID
 
-	resp, err := h.newGrpcClient(ctx).GetExercises(ctx, &genproto.GetExercisesRequest{
+	resp, err := h.newGrpcClient().GetExercises(ctx, &genproto.GetExercisesRequest{
 		TrainingName: h.config.TrainingConfig(trainingRootFs).TrainingName,
 		Token:        h.config.GlobalConfig().Token,
 	})
@@ -208,7 +216,7 @@ func (h *Handlers) Jump(ctx context.Context, exerciseID string) error {
 	}
 	trainingRootFs := newTrainingRootFs(trainingRoot)
 
-	resp, err := h.newGrpcClient(ctx).GetExercise(ctx, &genproto.GetExerciseRequest{
+	resp, err := h.newGrpcClient().GetExercise(ctx, &genproto.GetExerciseRequest{
 		TrainingName: h.config.TrainingConfig(trainingRootFs).TrainingName,
 		Token:        h.config.GlobalConfig().Token,
 		ExerciseId:   exerciseID,

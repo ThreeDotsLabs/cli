@@ -40,6 +40,13 @@ func (h *Handlers) setExercise(fs *afero.BasePathFs, exercise *genproto.NextExer
 		return false, nil
 	}
 
+	if exercise.GetExercise() != nil {
+		h.printCurrentExercise(
+			exercise.GetExercise().GetModule().GetName(),
+			exercise.GetExercise().GetName(),
+		)
+	}
+
 	if err := h.writeExerciseFiles(exercise, fs); err != nil {
 		return false, err
 	}
@@ -64,7 +71,7 @@ func (h *Handlers) getNextExercise(
 	currentExerciseID string,
 	trainingRootFs *afero.BasePathFs,
 ) (resp *genproto.NextExerciseResponse, err error) {
-	resp, err = h.newGrpcClient(ctx).NextExercise(
+	resp, err = h.newGrpcClient().NextExercise(
 		ctxWithRequestHeader(ctx, h.cliMetadata),
 		&genproto.NextExerciseRequest{
 			TrainingName:      h.config.TrainingConfig(trainingRootFs).TrainingName,
@@ -99,6 +106,7 @@ func (h *Handlers) writeExerciseFiles(resp *genproto.NextExerciseResponse, train
 			ExerciseID: resp.ExerciseId,
 			Directory:  resp.Dir,
 			IsTextOnly: resp.IsTextOnly,
+			IsOptional: resp.IsOptional,
 		},
 	)
 }
