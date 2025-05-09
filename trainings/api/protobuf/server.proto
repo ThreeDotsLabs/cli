@@ -112,6 +112,18 @@ message VerifyExerciseResponse {
   string verification_id = 6;
 
   map<string, string> metadata = 7;
+
+  SuiteResult suite_result = 11;
+}
+
+message SuiteResult {
+  repeated ScenarioResult scenarios = 1;
+}
+
+message ScenarioResult {
+  string name = 1;
+  bool failed = 2;
+  string logs = 3;
 }
 
 message GetSolutionFilesRequest {

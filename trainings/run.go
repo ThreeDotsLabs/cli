@@ -279,6 +279,10 @@ func (h *Handlers) runExercise(trainingRootFs *afero.BasePathFs) (bool, error) {
 		// todo - support stderr and commands
 
 		if response.Finished {
+			if len(response.GetSuiteResult().GetScenarios()) > 0 {
+				PrintScenarios(response.GetSuiteResult().GetScenarios())
+			}
+
 			fmt.Println("--------")
 
 			if response.Successful {
