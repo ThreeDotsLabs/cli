@@ -3,6 +3,7 @@ package trainings
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/fatih/color"
 
@@ -22,6 +23,15 @@ func (h *Handlers) printNotInATrainingDirectory() {
 
 func printFinished() {
 	fmt.Println("Congratulations, you finished the training " + color.YellowString("🏆"))
+}
+
+func printCohortBatchDone(date *time.Time) {
+	fmt.Println("Congratulations, you're done with this batch of modules! " + color.YellowString("✅"))
+	fmt.Println("Get some rest and come back later to continue the training.")
+
+	if date != nil {
+		fmt.Println("The next batch will be available on " + color.YellowString(date.Format("Monday Jan 2 2006")) + ".")
+	}
 }
 
 func printPaymentRequired() {
