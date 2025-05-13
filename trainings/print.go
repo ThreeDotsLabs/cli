@@ -26,7 +26,9 @@ func printFinished() {
 }
 
 func printCohortBatchDone(date *time.Time) {
-	fmt.Println("Congratulations, you're done with this batch of modules! " + color.YellowString("✅"))
+	fmt.Println()
+	fmt.Println("Good job, you're done with the current batch of modules! " + color.YellowString("✅"))
+	fmt.Println()
 	fmt.Println("Get some rest and come back later to continue the training.")
 
 	if date != nil {
