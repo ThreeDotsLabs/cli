@@ -2,6 +2,7 @@ package trainings
 
 import (
 	"context"
+	"time"
 
 	"github.com/ThreeDotsLabs/cli/trainings/config"
 	"github.com/ThreeDotsLabs/cli/trainings/files"
@@ -33,6 +34,16 @@ func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string, t
 func (h *Handlers) setExercise(fs *afero.BasePathFs, exercise *genproto.NextExerciseResponse, trainingRoot string) (finished bool, err error) {
 	if exercise.TrainingStatus == genproto.NextExerciseResponse_FINISHED {
 		printFinished()
+		return true, nil
+	}
+	if exercise.TrainingStatus == genproto.NextExerciseResponse_COHORT_BATCH_DONE {
+		var date *time.Time
+		if exercise.GetNextBatchDate() != nil {
+			t := exercise.GetNextBatchDate().AsTime()
+			date = &t
+		}
+
+		printCohortBatchDone(date)
 		return true, nil
 	}
 	if exercise.TrainingStatus == genproto.NextExerciseResponse_PAYMENT_REQUIRED {
