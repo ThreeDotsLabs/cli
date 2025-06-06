@@ -24,27 +24,56 @@ func CheckForUpdate(currentVersion string) {
 		return
 	}
 
-	lastUpdate, _ := LastUpdateCheckTime()
+	updateInfo, _ := getUpdateInfo()
 
-	if time.Since(lastUpdate) < 24*time.Hour {
+	if updateInfo.UpdateAvailable && updateInfo.CurrentVersion == currentVersion {
+		printVersionNotice(updateInfo.CurrentVersion, updateInfo.AvailableVersion)
 		return
 	}
 
-	defer func() {
-		_ = StoreUpdateCheckTime(time.Now().UTC())
-	}()
+	if time.Since(updateInfo.LastChecked) < time.Hour {
+		return
+	}
 
+	latestVersion := getLatestVersion()
+
+	if latestVersion != "" && latestVersion != currentVersion {
+		updateInfo.CurrentVersion = currentVersion
+		updateInfo.AvailableVersion = latestVersion
+		updateInfo.UpdateAvailable = true
+
+		printVersionNotice(currentVersion, latestVersion)
+	} else {
+		updateInfo.CurrentVersion = currentVersion
+		updateInfo.AvailableVersion = ""
+		updateInfo.UpdateAvailable = false
+	}
+
+	updateInfo.LastChecked = time.Now()
+
+	_ = storeUpdateInfo(updateInfo)
+}
+
+func printVersionNotice(currentVersion string, availableVersion string) {
+	c := color.New(color.FgHiYellow)
+	_, _ = c.Printf("A new version of the CLI is available: %s (current: %s)\n", availableVersion, currentVersion)
+	_, _ = c.Printf("Some features may not work correctly. Please update ASAP!\n")
+	_, _ = c.Printf("See instructions at: %v\n", repoURL)
+	fmt.Println()
+}
+
+func getLatestVersion() string {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, releasesURL, nil)
 	if err != nil {
-		return
+		return ""
 	}
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return
+		return ""
 	}
 	defer func() {
 		_ = resp.Body.Close()
@@ -52,43 +81,52 @@ func CheckForUpdate(currentVersion string) {
 
 	var release releaseResponse
 	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-		return
+		return ""
 	}
 
-	latestVersion := strings.TrimLeft(release.TagName, "v")
-
-	if latestVersion != currentVersion {
-		c := color.New(color.FgHiYellow)
-		_, _ = c.Printf("A new version is available: %s (current: %s)\n", release.TagName, currentVersion)
-		_, _ = c.Printf("Visit %v to update\n", repoURL)
-		fmt.Println()
-	}
+	return strings.TrimLeft(release.TagName, "v")
 }
 
-func lastUpdateCheckPath() string {
-	return path.Join(GlobalConfigDir(), "last-update-check")
+func updateInfoPath() string {
+	return path.Join(GlobalConfigDir(), "update")
 }
 
-func LastUpdateCheckTime() (time.Time, error) {
-	if !fileExists(lastUpdateCheckPath()) {
-		return time.Time{}, nil
+type UpdateInfo struct {
+	CurrentVersion   string    `json:"current_version"`
+	AvailableVersion string    `json:"available_version"`
+	UpdateAvailable  bool      `json:"update_available"`
+	LastChecked      time.Time `json:"last_checked"`
+}
+
+func getUpdateInfo() (UpdateInfo, error) {
+	if !fileExists(updateInfoPath()) {
+		return UpdateInfo{}, nil
 	}
 
-	content, err := os.ReadFile(lastUpdateCheckPath())
+	content, err := os.ReadFile(updateInfoPath())
 	if err != nil {
-		return time.Time{}, err
+		return UpdateInfo{}, fmt.Errorf("failed to read update file: %w", err)
 	}
 
-	t, err := time.Parse(time.RFC3339, string(content))
-	if err != nil {
-		return time.Time{}, err
+	var info UpdateInfo
+	if err := json.Unmarshal(content, &info); err != nil {
+		return UpdateInfo{}, fmt.Errorf("failed to unmarshal update info: %w", err)
 	}
 
-	return t, nil
+	return info, nil
 }
 
-func StoreUpdateCheckTime(t time.Time) error {
-	return os.WriteFile(lastUpdateCheckPath(), []byte(t.Format(time.RFC3339)), 0644)
+func storeUpdateInfo(info UpdateInfo) error {
+	content, err := json.Marshal(info)
+	if err != nil {
+		return fmt.Errorf("failed to marshal update info: %w", err)
+	}
+
+	if err := os.WriteFile(updateInfoPath(), content, 0644); err != nil {
+		return fmt.Errorf("failed to write update info file: %w", err)
+	}
+
+	return nil
 }
 
 func fileExists(path string) bool {
