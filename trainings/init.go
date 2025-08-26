@@ -178,6 +178,10 @@ func writeGitignore(trainingRootFs *afero.BasePathFs) error {
 }
 
 func createGoWorkspace(trainingRoot string) error {
+	if !hasGo() {
+		return nil
+	}
+
 	cmd := exec.Command("go", "work", "init")
 	cmd.Dir = trainingRoot
 
@@ -201,6 +205,10 @@ func hasGoWorkspace(trainingRoot string) bool {
 }
 
 func addModuleToWorkspace(trainingRoot string, modulePath string) error {
+	if !hasGo() {
+		return nil
+	}
+
 	if !hasGoWorkspace(trainingRoot) {
 		return nil
 	}
@@ -215,6 +223,11 @@ func addModuleToWorkspace(trainingRoot string, modulePath string) error {
 	}
 
 	return nil
+}
+
+func hasGo() bool {
+	_, err := exec.LookPath("go")
+	return err == nil
 }
 
 func (h *Handlers) showTrainingStartPrompt(trainingDir string) error {
