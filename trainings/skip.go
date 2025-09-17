@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings/config"
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
@@ -20,6 +21,20 @@ func (h *Handlers) Skip(ctx context.Context) error {
 	trainingRootFs := newTrainingRootFs(trainingRoot)
 	exerciseConfig := h.config.ExerciseConfig(trainingRootFs)
 
+	resp, err := h.newGrpcClient().CanSkipExercise(context.Background(), &genproto.CanSkipExerciseRequest{
+		TrainingName: h.config.TrainingConfig(trainingRootFs).TrainingName,
+		ExerciseId:   exerciseConfig.ExerciseID,
+		Token:        h.config.GlobalConfig().Token,
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	if !resp.CanSkip {
+		fmt.Println(color.New(color.FgYellow).Sprint("You cannot skip this module."))
+		return nil
+	}
+
 	fmt.Println()
 	fmt.Println(`Some modules are optional and you can skip them.
 
@@ -34,10 +49,19 @@ func (h *Handlers) Skip(ctx context.Context) error {
 		return nil
 	}
 
+	var skipAll bool
+	if resp.CanSkipAllOptional {
+		fmt.Println("You can also skip all the remaining optional modules in this training.")
+		fmt.Printf("It will let you get the certificate now and you can always come back to the skipped modules later using \"tdl training jump\".\n\n")
+
+		skipAll = internal.ConfirmPromptDefaultYes("skip all the remaining optional modules in this training")
+	}
+
 	_, err = h.newGrpcClient().SkipExercise(context.Background(), &genproto.SkipExerciseRequest{
-		TrainingName: h.config.TrainingConfig(trainingRootFs).TrainingName,
-		ExerciseId:   exerciseConfig.ExerciseID,
-		Token:        h.config.GlobalConfig().Token,
+		TrainingName:    h.config.TrainingConfig(trainingRootFs).TrainingName,
+		ExerciseId:      exerciseConfig.ExerciseID,
+		Token:           h.config.GlobalConfig().Token,
+		SkipAllOptional: skipAll,
 	})
 	if err != nil {
 		panic(err)

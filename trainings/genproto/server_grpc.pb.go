@@ -28,6 +28,7 @@ const (
 	Trainings_GetSolutionFiles_FullMethodName = "/Trainings/GetSolutionFiles"
 	Trainings_GetExercises_FullMethodName     = "/Trainings/GetExercises"
 	Trainings_GetExercise_FullMethodName      = "/Trainings/GetExercise"
+	Trainings_CanSkipExercise_FullMethodName  = "/Trainings/CanSkipExercise"
 	Trainings_SkipExercise_FullMethodName     = "/Trainings/SkipExercise"
 )
 
@@ -43,6 +44,7 @@ type TrainingsClient interface {
 	GetSolutionFiles(ctx context.Context, in *GetSolutionFilesRequest, opts ...grpc.CallOption) (*GetSolutionFilesResponse, error)
 	GetExercises(ctx context.Context, in *GetExercisesRequest, opts ...grpc.CallOption) (*GetExercisesResponse, error)
 	GetExercise(ctx context.Context, in *GetExerciseRequest, opts ...grpc.CallOption) (*NextExerciseResponse, error)
+	CanSkipExercise(ctx context.Context, in *CanSkipExerciseRequest, opts ...grpc.CallOption) (*CanSkipExerciseResponse, error)
 	SkipExercise(ctx context.Context, in *SkipExerciseRequest, opts ...grpc.CallOption) (*SkipExerciseResponse, error)
 }
 
@@ -143,6 +145,16 @@ func (c *trainingsClient) GetExercise(ctx context.Context, in *GetExerciseReques
 	return out, nil
 }
 
+func (c *trainingsClient) CanSkipExercise(ctx context.Context, in *CanSkipExerciseRequest, opts ...grpc.CallOption) (*CanSkipExerciseResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CanSkipExerciseResponse)
+	err := c.cc.Invoke(ctx, Trainings_CanSkipExercise_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *trainingsClient) SkipExercise(ctx context.Context, in *SkipExerciseRequest, opts ...grpc.CallOption) (*SkipExerciseResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SkipExerciseResponse)
@@ -165,6 +177,7 @@ type TrainingsServer interface {
 	GetSolutionFiles(context.Context, *GetSolutionFilesRequest) (*GetSolutionFilesResponse, error)
 	GetExercises(context.Context, *GetExercisesRequest) (*GetExercisesResponse, error)
 	GetExercise(context.Context, *GetExerciseRequest) (*NextExerciseResponse, error)
+	CanSkipExercise(context.Context, *CanSkipExerciseRequest) (*CanSkipExerciseResponse, error)
 	SkipExercise(context.Context, *SkipExerciseRequest) (*SkipExerciseResponse, error)
 }
 
@@ -198,6 +211,9 @@ func (UnimplementedTrainingsServer) GetExercises(context.Context, *GetExercisesR
 }
 func (UnimplementedTrainingsServer) GetExercise(context.Context, *GetExerciseRequest) (*NextExerciseResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetExercise not implemented")
+}
+func (UnimplementedTrainingsServer) CanSkipExercise(context.Context, *CanSkipExerciseRequest) (*CanSkipExerciseResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CanSkipExercise not implemented")
 }
 func (UnimplementedTrainingsServer) SkipExercise(context.Context, *SkipExerciseRequest) (*SkipExerciseResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SkipExercise not implemented")
@@ -359,6 +375,24 @@ func _Trainings_GetExercise_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Trainings_CanSkipExercise_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CanSkipExerciseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TrainingsServer).CanSkipExercise(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Trainings_CanSkipExercise_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TrainingsServer).CanSkipExercise(ctx, req.(*CanSkipExerciseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Trainings_SkipExercise_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SkipExerciseRequest)
 	if err := dec(in); err != nil {
@@ -411,6 +445,10 @@ var Trainings_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetExercise",
 			Handler:    _Trainings_GetExercise_Handler,
+		},
+		{
+			MethodName: "CanSkipExercise",
+			Handler:    _Trainings_CanSkipExercise_Handler,
 		},
 		{
 			MethodName: "SkipExercise",
