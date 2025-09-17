@@ -19,6 +19,7 @@ service Trainings {
   rpc GetExercises(GetExercisesRequest) returns (GetExercisesResponse) {};
   rpc GetExercise(GetExerciseRequest) returns (NextExerciseResponse) {};
 
+  rpc CanSkipExercise(CanSkipExerciseRequest) returns (CanSkipExerciseResponse) {};
   rpc SkipExercise(SkipExerciseRequest) returns (SkipExerciseResponse) {};
 }
 
@@ -172,6 +173,18 @@ message SkipExerciseRequest {
   string training_name = 1;
   string exercise_id = 2;
   string token = 3;
+  bool skip_all_optional = 4;
 }
 
 message SkipExerciseResponse {}
+
+message CanSkipExerciseRequest {
+  string training_name = 1;
+  string exercise_id = 2;
+  string token = 3;
+}
+
+message CanSkipExerciseResponse {
+  bool can_skip = 1;
+  bool can_skip_all_optional = 2;
+}
