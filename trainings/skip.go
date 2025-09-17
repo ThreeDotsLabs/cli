@@ -5,10 +5,16 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings/config"
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 	"github.com/fatih/color"
+	"github.com/manifoldco/promptui"
+)
+
+const (
+	actionSkipAll     = "Skip all remaining optional modules"
+	actionSkipCurrent = "Skip the current module"
+	actionCancel      = "(cancel)"
 )
 
 func (h *Handlers) Skip(ctx context.Context) error {
@@ -27,11 +33,11 @@ func (h *Handlers) Skip(ctx context.Context) error {
 		Token:        h.config.GlobalConfig().Token,
 	})
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	if !resp.CanSkip {
-		fmt.Println(color.New(color.FgYellow).Sprint("You cannot skip this module."))
+		fmt.Println(color.New(color.Bold, color.FgYellow).Sprint("You cannot skip this module."))
 		return nil
 	}
 
@@ -44,17 +50,42 @@ func (h *Handlers) Skip(ctx context.Context) error {
 	- You can always come back to the skipped module later using "tdl training jump".
 `)
 
-	if !internal.ConfirmPromptDefaultYes("skip the current module") {
+	actions := []string{actionSkipCurrent, actionCancel}
+
+	if resp.CanSkipAllOptional {
+		actions = append([]string{actionSkipAll}, actions...)
+
+		fmt.Println(color.New(color.Bold, color.FgYellow).Sprint("\nYou can also skip all the remaining optional modules in this training."))
+		fmt.Printf("It will let you get the certificate now and you can always come back to the skipped modules later.\n\n")
+	}
+
+	moduleSelect := promptui.Select{
+		Label: "Choose what to do",
+		Items: actions,
+		Templates: &promptui.SelectTemplates{
+			Label:    "{{ . }}",
+			Active:   "{{ . | cyan }}",
+			Inactive: "{{ . }}",
+		},
+		HideSelected: true,
+	}
+
+	_, choice, err := moduleSelect.Run()
+	if err != nil {
 		fmt.Println("Skipping cancelled")
-		return nil
+		return err
 	}
 
 	var skipAll bool
-	if resp.CanSkipAllOptional {
-		fmt.Println("You can also skip all the remaining optional modules in this training.")
-		fmt.Printf("It will let you get the certificate now and you can always come back to the skipped modules later using \"tdl training jump\".\n\n")
-
-		skipAll = internal.ConfirmPromptDefaultYes("skip all the remaining optional modules in this training")
+	if choice == actionSkipAll {
+		fmt.Println("Skipping all remaining optional modules.")
+		skipAll = true
+	} else if choice == actionSkipCurrent {
+		fmt.Println("Skipping current module.")
+		skipAll = false
+	} else {
+		fmt.Println("Skipping cancelled")
+		return nil
 	}
 
 	_, err = h.newGrpcClient().SkipExercise(context.Background(), &genproto.SkipExerciseRequest{
@@ -64,12 +95,12 @@ func (h *Handlers) Skip(ctx context.Context) error {
 		SkipAllOptional: skipAll,
 	})
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	_, err = h.nextExercise(ctx, "", trainingRoot)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	return nil
