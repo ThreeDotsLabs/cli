@@ -20,16 +20,17 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Trainings_Init_FullMethodName             = "/Trainings/Init"
-	Trainings_GetTrainings_FullMethodName     = "/Trainings/GetTrainings"
-	Trainings_StartTraining_FullMethodName    = "/Trainings/StartTraining"
-	Trainings_NextExercise_FullMethodName     = "/Trainings/NextExercise"
-	Trainings_VerifyExercise_FullMethodName   = "/Trainings/VerifyExercise"
-	Trainings_GetSolutionFiles_FullMethodName = "/Trainings/GetSolutionFiles"
-	Trainings_GetExercises_FullMethodName     = "/Trainings/GetExercises"
-	Trainings_GetExercise_FullMethodName      = "/Trainings/GetExercise"
-	Trainings_CanSkipExercise_FullMethodName  = "/Trainings/CanSkipExercise"
-	Trainings_SkipExercise_FullMethodName     = "/Trainings/SkipExercise"
+	Trainings_Init_FullMethodName                = "/Trainings/Init"
+	Trainings_GetTrainings_FullMethodName        = "/Trainings/GetTrainings"
+	Trainings_StartTraining_FullMethodName       = "/Trainings/StartTraining"
+	Trainings_NextExercise_FullMethodName        = "/Trainings/NextExercise"
+	Trainings_VerifyExercise_FullMethodName      = "/Trainings/VerifyExercise"
+	Trainings_GetSolutionFiles_FullMethodName    = "/Trainings/GetSolutionFiles"
+	Trainings_GetAllSolutionFiles_FullMethodName = "/Trainings/GetAllSolutionFiles"
+	Trainings_GetExercises_FullMethodName        = "/Trainings/GetExercises"
+	Trainings_GetExercise_FullMethodName         = "/Trainings/GetExercise"
+	Trainings_CanSkipExercise_FullMethodName     = "/Trainings/CanSkipExercise"
+	Trainings_SkipExercise_FullMethodName        = "/Trainings/SkipExercise"
 )
 
 // TrainingsClient is the client API for Trainings service.
@@ -42,6 +43,7 @@ type TrainingsClient interface {
 	NextExercise(ctx context.Context, in *NextExerciseRequest, opts ...grpc.CallOption) (*NextExerciseResponse, error)
 	VerifyExercise(ctx context.Context, in *VerifyExerciseRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[VerifyExerciseResponse], error)
 	GetSolutionFiles(ctx context.Context, in *GetSolutionFilesRequest, opts ...grpc.CallOption) (*GetSolutionFilesResponse, error)
+	GetAllSolutionFiles(ctx context.Context, in *GetAllSolutionFilesRequest, opts ...grpc.CallOption) (*GetAllSolutionFilesResponse, error)
 	GetExercises(ctx context.Context, in *GetExercisesRequest, opts ...grpc.CallOption) (*GetExercisesResponse, error)
 	GetExercise(ctx context.Context, in *GetExerciseRequest, opts ...grpc.CallOption) (*NextExerciseResponse, error)
 	CanSkipExercise(ctx context.Context, in *CanSkipExerciseRequest, opts ...grpc.CallOption) (*CanSkipExerciseResponse, error)
@@ -125,6 +127,16 @@ func (c *trainingsClient) GetSolutionFiles(ctx context.Context, in *GetSolutionF
 	return out, nil
 }
 
+func (c *trainingsClient) GetAllSolutionFiles(ctx context.Context, in *GetAllSolutionFilesRequest, opts ...grpc.CallOption) (*GetAllSolutionFilesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAllSolutionFilesResponse)
+	err := c.cc.Invoke(ctx, Trainings_GetAllSolutionFiles_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *trainingsClient) GetExercises(ctx context.Context, in *GetExercisesRequest, opts ...grpc.CallOption) (*GetExercisesResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetExercisesResponse)
@@ -175,6 +187,7 @@ type TrainingsServer interface {
 	NextExercise(context.Context, *NextExerciseRequest) (*NextExerciseResponse, error)
 	VerifyExercise(*VerifyExerciseRequest, grpc.ServerStreamingServer[VerifyExerciseResponse]) error
 	GetSolutionFiles(context.Context, *GetSolutionFilesRequest) (*GetSolutionFilesResponse, error)
+	GetAllSolutionFiles(context.Context, *GetAllSolutionFilesRequest) (*GetAllSolutionFilesResponse, error)
 	GetExercises(context.Context, *GetExercisesRequest) (*GetExercisesResponse, error)
 	GetExercise(context.Context, *GetExerciseRequest) (*NextExerciseResponse, error)
 	CanSkipExercise(context.Context, *CanSkipExerciseRequest) (*CanSkipExerciseResponse, error)
@@ -205,6 +218,9 @@ func (UnimplementedTrainingsServer) VerifyExercise(*VerifyExerciseRequest, grpc.
 }
 func (UnimplementedTrainingsServer) GetSolutionFiles(context.Context, *GetSolutionFilesRequest) (*GetSolutionFilesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSolutionFiles not implemented")
+}
+func (UnimplementedTrainingsServer) GetAllSolutionFiles(context.Context, *GetAllSolutionFilesRequest) (*GetAllSolutionFilesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAllSolutionFiles not implemented")
 }
 func (UnimplementedTrainingsServer) GetExercises(context.Context, *GetExercisesRequest) (*GetExercisesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetExercises not implemented")
@@ -339,6 +355,24 @@ func _Trainings_GetSolutionFiles_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Trainings_GetAllSolutionFiles_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAllSolutionFilesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TrainingsServer).GetAllSolutionFiles(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Trainings_GetAllSolutionFiles_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TrainingsServer).GetAllSolutionFiles(ctx, req.(*GetAllSolutionFilesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Trainings_GetExercises_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetExercisesRequest)
 	if err := dec(in); err != nil {
@@ -437,6 +471,10 @@ var Trainings_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetSolutionFiles",
 			Handler:    _Trainings_GetSolutionFiles_Handler,
+		},
+		{
+			MethodName: "GetAllSolutionFiles",
+			Handler:    _Trainings_GetAllSolutionFiles_Handler,
 		},
 		{
 			MethodName: "GetExercises",
