@@ -149,8 +149,7 @@ message GetAllSolutionFilesRequest {
 }
 
 message GetAllSolutionFilesResponse {
-  string training_name = 1;
-  repeated NextExerciseResponse exercises = 2;
+  repeated NextExerciseResponse exercises = 1;
 }
 
 message GetExercisesRequest {
