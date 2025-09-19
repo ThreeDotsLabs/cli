@@ -278,13 +278,6 @@ Note: after completing this exercise, the next exercise will be the last one you
 					},
 				},
 				{
-					Name:  "restore",
-					Usage: "Restore your latest solution files. Useful when starting from scratch on another machine",
-					Action: func(c *cli.Context) error {
-						return newHandlers(c).Restore(c.Context)
-					},
-				},
-				{
 					Name:      "skip",
 					Usage:     "Skip the current exercise and the rest of the module (only selected modules)",
 					ArgsUsage: "",
