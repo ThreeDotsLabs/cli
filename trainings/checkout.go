@@ -33,6 +33,10 @@ func (h *Handlers) Checkout(ctx context.Context) error {
 		"err":  err,
 	}).Debug("Received solutions from server")
 
+	// TODO Show current?
+	// TODO Show success/failure
+	// TODO Cancel
+
 	selectUI := promptui.Select{
 		Label: "Select a solution to checkout",
 		Items: resp.Solutions,
