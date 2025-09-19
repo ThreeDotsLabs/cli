@@ -25,6 +25,7 @@ const (
 	Trainings_StartTraining_FullMethodName       = "/Trainings/StartTraining"
 	Trainings_NextExercise_FullMethodName        = "/Trainings/NextExercise"
 	Trainings_VerifyExercise_FullMethodName      = "/Trainings/VerifyExercise"
+	Trainings_GetSolutions_FullMethodName        = "/Trainings/GetSolutions"
 	Trainings_GetSolutionFiles_FullMethodName    = "/Trainings/GetSolutionFiles"
 	Trainings_GetAllSolutionFiles_FullMethodName = "/Trainings/GetAllSolutionFiles"
 	Trainings_GetExercises_FullMethodName        = "/Trainings/GetExercises"
@@ -39,9 +40,10 @@ const (
 type TrainingsClient interface {
 	Init(ctx context.Context, in *InitRequest, opts ...grpc.CallOption) (*InitResponse, error)
 	GetTrainings(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetTrainingsResponse, error)
-	StartTraining(ctx context.Context, in *StartTrainingRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	StartTraining(ctx context.Context, in *StartTrainingRequest, opts ...grpc.CallOption) (*StartTrainingResponse, error)
 	NextExercise(ctx context.Context, in *NextExerciseRequest, opts ...grpc.CallOption) (*NextExerciseResponse, error)
 	VerifyExercise(ctx context.Context, in *VerifyExerciseRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[VerifyExerciseResponse], error)
+	GetSolutions(ctx context.Context, in *GetSolutionsRequest, opts ...grpc.CallOption) (*GetSolutionsResponse, error)
 	GetSolutionFiles(ctx context.Context, in *GetSolutionFilesRequest, opts ...grpc.CallOption) (*GetSolutionFilesResponse, error)
 	GetAllSolutionFiles(ctx context.Context, in *GetAllSolutionFilesRequest, opts ...grpc.CallOption) (*GetAllSolutionFilesResponse, error)
 	GetExercises(ctx context.Context, in *GetExercisesRequest, opts ...grpc.CallOption) (*GetExercisesResponse, error)
@@ -78,9 +80,9 @@ func (c *trainingsClient) GetTrainings(ctx context.Context, in *emptypb.Empty, o
 	return out, nil
 }
 
-func (c *trainingsClient) StartTraining(ctx context.Context, in *StartTrainingRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *trainingsClient) StartTraining(ctx context.Context, in *StartTrainingRequest, opts ...grpc.CallOption) (*StartTrainingResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(emptypb.Empty)
+	out := new(StartTrainingResponse)
 	err := c.cc.Invoke(ctx, Trainings_StartTraining_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -116,6 +118,16 @@ func (c *trainingsClient) VerifyExercise(ctx context.Context, in *VerifyExercise
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Trainings_VerifyExerciseClient = grpc.ServerStreamingClient[VerifyExerciseResponse]
+
+func (c *trainingsClient) GetSolutions(ctx context.Context, in *GetSolutionsRequest, opts ...grpc.CallOption) (*GetSolutionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSolutionsResponse)
+	err := c.cc.Invoke(ctx, Trainings_GetSolutions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
 
 func (c *trainingsClient) GetSolutionFiles(ctx context.Context, in *GetSolutionFilesRequest, opts ...grpc.CallOption) (*GetSolutionFilesResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -183,9 +195,10 @@ func (c *trainingsClient) SkipExercise(ctx context.Context, in *SkipExerciseRequ
 type TrainingsServer interface {
 	Init(context.Context, *InitRequest) (*InitResponse, error)
 	GetTrainings(context.Context, *emptypb.Empty) (*GetTrainingsResponse, error)
-	StartTraining(context.Context, *StartTrainingRequest) (*emptypb.Empty, error)
+	StartTraining(context.Context, *StartTrainingRequest) (*StartTrainingResponse, error)
 	NextExercise(context.Context, *NextExerciseRequest) (*NextExerciseResponse, error)
 	VerifyExercise(*VerifyExerciseRequest, grpc.ServerStreamingServer[VerifyExerciseResponse]) error
+	GetSolutions(context.Context, *GetSolutionsRequest) (*GetSolutionsResponse, error)
 	GetSolutionFiles(context.Context, *GetSolutionFilesRequest) (*GetSolutionFilesResponse, error)
 	GetAllSolutionFiles(context.Context, *GetAllSolutionFilesRequest) (*GetAllSolutionFilesResponse, error)
 	GetExercises(context.Context, *GetExercisesRequest) (*GetExercisesResponse, error)
@@ -207,7 +220,7 @@ func (UnimplementedTrainingsServer) Init(context.Context, *InitRequest) (*InitRe
 func (UnimplementedTrainingsServer) GetTrainings(context.Context, *emptypb.Empty) (*GetTrainingsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetTrainings not implemented")
 }
-func (UnimplementedTrainingsServer) StartTraining(context.Context, *StartTrainingRequest) (*emptypb.Empty, error) {
+func (UnimplementedTrainingsServer) StartTraining(context.Context, *StartTrainingRequest) (*StartTrainingResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StartTraining not implemented")
 }
 func (UnimplementedTrainingsServer) NextExercise(context.Context, *NextExerciseRequest) (*NextExerciseResponse, error) {
@@ -215,6 +228,9 @@ func (UnimplementedTrainingsServer) NextExercise(context.Context, *NextExerciseR
 }
 func (UnimplementedTrainingsServer) VerifyExercise(*VerifyExerciseRequest, grpc.ServerStreamingServer[VerifyExerciseResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method VerifyExercise not implemented")
+}
+func (UnimplementedTrainingsServer) GetSolutions(context.Context, *GetSolutionsRequest) (*GetSolutionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetSolutions not implemented")
 }
 func (UnimplementedTrainingsServer) GetSolutionFiles(context.Context, *GetSolutionFilesRequest) (*GetSolutionFilesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSolutionFiles not implemented")
@@ -336,6 +352,24 @@ func _Trainings_VerifyExercise_Handler(srv interface{}, stream grpc.ServerStream
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Trainings_VerifyExerciseServer = grpc.ServerStreamingServer[VerifyExerciseResponse]
+
+func _Trainings_GetSolutions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSolutionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TrainingsServer).GetSolutions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Trainings_GetSolutions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TrainingsServer).GetSolutions(ctx, req.(*GetSolutionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
 
 func _Trainings_GetSolutionFiles_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetSolutionFilesRequest)
@@ -467,6 +501,10 @@ var Trainings_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "NextExercise",
 			Handler:    _Trainings_NextExercise_Handler,
+		},
+		{
+			MethodName: "GetSolutions",
+			Handler:    _Trainings_GetSolutions_Handler,
 		},
 		{
 			MethodName: "GetSolutionFiles",

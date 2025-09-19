@@ -33,7 +33,7 @@ func (h *Handlers) Clone(ctx context.Context, executionID string, directory stri
 
 	absoluteDirToClone = path.Join(absoluteDirToClone, directory)
 
-	if _, err := h.startTraining(ctx, resp.TrainingName, absoluteDirToClone); err != nil {
+	if _, err := h.startTraining(ctx, resp.TrainingName, absoluteDirToClone, false); err != nil {
 		return err
 	}
 
@@ -43,15 +43,7 @@ func (h *Handlers) Clone(ctx context.Context, executionID string, directory stri
 		return errors.Wrap(err, "can't write training config")
 	}
 
-	files := &genproto.NextExerciseResponse{
-		TrainingStatus: genproto.NextExerciseResponse_IN_PROGRESS,
-		Dir:            resp.Dir,
-		ExerciseId:     resp.ExerciseId,
-		FilesToCreate:  resp.FilesToCreate,
-		IsTextOnly:     false,
-	}
-
-	if err := h.writeExerciseFiles(files, trainingRootFs); err != nil {
+	if err := h.writeExerciseFiles(getSolutionFilesToExerciseContent(resp), trainingRootFs); err != nil {
 		return err
 	}
 
@@ -61,4 +53,14 @@ func (h *Handlers) Clone(ctx context.Context, executionID string, directory stri
 	}
 
 	return nil
+}
+
+func getSolutionFilesToExerciseContent(resp *genproto.GetSolutionFilesResponse) *genproto.ExerciseContent {
+	return &genproto.ExerciseContent{
+		ExerciseId: resp.ExerciseId,
+		Dir:        resp.Dir,
+		Files:      resp.FilesToCreate,
+		IsTextOnly: false,
+		IsOptional: false,
+	}
 }

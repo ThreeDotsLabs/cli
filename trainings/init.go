@@ -33,7 +33,7 @@ func (h *Handlers) Init(ctx context.Context, trainingName string, dir string) er
 	trainingRootDir := path.Join(wd, dir)
 
 	// trainingRootDir may be different when doing init in already existing workspace
-	trainingRootDir, err = h.startTraining(ctx, trainingName, trainingRootDir)
+	trainingRootDir, err = h.startTraining(ctx, trainingName, trainingRootDir, true)
 	if errors.Is(err, ErrInterrupted) {
 		fmt.Println("Interrupted")
 		return nil
@@ -87,6 +87,7 @@ func (h *Handlers) startTraining(
 	ctx context.Context,
 	trainingName string,
 	trainingRootDir string,
+	cloneExistingExercises bool,
 ) (string, error) {
 	alreadyExistingTrainingRoot, err := h.config.FindTrainingRoot()
 	if err == nil {
@@ -125,7 +126,7 @@ func (h *Handlers) startTraining(
 		}
 	}
 
-	_, err = h.newGrpcClient().StartTraining(
+	resp, err := h.newGrpcClient().StartTraining(
 		ctxWithRequestHeader(ctx, h.cliMetadata),
 		&genproto.StartTrainingRequest{
 			TrainingName: trainingName,
@@ -148,6 +149,19 @@ func (h *Handlers) startTraining(
 
 	if err := writeGitignore(trainingRootFs); err != nil {
 		return "", err
+	}
+
+	if cloneExistingExercises && resp.ExercisesAvailable {
+		fmt.Println("\nIt looks like you have already started this training and have existing exercises.")
+		fmt.Println("You can clone your existing solutions to this directory.")
+		ok := internal.ConfirmPromptDefaultYes("download your latest solution FOR EACH EXERCISE")
+
+		if ok {
+			err := h.restore(ctx)
+			if err != nil {
+				return "", errors.Wrap(err, "can't restore existing exercises")
+			}
+		}
 	}
 
 	return trainingRootDir, nil

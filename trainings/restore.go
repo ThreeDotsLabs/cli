@@ -4,16 +4,14 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings/config"
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
+	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
-func (h *Handlers) Restore(ctx context.Context) error {
-	internal.ConfirmPromptDefaultYes("This will download your latest solution FOR EACH EXERCISE. Are you sure you want to continue?")
-
+func (h *Handlers) restore(ctx context.Context) error {
 	trainingRoot, err := h.config.FindTrainingRoot()
 	if errors.Is(err, config.TrainingRootNotFoundError) {
 		h.printNotInATrainingDirectory()
@@ -36,6 +34,8 @@ func (h *Handlers) Restore(ctx context.Context) error {
 	}).Debug("Received solutions from server")
 
 	for _, exercise := range resp.Exercises {
+		fmt.Println(color.New(color.Bold, color.FgYellow).Sprint("\nRestoring exercise:"), exercise.Exercise.Module.Name, "/", exercise.Exercise.Name)
+
 		if err := h.writeExerciseFiles(exercise, trainingRootFs); err != nil {
 			return err
 		}
