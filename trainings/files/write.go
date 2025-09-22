@@ -143,6 +143,13 @@ func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, trainingRootFs
 	if f.deleteUnusedFiles {
 		var deletedFiles []string
 		for path := range currentPaths {
+			if !f.showFullDiff {
+				shouldDelete := internal.FConfirmPrompt(fmt.Sprintf("File %s is not used anymore, should it be deleted?", path), f.stdin, f.stdout)
+				if !shouldDelete {
+					continue
+				}
+			}
+
 			if err := trainingRootFs.Remove(path); err != nil {
 				return errors.Wrapf(err, "can't delete %s", path)
 			}
