@@ -157,7 +157,7 @@ func (h *Handlers) startTraining(
 		ok := internal.ConfirmPromptDefaultYes("download your latest solution FOR EACH EXERCISE")
 
 		if ok {
-			err := h.restore(ctx)
+			err := h.restore(ctx, trainingRootDir)
 			if err != nil {
 				return "", errors.Wrap(err, "can't restore existing exercises")
 			}

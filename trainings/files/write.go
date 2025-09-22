@@ -221,7 +221,9 @@ func (f Files) shouldWriteAllFiles(fs afero.Fs, exerciseDir string, filesToCreat
 
 	sort.Strings(allPathsSorted)
 
+	additions := false
 	changes := false
+
 	for _, filePath := range allPathsSorted {
 		exists, err := afero.Exists(fs, filePath)
 		if err != nil {
@@ -243,7 +245,11 @@ func (f Files) shouldWriteAllFiles(fs afero.Fs, exerciseDir string, filesToCreat
 		}
 
 		if string(localContent) != externalContent {
-			changes = true
+			if exists {
+				changes = true
+			} else {
+				additions = true
+			}
 
 			relPath, err := filepath.Rel(exerciseDir, filePath)
 			if err != nil {
@@ -256,9 +262,13 @@ func (f Files) shouldWriteAllFiles(fs afero.Fs, exerciseDir string, filesToCreat
 		}
 	}
 
-	if !changes {
-		fmt.Println("No changes detected, all files are up to date.")
-		return false, nil
+	if !changes && len(pathsToDelete) == 0 {
+		if additions {
+			return true, nil
+		} else {
+			fmt.Println("All files are up to date.")
+			return false, nil
+		}
 	}
 
 	if len(pathsToDelete) > 0 {
