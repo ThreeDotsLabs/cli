@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ThreeDotsLabs/cli/trainings/config"
+	"github.com/ThreeDotsLabs/cli/trainings/files"
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
@@ -36,7 +37,7 @@ func (h *Handlers) restore(ctx context.Context) error {
 	for _, exercise := range resp.Exercises {
 		fmt.Println(color.New(color.Bold, color.FgYellow).Sprint("\nRestoring exercise:"), exercise.Exercise.Module.Name, "/", exercise.Exercise.Name)
 
-		if err := h.writeExerciseFiles(exercise, trainingRootFs); err != nil {
+		if err := h.writeExerciseFiles(files.NewFiles(), exercise, trainingRootFs); err != nil {
 			return err
 		}
 

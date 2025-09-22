@@ -58,7 +58,7 @@ func (h *Handlers) setExercise(fs *afero.BasePathFs, exercise *genproto.NextExer
 		)
 	}
 
-	if err := h.writeExerciseFiles(nextExerciseResponseToExerciseContent(exercise), fs); err != nil {
+	if err := h.writeExerciseFiles(files.NewFiles(), nextExerciseResponseToExerciseContent(exercise), fs); err != nil {
 		return false, err
 	}
 
@@ -99,7 +99,7 @@ func (h *Handlers) getNextExercise(
 	return resp, err
 }
 
-func (h *Handlers) writeExerciseFiles(resp *genproto.ExerciseContent, trainingRootFs *afero.BasePathFs) error {
+func (h *Handlers) writeExerciseFiles(files files.Files, resp *genproto.ExerciseContent, trainingRootFs *afero.BasePathFs) error {
 	if resp.Dir == "" {
 		return errors.New("exercise dir is empty")
 	}
@@ -107,7 +107,7 @@ func (h *Handlers) writeExerciseFiles(resp *genproto.ExerciseContent, trainingRo
 		return errors.New("exercise id is empty")
 	}
 
-	if err := files.NewFiles().WriteExerciseFiles(resp.Files, trainingRootFs, resp.Dir); err != nil {
+	if err := files.WriteExerciseFiles(resp.Files, trainingRootFs, resp.Dir); err != nil {
 		return err
 	}
 

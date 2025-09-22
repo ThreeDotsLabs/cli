@@ -5,8 +5,10 @@ import (
 	"fmt"
 
 	"github.com/ThreeDotsLabs/cli/trainings/config"
+	"github.com/ThreeDotsLabs/cli/trainings/files"
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 	"github.com/manifoldco/promptui"
+	"github.com/mergestat/timediff"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -33,18 +35,30 @@ func (h *Handlers) Checkout(ctx context.Context) error {
 		"err":  err,
 	}).Debug("Received solutions from server")
 
-	// TODO Show current?
-	// TODO Show success/failure
-	// TODO Cancel
+	items := []string{"(cancel)"}
+	for _, solution := range resp.Solutions {
+		text := ""
+		if solution.Successful {
+			text += "✅"
+		} else {
+			text += "❌"
+		}
+		text += " "
+		text += solution.VerificationId
+		text += " "
+		text += timediff.TimeDiff(solution.ExecutedAt.AsTime())
+
+		items = append(items, text)
+	}
 
 	selectUI := promptui.Select{
 		Label: "Select a solution to checkout",
-		Items: resp.Solutions,
+		Items: items,
 		Size:  10,
 		Templates: &promptui.SelectTemplates{
-			Label:    "{{ .VerificationId }}",
-			Active:   "{{ .VerificationId | cyan }}",
-			Inactive: "{{ .VerificationId }}",
+			Label:    "{{ . }}",
+			Active:   "{{ . | cyan }}",
+			Inactive: "{{ . }}",
 		},
 		HideSelected: true,
 	}
@@ -54,14 +68,19 @@ func (h *Handlers) Checkout(ctx context.Context) error {
 		return err
 	}
 
+	if index == 0 {
+		fmt.Println("Cancelled")
+		return nil
+	}
+
 	getResp, err := h.newGrpcClient().GetSolutionFiles(ctx, &genproto.GetSolutionFilesRequest{
-		ExecutionId: resp.Solutions[index].VerificationId,
+		ExecutionId: resp.Solutions[index-1].VerificationId,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to get solution files: %w", err)
 	}
 
-	if err := h.writeExerciseFiles(getSolutionFilesToExerciseContent(getResp), trainingRootFs); err != nil {
+	if err := h.writeExerciseFiles(files.NewFilesWithConfig(true, true), getSolutionFilesToExerciseContent(getResp), trainingRootFs); err != nil {
 		return err
 	}
 
