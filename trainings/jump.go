@@ -225,6 +225,6 @@ func (h *Handlers) Jump(ctx context.Context, exerciseID string) error {
 		return fmt.Errorf("failed to get exercise: %w", err)
 	}
 
-	_, err = h.setExercise(trainingRootFs, resp, trainingRoot)
+	_, err = h.setExercise(trainingRootFs, resp, trainingRoot, true)
 	return err
 }

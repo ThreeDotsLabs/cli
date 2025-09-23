@@ -76,6 +76,7 @@ func (h *Handlers) Checkout(ctx context.Context) error {
 	getResp, err := h.newGrpcClient().GetSolutionFiles(ctx, &genproto.GetSolutionFilesRequest{
 		ExecutionId: resp.Solutions[index-1].VerificationId,
 	})
+	fmt.Printf("resp %#v %#v\n", getResp, err)
 	if err != nil {
 		return fmt.Errorf("failed to get solution files: %w", err)
 	}

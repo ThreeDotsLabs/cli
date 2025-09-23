@@ -34,7 +34,7 @@ func (h *Handlers) Clone(ctx context.Context, executionID string, directory stri
 
 	absoluteDirToClone = path.Join(absoluteDirToClone, directory)
 
-	if _, err := h.startTraining(ctx, resp.TrainingName, absoluteDirToClone, false); err != nil {
+	if _, _, err := h.startTraining(ctx, resp.TrainingName, absoluteDirToClone); err != nil {
 		return err
 	}
 

@@ -11,7 +11,7 @@ import (
 )
 
 // restore restores all solution files for the training in the given directory.
-func (h *Handlers) restore(ctx context.Context, trainingRoot string) error {
+func (h *Handlers) restore(ctx context.Context, trainingRoot string) ([]string, error) {
 	trainingRootFs := newTrainingRootFs(trainingRoot)
 
 	resp, err := h.newGrpcClient().GetAllSolutionFiles(ctx, &genproto.GetAllSolutionFilesRequest{
@@ -19,7 +19,7 @@ func (h *Handlers) restore(ctx context.Context, trainingRoot string) error {
 		Token:        h.config.GlobalConfig().Token,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to get all solution files: %w", err)
+		return nil, fmt.Errorf("failed to get all solution files: %w", err)
 	}
 
 	logrus.WithFields(logrus.Fields{
@@ -29,18 +29,21 @@ func (h *Handlers) restore(ctx context.Context, trainingRoot string) error {
 
 	files := files.NewFilesWithConfig(false, true)
 
+	var exerciseIDs []string
 	for _, exercise := range resp.Solutions {
 		fmt.Println(color.New(color.Bold, color.FgYellow).Sprint("\nRestoring exercise:"), exercise.Exercise.Module.Name, "/", exercise.Exercise.Name)
 
 		if err := h.writeExerciseFiles(files, exercise, trainingRootFs); err != nil {
-			return err
+			return nil, err
 		}
 
 		err = addModuleToWorkspace(trainingRoot, exercise.Dir)
 		if err != nil {
 			logrus.WithError(err).Warn("Failed to add module to workspace")
 		}
+
+		exerciseIDs = append(exerciseIDs, exercise.ExerciseId)
 	}
 
-	return nil
+	return exerciseIDs, nil
 }

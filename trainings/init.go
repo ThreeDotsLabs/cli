@@ -33,7 +33,7 @@ func (h *Handlers) Init(ctx context.Context, trainingName string, dir string) er
 	trainingRootDir := path.Join(wd, dir)
 
 	// trainingRootDir may be different when doing init in already existing workspace
-	trainingRootDir, err = h.startTraining(ctx, trainingName, trainingRootDir, true)
+	trainingRootDir, previousSolutionsAvailable, err := h.startTraining(ctx, trainingName, trainingRootDir)
 	if errors.Is(err, ErrInterrupted) {
 		fmt.Println("Interrupted")
 		return nil
@@ -41,8 +41,22 @@ func (h *Handlers) Init(ctx context.Context, trainingName string, dir string) er
 		return err
 	}
 
-	// todo - handle situation when training was started but something failed here and someone is starting excersise again (because he have no local files)
-	_, err = h.nextExercise(ctx, "", trainingRootDir)
+	var previousSolutions []string
+
+	if previousSolutionsAvailable {
+		fmt.Println("\nIt looks like you have already started this training and have existing exercises.")
+		fmt.Println("You can clone your existing solutions to this directory.")
+		ok := internal.ConfirmPromptDefaultYes("download your latest solution FOR EACH EXERCISE")
+
+		if ok {
+			previousSolutions, err = h.restore(ctx, trainingRootDir)
+			if err != nil {
+				return errors.Wrap(err, "can't restore existing exercises")
+			}
+		}
+	}
+
+	_, err = h.nextExerciseWithSkipped(ctx, "", trainingRootDir, previousSolutions)
 	if err != nil {
 		return err
 	}
@@ -87,17 +101,16 @@ func (h *Handlers) startTraining(
 	ctx context.Context,
 	trainingName string,
 	trainingRootDir string,
-	clonePreviousSolutions bool,
-) (string, error) {
+) (string, bool, error) {
 	alreadyExistingTrainingRoot, err := h.config.FindTrainingRoot()
 	if err == nil {
 		fmt.Println(color.BlueString("Training was already initialised. Training root:" + alreadyExistingTrainingRoot))
 		trainingRootDir = alreadyExistingTrainingRoot
 	} else if !errors.Is(err, config.TrainingRootNotFoundError) {
-		return "", errors.Wrap(err, "can't check if training root exists")
+		return "", false, errors.Wrap(err, "can't check if training root exists")
 	} else {
 		if err := h.showTrainingStartPrompt(trainingRootDir); err != nil {
-			return "", err
+			return "", false, err
 		}
 
 		// we will create training root in current working directory
@@ -109,7 +122,7 @@ func (h *Handlers) startTraining(
 	if alreadyExistingTrainingRoot != "" {
 		cfg := h.config.TrainingConfig(trainingRootFs)
 		if cfg.TrainingName != trainingName {
-			return "", fmt.Errorf(
+			return "", false, fmt.Errorf(
 				"training %s was already started in this directory, please go to other directory and run `tdl training init`",
 				cfg.TrainingName,
 			)
@@ -117,7 +130,7 @@ func (h *Handlers) startTraining(
 	} else {
 		err := os.MkdirAll(trainingRootDir, 0755)
 		if err != nil {
-			return "", errors.Wrap(err, "can't create training root dir")
+			return "", false, errors.Wrap(err, "can't create training root dir")
 		}
 
 		err = createGoWorkspace(trainingRootDir)
@@ -135,36 +148,23 @@ func (h *Handlers) startTraining(
 	)
 	if err != nil {
 		if st, ok := status.FromError(err); ok && st.Code() == codes.NotFound {
-			return "", UserFacingError{
+			return "", false, UserFacingError{
 				Msg:          fmt.Sprintf("Training '%v' not found", trainingName),
 				SolutionHint: "Please check the correct training name on the website.\n\nIf you wanted to init the training in a separate directory, use this format:\n\n\ttdl training init <name> <directory>",
 			}
 		}
-		return "", errors.Wrap(err, "start training gRPC call failed")
+		return "", false, errors.Wrap(err, "start training gRPC call failed")
 	}
 
 	if err := h.config.WriteTrainingConfig(config.TrainingConfig{TrainingName: trainingName}, trainingRootFs); err != nil {
-		return "", errors.Wrap(err, "can't write training config")
+		return "", false, errors.Wrap(err, "can't write training config")
 	}
 
 	if err := writeGitignore(trainingRootFs); err != nil {
-		return "", err
+		return "", false, err
 	}
 
-	if clonePreviousSolutions && resp.PreviousSolutionsAvailable {
-		fmt.Println("\nIt looks like you have already started this training and have existing exercises.")
-		fmt.Println("You can clone your existing solutions to this directory.")
-		ok := internal.ConfirmPromptDefaultYes("download your latest solution FOR EACH EXERCISE")
-
-		if ok {
-			err := h.restore(ctx, trainingRootDir)
-			if err != nil {
-				return "", errors.Wrap(err, "can't restore existing exercises")
-			}
-		}
-	}
-
-	return trainingRootDir, nil
+	return trainingRootDir, resp.PreviousSolutionsAvailable, nil
 }
 
 var gitignore = strings.Join(
