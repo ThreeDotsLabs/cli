@@ -47,7 +47,7 @@ message StartTrainingRequest {
 }
 
 message StartTrainingResponse {
-  bool exercises_available = 1;
+  bool previous_solutions_available = 1;
 }
 
 message NextExerciseRequest {
@@ -88,7 +88,7 @@ message NextExerciseResponse {
   google.protobuf.Timestamp next_batch_date = 8;
 }
 
-message ExerciseContent {
+message ExerciseSolution {
   string exercise_id = 1;
   string dir = 2;
   repeated File files = 3;
@@ -172,7 +172,7 @@ message GetAllSolutionFilesRequest {
 }
 
 message GetAllSolutionFilesResponse {
-  repeated ExerciseContent exercises = 1;
+  repeated ExerciseSolution solutions = 1;
 }
 
 message GetExercisesRequest {
