@@ -46,7 +46,7 @@ func (h *Handlers) Init(ctx context.Context, trainingName string, dir string) er
 	if previousSolutionsAvailable {
 		fmt.Println("\nIt looks like you have already started this training and have existing exercises.")
 		fmt.Println("You can clone your existing solutions to this directory.")
-		ok := internal.ConfirmPromptDefaultYes("download your latest solution FOR EACH EXERCISE")
+		ok := promptForPastSolutions()
 
 		if ok {
 			previousSolutions, err = h.restore(ctx, trainingRootDir)
@@ -71,6 +71,18 @@ func (h *Handlers) Init(ctx context.Context, trainingName string, dir string) er
 	}
 
 	return nil
+}
+
+func promptForPastSolutions() bool {
+	promptValue := internal.Prompt(
+		internal.Actions{
+			{Shortcut: '\n', Action: "download your latest solution FOR EACH EXERCISE", ShortcutAliases: []rune{'\r'}},
+			{Shortcut: 'n', Action: "cancel"},
+		},
+		os.Stdin,
+		os.Stdout,
+	)
+	return promptValue == '\n'
 }
 
 func isInTrainingRoot(trainingRoot string) bool {
