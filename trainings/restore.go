@@ -27,10 +27,12 @@ func (h *Handlers) restore(ctx context.Context, trainingRoot string) error {
 		"err":  err,
 	}).Debug("Received solutions from server")
 
+	files := files.NewFilesWithConfig(false, true)
+
 	for _, exercise := range resp.Solutions {
 		fmt.Println(color.New(color.Bold, color.FgYellow).Sprint("\nRestoring exercise:"), exercise.Exercise.Module.Name, "/", exercise.Exercise.Name)
 
-		if err := h.writeExerciseFiles(files.NewFilesWithConfig(false, true), exercise, trainingRootFs); err != nil {
+		if err := h.writeExerciseFiles(files, exercise, trainingRootFs); err != nil {
 			return err
 		}
 

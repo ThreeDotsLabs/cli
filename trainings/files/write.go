@@ -51,7 +51,7 @@ func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, trainingRootFs
 
 	var savedFiles []savedFile
 
-	currentPaths := map[string]struct{}{}
+	filesToDelete := map[string]struct{}{}
 
 	if f.deleteUnusedFiles {
 		err := afero.Walk(trainingRootFs, exerciseDir, func(path string, info os.FileInfo, err error) error {
@@ -60,7 +60,7 @@ func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, trainingRootFs
 			}
 
 			if !info.IsDir() && filepath.Base(path) != ExerciseFile && filepath.Base(path) != "go.sum" {
-				currentPaths[path] = struct{}{}
+				filesToDelete[path] = struct{}{}
 			}
 
 			return nil
@@ -68,15 +68,15 @@ func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, trainingRootFs
 		if err != nil {
 			return errors.Wrapf(err, "can't walk through %s", exerciseDir)
 		}
-	}
 
-	for _, fileFromServer := range filesToCreate {
-		fullFilePath := filepath.Join(exerciseDir, fileFromServer.Path)
-		delete(currentPaths, fullFilePath)
+		for _, fileFromServer := range filesToCreate {
+			fullFilePath := filepath.Join(exerciseDir, fileFromServer.Path)
+			delete(filesToDelete, fullFilePath)
+		}
 	}
 
 	if f.showFullDiff {
-		proceed, err := f.shouldWriteAllFiles(trainingRootFs, exerciseDir, filesToCreate, currentPaths)
+		proceed, err := f.shouldWriteAllFiles(trainingRootFs, exerciseDir, filesToCreate, filesToDelete)
 		if err != nil {
 			return err
 		}
@@ -142,7 +142,7 @@ func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, trainingRootFs
 
 	if f.deleteUnusedFiles {
 		var deletedFiles []string
-		for path := range currentPaths {
+		for path := range filesToDelete {
 			if !f.showFullDiff {
 				shouldDelete := internal.FConfirmPrompt(fmt.Sprintf("File %s is not used anymore, should it be deleted?", path), f.stdin, f.stdout)
 				if !shouldDelete {
