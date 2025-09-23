@@ -80,7 +80,7 @@ func (h *Handlers) Checkout(ctx context.Context) error {
 		return fmt.Errorf("failed to get solution files: %w", err)
 	}
 
-	if err := h.writeExerciseFiles(files.NewFilesWithConfig(true, true), getSolutionFilesToExerciseContent(getResp), trainingRootFs); err != nil {
+	if err := h.writeExerciseFiles(files.NewFilesWithConfig(true, true), getSolutionFilesToExerciseSolution(getResp), trainingRootFs); err != nil {
 		return err
 	}
 

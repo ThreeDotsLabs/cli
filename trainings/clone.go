@@ -44,7 +44,7 @@ func (h *Handlers) Clone(ctx context.Context, executionID string, directory stri
 		return errors.Wrap(err, "can't write training config")
 	}
 
-	if err := h.writeExerciseFiles(files.NewFiles(), getSolutionFilesToExerciseContent(resp), trainingRootFs); err != nil {
+	if err := h.writeExerciseFiles(files.NewFiles(), getSolutionFilesToExerciseSolution(resp), trainingRootFs); err != nil {
 		return err
 	}
 
@@ -56,8 +56,8 @@ func (h *Handlers) Clone(ctx context.Context, executionID string, directory stri
 	return nil
 }
 
-func getSolutionFilesToExerciseContent(resp *genproto.GetSolutionFilesResponse) *genproto.ExerciseContent {
-	return &genproto.ExerciseContent{
+func getSolutionFilesToExerciseSolution(resp *genproto.GetSolutionFilesResponse) *genproto.ExerciseSolution {
+	return &genproto.ExerciseSolution{
 		ExerciseId: resp.ExerciseId,
 		Dir:        resp.Dir,
 		Files:      resp.FilesToCreate,

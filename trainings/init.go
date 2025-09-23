@@ -87,7 +87,7 @@ func (h *Handlers) startTraining(
 	ctx context.Context,
 	trainingName string,
 	trainingRootDir string,
-	cloneExistingExercises bool,
+	clonePreviousSolutions bool,
 ) (string, error) {
 	alreadyExistingTrainingRoot, err := h.config.FindTrainingRoot()
 	if err == nil {
@@ -151,7 +151,7 @@ func (h *Handlers) startTraining(
 		return "", err
 	}
 
-	if cloneExistingExercises && resp.ExercisesAvailable {
+	if clonePreviousSolutions && resp.PreviousSolutionsAvailable {
 		fmt.Println("\nIt looks like you have already started this training and have existing exercises.")
 		fmt.Println("You can clone your existing solutions to this directory.")
 		ok := internal.ConfirmPromptDefaultYes("download your latest solution FOR EACH EXERCISE")
