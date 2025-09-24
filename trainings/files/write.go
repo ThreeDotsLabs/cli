@@ -224,6 +224,8 @@ func (f Files) shouldWriteAllFiles(fs afero.Fs, exerciseDir string, filesToCreat
 	additions := false
 	changes := false
 
+	var filesToPrint []fileItem
+
 	for _, filePath := range allPathsSorted {
 		exists, err := afero.Exists(fs, filePath)
 		if err != nil {
@@ -239,21 +241,36 @@ func (f Files) shouldWriteAllFiles(fs afero.Fs, exerciseDir string, filesToCreat
 		}
 
 		var externalContent string
-		externalFile, ok := externalFiles[filePath]
-		if ok {
+		externalFile, externalExists := externalFiles[filePath]
+		if externalExists {
 			externalContent = externalFile.Content
 		}
 
 		if string(localContent) != externalContent {
-			if exists {
-				changes = true
-			} else {
-				additions = true
-			}
-
 			relPath, err := filepath.Rel(exerciseDir, filePath)
 			if err != nil {
 				return false, errors.Wrapf(err, "can't get relative path for %s", filePath)
+			}
+
+			if exists {
+				changes = true
+				if externalExists {
+					filesToPrint = append(filesToPrint, fileItem{
+						Path: relPath,
+						Type: fileItemTypeModified,
+					})
+				} else {
+					filesToPrint = append(filesToPrint, fileItem{
+						Path: relPath,
+						Type: fileItemTypeDeleted,
+					})
+				}
+			} else {
+				additions = true
+				filesToPrint = append(filesToPrint, fileItem{
+					Path: relPath,
+					Type: fileItemTypeAdded,
+				})
 			}
 
 			edits := myers.ComputeEdits(span.URIFromPath("local "+filePath), string(localContent), externalContent)
@@ -271,16 +288,16 @@ func (f Files) shouldWriteAllFiles(fs afero.Fs, exerciseDir string, filesToCreat
 		}
 	}
 
-	if len(pathsToDelete) > 0 {
-		fmt.Printf("Warning! Files to be deleted:\n")
-		for path := range pathsToDelete {
-			relPath, err := filepath.Rel(exerciseDir, path)
-			if err != nil {
-				return false, errors.Wrapf(err, "can't get relative path for %s", path)
-			}
+	fmt.Println()
+	fmt.Println("Changes to be made:")
+	fmt.Println()
 
-			fmt.Printf(color.RedString("- %s\n"), relPath)
-		}
+	printFilesList(filesToPrint)
+
+	fmt.Println()
+
+	if len(pathsToDelete) > 0 {
+		fmt.Println("Warning! Some files will be deleted!")
 		fmt.Println()
 	}
 
@@ -366,4 +383,45 @@ func colorDiff(diffText string) string {
 	}
 
 	return strings.Join(coloredLines, "\n")
+}
+
+type fileItemType int
+
+const (
+	fileItemTypeDeleted fileItemType = iota
+	fileItemTypeAdded
+	fileItemTypeModified
+)
+
+type fileItem struct {
+	Path string
+	Type fileItemType
+}
+
+func printFilesList(files []fileItem) {
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].Path < files[j].Path
+	})
+
+	for _, file := range files {
+		var sign string
+		var textColor *color.Color
+
+		switch file.Type {
+		case fileItemTypeDeleted:
+			sign = "-"
+			textColor = color.New(color.FgRed)
+		case fileItemTypeAdded:
+			sign = "+"
+			textColor = color.New(color.FgGreen)
+		case fileItemTypeModified:
+			sign = "~"
+			textColor = color.New(color.FgYellow)
+		default:
+			sign = "?"
+			textColor = color.New(color.FgWhite)
+		}
+
+		fmt.Printf("%s %s\n", textColor.Sprintf(sign), textColor.Sprintf(file.Path))
+	}
 }
