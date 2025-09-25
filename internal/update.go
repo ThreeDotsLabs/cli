@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/fatih/color"
 	"net/http"
 	"os"
 	"path"
 	"strings"
 	"time"
+
+	"github.com/fatih/color"
 )
 
 type releaseResponse struct {
@@ -57,7 +58,7 @@ func CheckForUpdate(currentVersion string) {
 func printVersionNotice(currentVersion string, availableVersion string) {
 	c := color.New(color.FgHiYellow)
 	_, _ = c.Printf("A new version of the CLI is available: %s (current: %s)\n", availableVersion, currentVersion)
-	_, _ = c.Printf("Some features may not work correctly. Please update ASAP!\n")
+	_, _ = c.Printf("Some features may be missing or not work correctly. Please update soon!\n")
 	_, _ = c.Printf("See instructions at: %v\n", repoURL)
 	fmt.Println()
 }

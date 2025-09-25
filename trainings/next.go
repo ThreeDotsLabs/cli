@@ -13,6 +13,10 @@ import (
 )
 
 func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string, trainingRoot string) (finished bool, err error) {
+	return h.nextExerciseWithSkipped(ctx, currentExerciseID, trainingRoot, nil)
+}
+
+func (h *Handlers) nextExerciseWithSkipped(ctx context.Context, currentExerciseID string, trainingRoot string, skipExerciseIDs []string) (finished bool, err error) {
 	h.solutionHintDisplayed = false
 	clear(h.notifications)
 
@@ -28,10 +32,19 @@ func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string, t
 		return false, err
 	}
 
-	return h.setExercise(trainingRootFs, resp, trainingRoot)
+	writeFiles := true
+	for _, skipExerciseID := range skipExerciseIDs {
+		if resp.ExerciseId == skipExerciseID {
+			// Exercise already has a local solution, don't overwrite files
+			writeFiles = false
+			break
+		}
+	}
+
+	return h.setExercise(trainingRootFs, resp, trainingRoot, writeFiles)
 }
 
-func (h *Handlers) setExercise(fs *afero.BasePathFs, exercise *genproto.NextExerciseResponse, trainingRoot string) (finished bool, err error) {
+func (h *Handlers) setExercise(fs *afero.BasePathFs, exercise *genproto.NextExerciseResponse, trainingRoot string, writeFiles bool) (finished bool, err error) {
 	if exercise.TrainingStatus == genproto.NextExerciseResponse_FINISHED {
 		printFinished()
 		return true, nil
@@ -58,8 +71,10 @@ func (h *Handlers) setExercise(fs *afero.BasePathFs, exercise *genproto.NextExer
 		)
 	}
 
-	if err := h.writeExerciseFiles(exercise, fs); err != nil {
-		return false, err
+	if writeFiles {
+		if err := h.writeExerciseFiles(files.NewFiles(), nextExerciseResponseToExerciseSolution(exercise), fs); err != nil {
+			return false, err
+		}
 	}
 
 	if exercise.IsTextOnly {
@@ -99,7 +114,7 @@ func (h *Handlers) getNextExercise(
 	return resp, err
 }
 
-func (h *Handlers) writeExerciseFiles(resp *genproto.NextExerciseResponse, trainingRootFs *afero.BasePathFs) error {
+func (h *Handlers) writeExerciseFiles(files files.Files, resp *genproto.ExerciseSolution, trainingRootFs *afero.BasePathFs) error {
 	if resp.Dir == "" {
 		return errors.New("exercise dir is empty")
 	}
@@ -107,7 +122,7 @@ func (h *Handlers) writeExerciseFiles(resp *genproto.NextExerciseResponse, train
 		return errors.New("exercise id is empty")
 	}
 
-	if err := files.NewFiles().WriteExerciseFiles(resp.FilesToCreate, trainingRootFs, resp.Dir); err != nil {
+	if err := files.WriteExerciseFiles(resp.Files, trainingRootFs, resp.Dir); err != nil {
 		return err
 	}
 
@@ -120,4 +135,14 @@ func (h *Handlers) writeExerciseFiles(resp *genproto.NextExerciseResponse, train
 			IsOptional: resp.IsOptional,
 		},
 	)
+}
+
+func nextExerciseResponseToExerciseSolution(resp *genproto.NextExerciseResponse) *genproto.ExerciseSolution {
+	return &genproto.ExerciseSolution{
+		ExerciseId: resp.ExerciseId,
+		Dir:        resp.Dir,
+		Files:      resp.FilesToCreate,
+		IsTextOnly: resp.IsTextOnly,
+		IsOptional: resp.IsOptional,
+	}
 }

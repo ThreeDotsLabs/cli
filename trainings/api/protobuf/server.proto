@@ -8,13 +8,15 @@ service Trainings {
   rpc Init(InitRequest) returns (InitResponse) {};
 
   rpc GetTrainings(google.protobuf.Empty) returns (GetTrainingsResponse) {};
-  rpc StartTraining(StartTrainingRequest) returns (google.protobuf.Empty) {};
+  rpc StartTraining(StartTrainingRequest) returns (StartTrainingResponse) {};
 
   rpc NextExercise(NextExerciseRequest) returns (NextExerciseResponse) {};
 
   rpc VerifyExercise(VerifyExerciseRequest) returns (stream VerifyExerciseResponse) {};
 
+  rpc GetSolutions(GetSolutionsRequest) returns (GetSolutionsResponse) {};
   rpc GetSolutionFiles(GetSolutionFilesRequest) returns (GetSolutionFilesResponse) {};
+  rpc GetAllSolutionFiles(GetAllSolutionFilesRequest) returns (GetAllSolutionFilesResponse) {};
 
   rpc GetExercises(GetExercisesRequest) returns (GetExercisesResponse) {};
   rpc GetExercise(GetExerciseRequest) returns (NextExerciseResponse) {};
@@ -45,7 +47,7 @@ message StartTrainingRequest {
 }
 
 message StartTrainingResponse {
-
+  bool previous_solutions_available = 1;
 }
 
 message NextExerciseRequest {
@@ -84,6 +86,28 @@ message NextExerciseResponse {
   Exercise exercise = 7;
 
   google.protobuf.Timestamp next_batch_date = 8;
+}
+
+message ExerciseSolution {
+  string exercise_id = 1;
+  string dir = 2;
+  repeated File files = 3;
+  bool is_text_only = 4;
+  bool is_optional = 5;
+
+  Module module = 6;
+  Exercise exercise = 7;
+
+  message Module {
+    string id = 1;
+    string name = 2;
+  }
+
+  message Exercise {
+    string id = 1;
+    Module module = 2;
+    string name = 3;
+  }
 }
 
 message NextExercise {
@@ -142,6 +166,15 @@ message GetSolutionFilesResponse {
   repeated File files_to_create = 4;
 }
 
+message GetAllSolutionFilesRequest {
+  string training_name = 1;
+  string token = 2;
+}
+
+message GetAllSolutionFilesResponse {
+  repeated ExerciseSolution solutions = 1;
+}
+
 message GetExercisesRequest {
   string training_name = 1;
   string token = 2;
@@ -187,4 +220,19 @@ message CanSkipExerciseRequest {
 message CanSkipExerciseResponse {
   bool can_skip = 1;
   bool can_skip_all_optional = 2;
+}
+
+message GetSolutionsRequest {
+  string exercise_id = 1;
+  string token = 2;
+}
+
+message GetSolutionsResponse {
+  message Solution {
+    string verification_id = 1;
+    bool successful = 2;
+    google.protobuf.Timestamp executed_at = 3;
+  }
+
+  repeated Solution solutions = 1;
 }

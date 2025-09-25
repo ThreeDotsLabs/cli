@@ -7,6 +7,7 @@ import (
 	"path"
 
 	"github.com/ThreeDotsLabs/cli/trainings/config"
+	"github.com/ThreeDotsLabs/cli/trainings/files"
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -33,7 +34,7 @@ func (h *Handlers) Clone(ctx context.Context, executionID string, directory stri
 
 	absoluteDirToClone = path.Join(absoluteDirToClone, directory)
 
-	if _, err := h.startTraining(ctx, resp.TrainingName, absoluteDirToClone); err != nil {
+	if _, _, err := h.startTraining(ctx, resp.TrainingName, absoluteDirToClone); err != nil {
 		return err
 	}
 
@@ -43,15 +44,7 @@ func (h *Handlers) Clone(ctx context.Context, executionID string, directory stri
 		return errors.Wrap(err, "can't write training config")
 	}
 
-	files := &genproto.NextExerciseResponse{
-		TrainingStatus: genproto.NextExerciseResponse_IN_PROGRESS,
-		Dir:            resp.Dir,
-		ExerciseId:     resp.ExerciseId,
-		FilesToCreate:  resp.FilesToCreate,
-		IsTextOnly:     false,
-	}
-
-	if err := h.writeExerciseFiles(files, trainingRootFs); err != nil {
+	if err := h.writeExerciseFiles(files.NewFiles(), getSolutionFilesToExerciseSolution(resp), trainingRootFs); err != nil {
 		return err
 	}
 
@@ -61,4 +54,14 @@ func (h *Handlers) Clone(ctx context.Context, executionID string, directory stri
 	}
 
 	return nil
+}
+
+func getSolutionFilesToExerciseSolution(resp *genproto.GetSolutionFilesResponse) *genproto.ExerciseSolution {
+	return &genproto.ExerciseSolution{
+		ExerciseId: resp.ExerciseId,
+		Dir:        resp.Dir,
+		Files:      resp.FilesToCreate,
+		IsTextOnly: false,
+		IsOptional: false,
+	}
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"syscall"
 
@@ -50,6 +51,41 @@ func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, trainingRootFs
 
 	var savedFiles []savedFile
 
+	filesToDelete := map[string]struct{}{}
+
+	if f.deleteUnusedFiles {
+		err := afero.Walk(trainingRootFs, exerciseDir, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+
+			if !info.IsDir() && filepath.Base(path) != ExerciseFile && filepath.Base(path) != "go.sum" {
+				filesToDelete[path] = struct{}{}
+			}
+
+			return nil
+		})
+		if err != nil {
+			return errors.Wrapf(err, "can't walk through %s", exerciseDir)
+		}
+
+		for _, fileFromServer := range filesToCreate {
+			fullFilePath := filepath.Join(exerciseDir, fileFromServer.Path)
+			delete(filesToDelete, fullFilePath)
+		}
+	}
+
+	if f.showFullDiff {
+		proceed, err := f.shouldWriteAllFiles(trainingRootFs, exerciseDir, filesToCreate, filesToDelete)
+		if err != nil {
+			return err
+		}
+
+		if !proceed {
+			return nil
+		}
+	}
+
 	for _, fileFromServer := range filesToCreate {
 		// We should never trust the remote server.
 		// Writing files based on external name is a vector for Path Traversal attack.
@@ -59,12 +95,14 @@ func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, trainingRootFs
 		fullFilePath := filepath.Join(exerciseDir, fileFromServer.Path)
 		fullFileDir := filepath.Dir(fullFilePath)
 
-		shouldWrite, err := f.shouldWriteFile(trainingRootFs, fullFilePath, fileFromServer)
-		if err != nil {
-			return err
-		}
-		if !shouldWrite {
-			continue
+		if !f.showFullDiff {
+			shouldWrite, err := f.shouldWriteFile(trainingRootFs, fullFilePath, fileFromServer)
+			if err != nil {
+				return err
+			}
+			if !shouldWrite {
+				continue
+			}
 		}
 
 		if err := trainingRootFs.MkdirAll(fullFileDir, 0755); err != nil {
@@ -102,6 +140,31 @@ func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, trainingRootFs
 		fmt.Fprintf(f.stdout, color.GreenString("+")+" %s (%d lines)\n", savedFileRelativePath, file.Lines)
 	}
 
+	if f.deleteUnusedFiles {
+		var deletedFiles []string
+		for path := range filesToDelete {
+			if !f.showFullDiff {
+				shouldDelete := internal.FConfirmPrompt(fmt.Sprintf("File %s is not used anymore, should it be deleted?", path), f.stdin, f.stdout)
+				if !shouldDelete {
+					continue
+				}
+			}
+
+			if err := trainingRootFs.Remove(path); err != nil {
+				return errors.Wrapf(err, "can't delete %s", path)
+			}
+
+			deletedFiles = append(deletedFiles, path)
+			deletedFileRelativePath, err := calculateSavedFileRelativePath(trainingRootFs, path)
+			if err != nil {
+				logrus.WithError(err).Warn("Can't calculate deletedFileRelativePath")
+				deletedFileRelativePath = path
+			}
+
+			fmt.Fprintf(f.stdout, color.RedString("-")+" %s\n", deletedFileRelativePath)
+		}
+	}
+
 	if len(savedFiles) == 1 {
 		fmt.Fprintf(f.stdout, "Exercise ready, 1 file saved.\n\n")
 	} else if len(savedFiles) > 0 {
@@ -137,6 +200,116 @@ func calculateSavedFileRelativePath(trainingRootFs afero.Fs, fileName string) (s
 	return terminalPath, nil
 }
 
+func (f Files) shouldWriteAllFiles(fs afero.Fs, exerciseDir string, filesToCreate []*genproto.File, pathsToDelete map[string]struct{}) (bool, error) {
+	externalFiles := map[string]*genproto.File{}
+
+	allPaths := map[string]struct{}{}
+	for _, file := range filesToCreate {
+		fullFilePath := filepath.Join(exerciseDir, file.Path)
+		allPaths[fullFilePath] = struct{}{}
+		externalFiles[fullFilePath] = file
+	}
+
+	for path := range pathsToDelete {
+		allPaths[path] = struct{}{}
+	}
+
+	allPathsSorted := make([]string, 0, len(allPaths))
+	for path := range allPaths {
+		allPathsSorted = append(allPathsSorted, path)
+	}
+
+	sort.Strings(allPathsSorted)
+
+	additions := false
+	changes := false
+
+	var filesToPrint []fileItem
+
+	for _, filePath := range allPathsSorted {
+		exists, err := afero.Exists(fs, filePath)
+		if err != nil {
+			return false, errors.Wrapf(err, "can't check if %s exists", filePath)
+		}
+
+		var localContent []byte
+		if exists {
+			localContent, err = afero.ReadFile(fs, filePath)
+			if err != nil {
+				return false, errors.Wrapf(err, "can't read %s", filePath)
+			}
+		}
+
+		var externalContent string
+		externalFile, externalExists := externalFiles[filePath]
+		if externalExists {
+			externalContent = externalFile.Content
+		}
+
+		if string(localContent) != externalContent {
+			relPath, err := filepath.Rel(exerciseDir, filePath)
+			if err != nil {
+				return false, errors.Wrapf(err, "can't get relative path for %s", filePath)
+			}
+
+			if exists {
+				changes = true
+				if externalExists {
+					filesToPrint = append(filesToPrint, fileItem{
+						Path: relPath,
+						Type: fileItemTypeModified,
+					})
+				} else {
+					filesToPrint = append(filesToPrint, fileItem{
+						Path: relPath,
+						Type: fileItemTypeDeleted,
+					})
+				}
+			} else {
+				additions = true
+				filesToPrint = append(filesToPrint, fileItem{
+					Path: relPath,
+					Type: fileItemTypeAdded,
+				})
+			}
+
+			edits := myers.ComputeEdits(span.URIFromPath("local "+filePath), string(localContent), externalContent)
+			diff := fmt.Sprint(gotextdiff.ToUnified("local "+relPath, "remote "+relPath, string(localContent), edits))
+			_, _ = fmt.Fprintln(f.stdout, colorDiff(diff))
+		}
+	}
+
+	if !changes && len(pathsToDelete) == 0 {
+		if additions {
+			return true, nil
+		} else {
+			fmt.Println("All files are up to date.")
+			return false, nil
+		}
+	}
+
+	fmt.Println()
+	fmt.Println("Changes to be made:")
+	fmt.Println()
+
+	printFilesList(filesToPrint)
+
+	fmt.Println()
+
+	if len(pathsToDelete) > 0 {
+		fmt.Println("Warning! Some files will be deleted!")
+		fmt.Println()
+	}
+
+	proceed := internal.FConfirmPrompt("Should all files be overridden?", f.stdin, f.stdout)
+	if !proceed {
+		fmt.Println("Skipping all files.")
+		return false, nil
+	}
+
+	return true, nil
+}
+
 func (f Files) shouldWriteFile(fs afero.Fs, filePath string, file *genproto.File) (bool, error) {
 	if !f.dirOrFileExists(fs, filePath) {
 		return true, nil
@@ -161,7 +334,7 @@ func (f Files) shouldWriteFile(fs afero.Fs, filePath string, file *genproto.File
 
 	edits := myers.ComputeEdits(span.URIFromPath("local "+filepath.Base(file.Path)), string(actualContent), file.Content)
 	diff := fmt.Sprint(gotextdiff.ToUnified("local "+filepath.Base(file.Path), "remote "+filepath.Base(file.Path), string(actualContent), edits))
-	_, _ = fmt.Fprintln(f.stdout, diff)
+	_, _ = fmt.Fprintln(f.stdout, colorDiff(diff))
 
 	if !internal.FConfirmPrompt("Should it be overridden?", f.stdin, f.stdout) {
 		_, _ = fmt.Fprintln(f.stdout, "Skipping file")
@@ -186,4 +359,69 @@ func DirOrFileExists(fs afero.Fs, path string) bool {
 
 	// it can be only some strange i/o error, let's not silently ignore it
 	panic(err)
+}
+
+func colorDiff(diffText string) string {
+	red := color.New(color.FgRed)
+	green := color.New(color.FgGreen)
+	yellow := color.New(color.FgYellow)
+
+	lines := strings.Split(diffText, "\n")
+	var coloredLines []string
+
+	for _, line := range lines {
+		switch {
+		case strings.HasPrefix(line, "-"):
+			coloredLines = append(coloredLines, red.Sprint(line))
+		case strings.HasPrefix(line, "+"):
+			coloredLines = append(coloredLines, green.Sprint(line))
+		case strings.HasPrefix(line, "@@"):
+			coloredLines = append(coloredLines, yellow.Sprint(line))
+		default:
+			coloredLines = append(coloredLines, line)
+		}
+	}
+
+	return strings.Join(coloredLines, "\n")
+}
+
+type fileItemType int
+
+const (
+	fileItemTypeDeleted fileItemType = iota
+	fileItemTypeAdded
+	fileItemTypeModified
+)
+
+type fileItem struct {
+	Path string
+	Type fileItemType
+}
+
+func printFilesList(files []fileItem) {
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].Path < files[j].Path
+	})
+
+	for _, file := range files {
+		var sign string
+		var textColor *color.Color
+
+		switch file.Type {
+		case fileItemTypeDeleted:
+			sign = "-"
+			textColor = color.New(color.FgRed)
+		case fileItemTypeAdded:
+			sign = "+"
+			textColor = color.New(color.FgGreen)
+		case fileItemTypeModified:
+			sign = "~"
+			textColor = color.New(color.FgYellow)
+		default:
+			sign = "?"
+			textColor = color.New(color.FgWhite)
+		}
+
+		fmt.Printf("%s %s\n", textColor.Sprintf(sign), textColor.Sprintf(file.Path))
+	}
 }
