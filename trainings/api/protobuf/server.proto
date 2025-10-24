@@ -25,6 +25,13 @@ service Trainings {
   rpc SkipExercise(SkipExerciseRequest) returns (SkipExerciseResponse) {};
 }
 
+enum TrainingDifficulty {
+  UNKNOWN = 0;
+  EASY = 1;
+  NORMAL = 2;
+  HARD = 3;
+}
+
 message InitRequest {
   string token = 1;
 }
@@ -84,6 +91,7 @@ message NextExerciseResponse {
   }
 
   Exercise exercise = 7;
+  TrainingDifficulty training_difficulty = 9;
 
   google.protobuf.Timestamp next_batch_date = 8;
 }
