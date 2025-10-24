@@ -72,7 +72,10 @@ func (h *Handlers) setExercise(fs *afero.BasePathFs, exercise *genproto.NextExer
 	}
 
 	if writeFiles {
-		if err := h.writeExerciseFiles(files.NewFiles(), nextExerciseResponseToExerciseSolution(exercise), fs); err != nil {
+		// In the relaxed mode, we clone the complete example solutions, so it makes sense to delete unused files
+		isEasy := exercise.TrainingDifficulty == genproto.TrainingDifficulty_EASY
+		f := files.NewFilesWithConfig(isEasy, isEasy)
+		if err := h.writeExerciseFiles(f, nextExerciseResponseToExerciseSolution(exercise), fs); err != nil {
 			return false, err
 		}
 	}
