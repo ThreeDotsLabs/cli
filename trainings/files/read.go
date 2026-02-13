@@ -2,6 +2,7 @@ package files
 
 import (
 	"os"
+	"path"
 	"path/filepath"
 
 	"github.com/pkg/errors"
@@ -25,7 +26,7 @@ func (f Files) ReadSolutionFiles(trainingRootFs afero.Fs, dir string) ([]*genpro
 			if info.IsDir() {
 				return nil
 			}
-			if !isSolutionFile(info) {
+			if !IsSolutionFile(filePath) {
 				return nil
 			}
 
@@ -61,18 +62,35 @@ func (f Files) ReadSolutionFiles(trainingRootFs afero.Fs, dir string) ([]*genpro
 	return files, nil
 }
 
-func isSolutionFile(info os.FileInfo) bool {
-	if filepath.Ext(info.Name()) == ".go" {
-		return true
+var solutionFiles = []string{
+	"go.mod",
+	"go.work",
+	"Dockerfile",
+	".gitattributes",
+}
+
+var solutionExtensions = []string{
+	".go",
+	".yaml",
+	".yml",
+	".conf",
+	".html",
+	".sql",
+}
+
+func IsSolutionFile(filePath string) bool {
+	name := path.Base(filePath)
+
+	for _, solutionFile := range solutionFiles {
+		if name == solutionFile {
+			return true
+		}
 	}
-	if info.Name() == "go.mod" {
-		return true
-	}
-	if info.Name() == "go.work" {
-		return true
-	}
-	if filepath.Ext(info.Name()) == ".sql" {
-		return true
+
+	for _, ext := range solutionExtensions {
+		if path.Ext(filePath) == ext {
+			return true
+		}
 	}
 
 	return false
