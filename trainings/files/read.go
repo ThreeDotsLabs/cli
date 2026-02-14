@@ -2,7 +2,6 @@ package files
 
 import (
 	"os"
-	"path"
 	"path/filepath"
 
 	"github.com/pkg/errors"
@@ -79,7 +78,7 @@ var solutionExtensions = []string{
 }
 
 func IsSolutionFile(filePath string) bool {
-	name := path.Base(filePath)
+	name := filepath.Base(filePath)
 
 	for _, solutionFile := range solutionFiles {
 		if name == solutionFile {
@@ -88,7 +87,7 @@ func IsSolutionFile(filePath string) bool {
 	}
 
 	for _, ext := range solutionExtensions {
-		if path.Ext(filePath) == ext {
+		if filepath.Ext(filePath) == ext {
 			return true
 		}
 	}
