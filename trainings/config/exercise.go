@@ -10,10 +10,21 @@ import (
 const exerciseConfigFile = ".tdl-exercise"
 
 type ExerciseConfig struct {
-	ExerciseID string `toml:"exercise_id"`
-	Directory  string `toml:"directory"`
-	IsTextOnly bool   `toml:"is_text_only"`
-	IsOptional bool   `toml:"is_optional"`
+	ExerciseID   string `toml:"exercise_id"`
+	Directory    string `toml:"directory"`
+	IsTextOnly   bool   `toml:"is_text_only"`
+	IsOptional   bool   `toml:"is_optional"`
+	ModuleName   string `toml:"module_name"`
+	ExerciseName string `toml:"exercise_name"`
+}
+
+// ModuleExercisePath returns "module/exercise" for use in branch names and commit messages.
+// Falls back to Directory for old configs that don't have module/exercise names.
+func (c ExerciseConfig) ModuleExercisePath() string {
+	if c.ModuleName != "" && c.ExerciseName != "" {
+		return c.ModuleName + "/" + c.ExerciseName
+	}
+	return c.Directory
 }
 
 func (c Config) WriteExerciseConfig(trainingRootFs afero.Fs, cfg ExerciseConfig) error {

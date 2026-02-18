@@ -13,7 +13,8 @@ import (
 
 func (h *Handlers) printCurrentExercise(moduleName string, exerciseName string) {
 	name := fmt.Sprintf("%v/%v", moduleName, exerciseName)
-	fmt.Printf("\n%s\n", color.New(color.Bold, color.FgCyan).Sprint(name))
+	fmt.Printf("\n%s\n", color.HiBlackString(strings.Repeat("─", internal.TerminalWidth())))
+	fmt.Println(color.New(color.Bold, color.FgCyan).Sprint(name))
 }
 
 func (h *Handlers) printNotInATrainingDirectory() {

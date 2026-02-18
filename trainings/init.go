@@ -13,6 +13,7 @@ import (
 	"github.com/ThreeDotsLabs/cli/trainings/config"
 	"github.com/ThreeDotsLabs/cli/trainings/files"
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
+	"github.com/ThreeDotsLabs/cli/trainings/git"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -21,7 +22,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func (h *Handlers) Init(ctx context.Context, trainingName string, dir string) error {
+func (h *Handlers) Init(ctx context.Context, trainingName string, dir string, noGit bool, forceGit bool) error {
 	logrus.WithFields(logrus.Fields{
 		"training_name": trainingName,
 	}).Debug("Starting training")
@@ -41,17 +42,72 @@ func (h *Handlers) Init(ctx context.Context, trainingName string, dir string) er
 		return err
 	}
 
+	// Git integration: init repo, configure preferences, initial commit
+	// Skip git entirely in non-interactive mode (pipes, CI, E2E) — we can't prompt for preferences.
+	// forceGit overrides the non-interactive check (used by E2E tests and scripted restore).
+	gitOps := git.NewOps(trainingRootDir, noGit || (!forceGit && !internal.IsStdinTerminal()))
+	if gitOps.Enabled() {
+		_, err := gitOps.Init()
+		if err != nil {
+			logrus.WithError(err).Warn("Could not initialize git repository")
+		}
+
+		trainingRootFs := newTrainingRootFs(trainingRootDir)
+		cfg := h.config.TrainingConfig(trainingRootFs)
+
+		if !cfg.GitConfigured {
+			showGitDefaults()
+			cfg.GitConfigured = true
+			cfg.GitEnabled = true
+			cfg.GitAutoCommit = true
+			cfg.GitGoldenSync = "always"
+			cfg.GitGoldenMode = "compare"
+
+			if err := h.config.WriteTrainingConfig(cfg, trainingRootFs); err != nil {
+				return errors.Wrap(err, "can't update training config with git preferences")
+			}
+		}
+
+		filesToCommit := []string{".tdl-training", ".gitignore"}
+		if hasGoWorkspace(trainingRootDir) {
+			filesToCommit = append(filesToCommit, "go.work")
+		}
+		if err := gitOps.AddFiles(filesToCommit...); err != nil {
+			logrus.WithError(err).Warn("Could not stage initial files")
+		}
+		initMsg := fmt.Sprintf("initialize %s", trainingName)
+
+		if gitOps.HasStagedChanges() && !previousSolutionsAvailable {
+			// No restore coming — commit now with current time.
+			if err := gitOps.Commit(initMsg); err != nil {
+				logrus.WithError(err).Warn("Could not create initial commit")
+			}
+		}
+		// When previousSolutionsAvailable, staged changes remain uncommitted
+		// so restore() can create the initialize commit with the correct date.
+	}
+
 	var previousSolutions []string
 
 	if previousSolutionsAvailable {
 		fmt.Println("\nIt looks like you have already started this training and have existing exercises.")
 		fmt.Println("You can clone your existing solutions to this directory.")
-		ok := promptForPastSolutions()
+
+		// forceGit implies scripted/non-interactive mode — auto-accept restore
+		ok := forceGit || promptForPastSolutions()
 
 		if ok {
-			previousSolutions, err = h.restore(ctx, trainingRootDir)
+			previousSolutions, err = h.restore(ctx, trainingRootDir, gitOps)
 			if err != nil {
 				return errors.Wrap(err, "can't restore existing exercises")
+			}
+		}
+
+		// If user declined restore (or restore found nothing), commit now.
+		if gitOps.Enabled() && gitOps.HasStagedChanges() {
+			initMsg := fmt.Sprintf("initialize %s", trainingName)
+			if err := gitOps.Commit(initMsg); err != nil {
+				logrus.WithError(err).Warn("Could not create initial commit")
 			}
 		}
 	}
@@ -71,6 +127,74 @@ func (h *Handlers) Init(ctx context.Context, trainingName string, dir string) er
 	}
 
 	return nil
+}
+
+func showGitDefaults() {
+	fmt.Println()
+	fmt.Println(color.New(color.Bold).Sprint("Git integration"))
+	fmt.Println()
+	fmt.Println("  Your progress will be tracked with git. Here's what happens automatically:")
+	fmt.Println()
+	fmt.Println("  When you complete an exercise:")
+	fmt.Println(color.CyanString("    git add <exercise-dir> && git commit -m \"completed <exercise>\""))
+	fmt.Println()
+	fmt.Println("  When loading the next exercise:")
+	fmt.Printf("    %s git fetch cli tdl/init/<exercise>\n", color.MagentaString("•••"))
+	fmt.Printf("    %s git merge tdl/init/<exercise>\n", color.MagentaString("•••"))
+	fmt.Println()
+	fmt.Println("  After passing, the official solution is saved for comparison:")
+	fmt.Println(color.CyanString("    git diff <your-branch>..tdl/golden/<exercise> -- <exercise-dir>"))
+	fmt.Println()
+	fmt.Println("  Press g after passing to replace your solution with the official one.")
+	fmt.Println("  Your work is saved to a backup branch first (never destructive).")
+	fmt.Println()
+	fmt.Printf("  Defaults: auto-commit on, golden sync always.\n")
+	fmt.Printf("  To change: %s\n\n", color.CyanString("tdl training config"))
+}
+
+// promptGitPreferences runs interactive prompts for git settings.
+// Used by "tdl training config" to let users change preferences.
+func promptGitPreferences() (autoCommit bool, goldenSync string, goldenMode string) {
+	fmt.Println()
+	fmt.Println(color.New(color.Bold).Sprint("Git settings"))
+	fmt.Println("Automatically commit your progress when you pass each exercise?")
+
+	autoCommitPrompt := internal.Prompt(
+		internal.Actions{
+			{Shortcut: '\n', Action: "enable auto-commit (recommended)", ShortcutAliases: []rune{'\r'}},
+			{Shortcut: 'n', Action: "skip auto-commit (you'll commit manually)"},
+		},
+		os.Stdin,
+		os.Stdout,
+	)
+	autoCommit = autoCommitPrompt == '\n'
+
+	fmt.Println()
+	fmt.Println("After passing an exercise, create a branch with the official solution for comparison?")
+
+	goldenPrompt := internal.Prompt(
+		internal.Actions{
+			{Shortcut: '\n', Action: "always sync golden solutions (recommended)", ShortcutAliases: []rune{'\r'}},
+			{Shortcut: 'a', Action: "ask each time"},
+			{Shortcut: 'n', Action: "never sync golden solutions"},
+		},
+		os.Stdin,
+		os.Stdout,
+	)
+
+	switch goldenPrompt {
+	case '\n':
+		goldenSync = "always"
+	case 'a':
+		goldenSync = "ask"
+	default:
+		goldenSync = "never"
+	}
+
+	goldenMode = "compare" // golden branch always uses compare; `g` action does override
+
+	fmt.Println()
+	return autoCommit, goldenSync, goldenMode
 }
 
 func promptForPastSolutions() bool {
@@ -184,6 +308,9 @@ var gitignore = strings.Join(
 		"# Exercise content is subject to Three Dots Labs' copyright.",
 		"**/" + files.ExerciseFile,
 		"",
+		"# TDL exercise state (managed by CLI)",
+		".tdl-exercise",
+		"",
 	},
 	"\n",
 )
@@ -211,7 +338,7 @@ func createGoWorkspace(trainingRoot string) error {
 	cmd := exec.Command("go", "work", "init")
 	cmd.Dir = trainingRoot
 
-	printlnCommand(trainingRoot, "go work init")
+	printlnCommand("go work init")
 
 	out, err := cmd.CombinedOutput()
 	if strings.Contains(string(out), "already exists") {
@@ -231,6 +358,10 @@ func hasGoWorkspace(trainingRoot string) bool {
 }
 
 func addModuleToWorkspace(trainingRoot string, modulePath string) error {
+	return addModuleToWorkspaceQuiet(trainingRoot, modulePath, true)
+}
+
+func addModuleToWorkspaceQuiet(trainingRoot string, modulePath string, quiet bool) error {
 	if !hasGo() {
 		return nil
 	}
@@ -242,7 +373,9 @@ func addModuleToWorkspace(trainingRoot string, modulePath string) error {
 	cmd := exec.Command("go", "work", "use", modulePath)
 	cmd.Dir = trainingRoot
 
-	printlnCommand(trainingRoot, fmt.Sprintf("go work use %v", modulePath))
+	if !quiet {
+		printlnCommand(fmt.Sprintf("go work use %v", modulePath))
+	}
 
 	if err := cmd.Run(); err != nil {
 		return errors.Wrap(err, "can't run go work use")

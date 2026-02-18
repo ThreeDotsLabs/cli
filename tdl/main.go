@@ -134,10 +134,21 @@ var app = &cli.App{
 						"<trainingID from %s> [directory, if empty defaults to trainingID]",
 						internal.WebsiteAddress,
 					),
-					Flags: append(configureFlags, &cli.StringFlag{
-						Name:  "token",
-						Usage: tokenDocs,
-					}),
+					Flags: append(configureFlags,
+						&cli.StringFlag{
+							Name:  "token",
+							Usage: tokenDocs,
+						},
+						&cli.BoolFlag{
+							Name:  "no-git",
+							Usage: "disable git integration",
+						},
+						&cli.BoolFlag{
+							Name:   "force-git",
+							Usage:  "enable git integration even in non-interactive mode",
+							Hidden: true,
+						},
+					),
 					Usage: "initialise training files in your current directory",
 					Action: func(c *cli.Context) error {
 						trainingID := c.Args().First()
@@ -166,7 +177,7 @@ var app = &cli.App{
 							}
 						}
 
-						return handlers.Init(c.Context, trainingID, dir)
+						return handlers.Init(c.Context, trainingID, dir, c.Bool("no-git"), c.Bool("force-git"))
 					},
 				},
 				{
@@ -283,6 +294,13 @@ Note: after completing this exercise, the next exercise will be the last one you
 					ArgsUsage: "",
 					Action: func(c *cli.Context) error {
 						return newHandlers(c).Skip(c.Context)
+					},
+				},
+				{
+					Name:  "config",
+					Usage: "Change git integration settings (auto-commit, golden sync, golden mode)",
+					Action: func(c *cli.Context) error {
+						return newHandlers(c).ConfigureGit()
 					},
 				},
 			},

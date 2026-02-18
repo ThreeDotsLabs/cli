@@ -216,6 +216,17 @@ func (h *Handlers) Jump(ctx context.Context, exerciseID string) error {
 	}
 	trainingRootFs := newTrainingRootFs(trainingRoot)
 
+	// Save progress before jumping
+	gitOps := h.newGitOps()
+	if gitOps.Enabled() {
+		exerciseCfg := h.config.ExerciseConfig(trainingRootFs)
+		if !exerciseCfg.IsTextOnly && exerciseCfg.Directory != "" {
+			if err := gitOps.AddAll(exerciseCfg.Directory); err == nil && gitOps.HasStagedChanges() {
+				_ = gitOps.Commit(fmt.Sprintf("save progress on %s", exerciseCfg.ModuleExercisePath()))
+			}
+		}
+	}
+
 	resp, err := h.newGrpcClient().GetExercise(ctx, &genproto.GetExerciseRequest{
 		TrainingName: h.config.TrainingConfig(trainingRootFs).TrainingName,
 		Token:        h.config.GlobalConfig().Token,
@@ -225,6 +236,6 @@ func (h *Handlers) Jump(ctx context.Context, exerciseID string) error {
 		return fmt.Errorf("failed to get exercise: %w", err)
 	}
 
-	_, err = h.setExercise(trainingRootFs, resp, trainingRoot, true)
+	_, err = h.setExercise(trainingRootFs, resp, trainingRoot, false)
 	return err
 }

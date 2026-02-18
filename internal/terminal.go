@@ -11,6 +11,12 @@ import (
 )
 
 const stdinFileDescriptor = 0
+const stdoutFileDescriptor = 1
+
+// IsStdinTerminal returns true if stdin is connected to a terminal (not a pipe or file).
+func IsStdinTerminal() bool {
+	return terminal.IsTerminal(stdinFileDescriptor)
+}
 
 // NewRawTerminalReader returns raw terminal reader which allows reading stdin without hitting enter.
 func NewRawTerminalReader(stdin io.Reader) (*bufio.Reader, func(), error) {
@@ -29,4 +35,13 @@ func NewRawTerminalReader(stdin io.Reader) (*bufio.Reader, func(), error) {
 			logrus.WithError(err).Warn("Failed to restore terminal")
 		}
 	}, err
+}
+
+// TerminalWidth returns the current terminal width, falling back to 60 if not a TTY.
+func TerminalWidth() int {
+	w, _, err := terminal.GetSize(stdoutFileDescriptor)
+	if err != nil || w <= 0 {
+		return 60
+	}
+	return w
 }

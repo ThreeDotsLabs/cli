@@ -7,6 +7,7 @@ import (
 	"runtime"
 
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -14,6 +15,7 @@ import (
 	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings/config"
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
+	"github.com/ThreeDotsLabs/cli/trainings/git"
 )
 
 type Handlers struct {
@@ -91,6 +93,19 @@ func (h *Handlers) newGrpcClientWithAddr(addr string, region string, insecure bo
 	}
 
 	return h.grpcClient
+}
+
+func (h *Handlers) newGitOps() *git.Ops {
+	trainingRoot, err := h.config.FindTrainingRoot()
+	if err != nil {
+		logrus.WithError(err).Debug("Can't find training root for git ops")
+		return git.NewOps("", true) // disabled
+	}
+
+	trainingRootFs := newTrainingRootFs(trainingRoot)
+	cfg := h.config.TrainingConfig(trainingRootFs)
+	disabled := !cfg.GitConfigured || !cfg.GitEnabled
+	return git.NewOps(trainingRoot, disabled)
 }
 
 func newTrainingRootFs(trainingRoot string) *afero.BasePathFs {

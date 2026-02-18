@@ -27,6 +27,14 @@ func (h *Handlers) Skip(ctx context.Context) error {
 	trainingRootFs := newTrainingRootFs(trainingRoot)
 	exerciseConfig := h.config.ExerciseConfig(trainingRootFs)
 
+	// Save progress before skipping
+	gitOps := h.newGitOps()
+	if gitOps.Enabled() && !exerciseConfig.IsTextOnly && exerciseConfig.Directory != "" {
+		if err := gitOps.AddAll(exerciseConfig.Directory); err == nil && gitOps.HasStagedChanges() {
+			_ = gitOps.Commit(fmt.Sprintf("save progress on %s", exerciseConfig.ModuleExercisePath()))
+		}
+	}
+
 	resp, err := h.newGrpcClient().CanSkipExercise(context.Background(), &genproto.CanSkipExerciseRequest{
 		TrainingName: h.config.TrainingConfig(trainingRootFs).TrainingName,
 		ExerciseId:   exerciseConfig.ExerciseID,

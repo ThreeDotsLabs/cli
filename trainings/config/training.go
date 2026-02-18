@@ -13,7 +13,12 @@ import (
 const trainingConfigFile = ".tdl-training"
 
 type TrainingConfig struct {
-	TrainingName string `toml:"training_name"`
+	TrainingName  string `toml:"training_name"`
+	GitConfigured bool   `toml:"git_configured,omitempty"`
+	GitEnabled    bool   `toml:"git_enabled,omitempty"`
+	GitAutoCommit bool   `toml:"git_auto_commit,omitempty"`
+	GitGoldenSync string `toml:"git_golden_sync,omitempty"` // "always" | "ask" | "never"
+	GitGoldenMode string `toml:"git_golden_mode,omitempty"` // "compare" | "merge" | "override"
 }
 
 func (c Config) WriteTrainingConfig(config TrainingConfig, trainingRootFs afero.Fs) error {

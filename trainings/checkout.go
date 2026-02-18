@@ -89,5 +89,13 @@ func (h *Handlers) Checkout(ctx context.Context) error {
 		logrus.WithError(err).Warn("Failed to add module to workspace")
 	}
 
+	// Commit after restoring past solution
+	gitOps := h.newGitOps()
+	if gitOps.Enabled() && getResp.Dir != "" {
+		if err := gitOps.AddAll(getResp.Dir); err == nil && gitOps.HasStagedChanges() {
+			_ = gitOps.Commit(fmt.Sprintf("restore solution for %s", getResp.Dir))
+		}
+	}
+
 	return nil
 }
