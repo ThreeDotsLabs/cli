@@ -561,16 +561,7 @@ func (h *Handlers) syncGoldenSolutionImpl(ctx context.Context, trainingRootFs *a
 	}
 	defer gitOps.WorktreeRemove(tmpDir)
 
-	// Clean exercise directory so golden branch = pure official solution.
 	worktreeExercisePath := filepath.Join(tmpDir, exerciseDir)
-	if entries, err := os.ReadDir(worktreeExercisePath); err == nil {
-		for _, entry := range entries {
-			if entry.Name() == "go.sum" {
-				continue
-			}
-			os.RemoveAll(filepath.Join(worktreeExercisePath, entry.Name()))
-		}
-	}
 	os.MkdirAll(worktreeExercisePath, 0755)
 
 	// Write golden files silently (worktree is internal)
