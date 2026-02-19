@@ -655,6 +655,7 @@ func TestGoldenBasedOnHEAD(t *testing.T) {
 	initBranch := "tdl/init/01-mod/01-ex"
 	require.NoError(t, ops.WorktreeAdd(wt1, initBranch))
 	writeFile(t, wt1, "01-mod/01-ex/main.go", "package main\n")
+	writeFile(t, wt1, "01-mod/01-ex/main_test.go", "package main\n\nimport \"testing\"\n\nfunc TestMain(t *testing.T) {}\n")
 	wt1Ops := NewQuietOps(wt1)
 	require.NoError(t, wt1Ops.AddAll("01-mod/01-ex"))
 	require.NoError(t, wt1Ops.Commit("init exercise"))
@@ -673,13 +674,8 @@ func TestGoldenBasedOnHEAD(t *testing.T) {
 	wt2 := filepath.Join(tmpDir2, "wt")
 	require.NoError(t, ops.WorktreeAdd(wt2, goldenBranch))
 
-	// Clean exercise dir in worktree (simulating what syncGoldenSolution does)
+	// No directory cleaning — syncGoldenSolution writes golden files over the worktree.
 	exerciseDir := filepath.Join(wt2, "01-mod", "01-ex")
-	entries, err := os.ReadDir(exerciseDir)
-	require.NoError(t, err)
-	for _, entry := range entries {
-		os.RemoveAll(filepath.Join(exerciseDir, entry.Name()))
-	}
 	os.MkdirAll(exerciseDir, 0755)
 
 	// Write golden files
@@ -706,8 +702,24 @@ func TestGoldenBasedOnHEAD(t *testing.T) {
 			"golden diff should only contain exercise dir files, got: %s", f)
 	}
 
-	// User's helper.go should appear as deleted on golden (user-created file not in golden solution)
-	assert.Contains(t, diffOutput, "01-mod/01-ex/helper.go", "user's extra file should appear in diff")
+	// Only main.go should appear in diff (the actual golden solution change).
+	// Without directory cleaning, unchanged files (helper.go, main_test.go)
+	// persist from HEAD on the golden branch — they shouldn't appear in diff.
+	assert.Contains(t, diffOutput, "01-mod/01-ex/main.go",
+		"golden diff should include the changed solution file")
+	assert.NotContains(t, diffOutput, "01-mod/01-ex/helper.go",
+		"user's extra files should not appear in diff (preserved from HEAD)")
+	assert.NotContains(t, diffOutput, "01-mod/01-ex/main_test.go",
+		"shared files (like test files) should not appear in diff (preserved from HEAD)")
+
+	// Verify all files still exist on the golden branch
+	goldenTreeOutput := strings.TrimSpace(runGit(t, dir, "ls-tree", "--name-only", goldenBranch, "--", "01-mod/01-ex/"))
+	assert.Contains(t, goldenTreeOutput, "main.go",
+		"golden branch should have solution file")
+	assert.Contains(t, goldenTreeOutput, "main_test.go",
+		"golden branch should preserve test files from init")
+	assert.Contains(t, goldenTreeOutput, "helper.go",
+		"golden branch should preserve user files from HEAD")
 }
 
 func TestDiffStat_Alignment(t *testing.T) {
