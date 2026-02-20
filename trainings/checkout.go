@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ThreeDotsLabs/cli/trainings/config"
-	"github.com/ThreeDotsLabs/cli/trainings/files"
-	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 	"github.com/manifoldco/promptui"
 	"github.com/mergestat/timediff"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
+	"github.com/ThreeDotsLabs/cli/trainings/config"
+	"github.com/ThreeDotsLabs/cli/trainings/files"
+	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )
 
 func (h *Handlers) Checkout(ctx context.Context) error {
@@ -21,6 +22,7 @@ func (h *Handlers) Checkout(ctx context.Context) error {
 	}
 
 	trainingRootFs := newTrainingRootFs(trainingRoot)
+	printGitMigrationNotice(h.config.TrainingConfig(trainingRootFs))
 
 	resp, err := h.newGrpcClient().GetSolutions(ctx, &genproto.GetSolutionsRequest{
 		ExerciseId: h.config.ExerciseConfig(trainingRootFs).ExerciseID,

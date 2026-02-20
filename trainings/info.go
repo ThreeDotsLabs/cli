@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ThreeDotsLabs/cli/internal"
-	"github.com/ThreeDotsLabs/cli/trainings/config"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
+
+	"github.com/ThreeDotsLabs/cli/internal"
+	"github.com/ThreeDotsLabs/cli/trainings/config"
 )
 
 func (h *Handlers) Info(ctx context.Context) error {
@@ -20,6 +21,8 @@ func (h *Handlers) Info(ctx context.Context) error {
 	trainingRootFs := newTrainingRootFs(trainingRoot)
 
 	trainingConfig := h.config.TrainingConfig(trainingRootFs)
+	printGitMigrationNotice(trainingConfig)
+
 	exerciseConfig := h.config.ExerciseConfig(trainingRootFs)
 
 	fmt.Println("### Training")

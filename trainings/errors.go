@@ -4,6 +4,10 @@ import (
 	"fmt"
 
 	"github.com/fatih/color"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type UserFacingError struct {
@@ -28,6 +32,37 @@ To start fresh, create a new directory and re-initialize:
 This will re-download all your existing solutions.`,
 		color.CyanString("tdl training init %s .", trainingName),
 	)
+}
+
+// formatServerError translates gRPC errors into user-friendly messages.
+// Unknown codes pass through unchanged for formatUnexpectedError in main.go.
+func formatServerError(err error) error {
+	logrus.WithError(err).Debug("server error")
+
+	switch status.Code(errors.Cause(err)) {
+	case codes.Unavailable:
+		return UserFacingError{
+			Msg:          "Verification server is not reachable.",
+			SolutionHint: "Check your internet connection and try again. If the problem persists, the server may be temporarily down.",
+		}
+	case codes.DeadlineExceeded:
+		return UserFacingError{
+			Msg:          "Verification timed out.",
+			SolutionHint: "Check your internet connection and try again.",
+		}
+	case codes.Unauthenticated:
+		return UserFacingError{
+			Msg:          "Authentication failed.",
+			SolutionHint: "Run " + color.CyanString("tdl training configure <token>") + " to set up your token.",
+		}
+	case codes.ResourceExhausted:
+		return UserFacingError{
+			Msg:          "Server is overloaded, please try again later.",
+			SolutionHint: "Wait a moment and try again.",
+		}
+	default:
+		return err
+	}
 }
 
 // formatGitWarning formats a non-blocking git failure for user display.

@@ -301,8 +301,8 @@ Note: after completing this exercise, the next exercise will be the last one you
 					},
 				},
 				{
-					Name:  "config",
-					Usage: "Change git integration settings (auto-commit, golden sync, golden mode)",
+					Name:  "settings",
+					Usage: "Change git integration settings (auto-commit, auto-golden)",
 					Action: func(c *cli.Context) error {
 						return newHandlers(c).ConfigureGit()
 					},

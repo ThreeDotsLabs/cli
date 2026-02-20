@@ -7,15 +7,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fatih/color"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
+
 	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings/config"
 	"github.com/ThreeDotsLabs/cli/trainings/files"
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 	"github.com/ThreeDotsLabs/cli/trainings/git"
-	"github.com/fatih/color"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
 )
 
 var errMergeAborted = fmt.Errorf("merge aborted by user")

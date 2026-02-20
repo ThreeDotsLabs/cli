@@ -14,10 +14,12 @@ func (h *Handlers) Reset(ctx context.Context) error {
 		return err
 	}
 
+	trainingRootFs := newTrainingRootFs(trainingRoot)
+	printGitMigrationNotice(h.config.TrainingConfig(trainingRootFs))
+
 	// Warn about uncommitted changes before reset
 	gitOps := h.newGitOps()
 	if gitOps.Enabled() {
-		trainingRootFs := newTrainingRootFs(trainingRoot)
 		exerciseCfg := h.config.ExerciseConfig(trainingRootFs)
 
 		if !exerciseCfg.IsTextOnly && exerciseCfg.Directory != "" {

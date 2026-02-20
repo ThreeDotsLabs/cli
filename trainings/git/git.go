@@ -381,7 +381,7 @@ func (g *Ops) DiffStat(ref1, ref2 string) (string, error) {
 		return "", nil
 	}
 
-	return g.run("diff", "--stat", ref1+".."+ref2)
+	return g.run("diff", "--stat", "--color=always", ref1+".."+ref2)
 }
 
 // DiffStatPath returns a diff stat between two refs, restricted to a specific path.
@@ -390,7 +390,7 @@ func (g *Ops) DiffStatPath(ref1, ref2, path string) (string, error) {
 		return "", nil
 	}
 
-	return g.run("diff", "--stat", ref1+".."+ref2, "--", path)
+	return g.run("diff", "--stat", "--color=always", ref1+".."+ref2, "--", path)
 }
 
 // Log returns the last n commit messages in oneline format.

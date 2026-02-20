@@ -17,7 +17,7 @@ type TrainingConfig struct {
 	GitConfigured bool   `toml:"git_configured,omitempty"`
 	GitEnabled    bool   `toml:"git_enabled,omitempty"`
 	GitAutoCommit bool   `toml:"git_auto_commit,omitempty"`
-	GitGoldenSync string `toml:"git_golden_sync,omitempty"` // "always" | "ask" | "never"
+	GitAutoGolden bool   `toml:"git_auto_golden,omitempty"`
 	GitGoldenMode string `toml:"git_golden_mode,omitempty"` // "compare" | "merge" | "override"
 }
 

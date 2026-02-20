@@ -17,6 +17,7 @@ func (h *Handlers) ConfigureGit() error {
 
 	trainingRootFs := newTrainingRootFs(trainingRoot)
 	cfg := h.config.TrainingConfig(trainingRootFs)
+	printGitMigrationNotice(cfg)
 
 	if !cfg.GitConfigured || !cfg.GitEnabled {
 		fmt.Println("Git integration is not enabled for this training.")
@@ -26,13 +27,12 @@ func (h *Handlers) ConfigureGit() error {
 
 	fmt.Printf("Current settings for %s:\n", color.CyanString(cfg.TrainingName))
 	fmt.Printf("  Auto-commit:  %s\n", formatBool(cfg.GitAutoCommit))
-	fmt.Printf("  Golden sync:  %s\n\n", color.CyanString(cfg.GitGoldenSync))
+	fmt.Printf("  Auto-golden:  %s\n\n", formatBool(cfg.GitAutoGolden))
 
-	autoCommit, goldenSync, _ := promptGitPreferences()
+	autoCommit, autoGolden := promptGitPreferences()
 
 	cfg.GitAutoCommit = autoCommit
-	cfg.GitGoldenSync = goldenSync
-	cfg.GitGoldenMode = "compare" // kept for backward compat; `g` action always does override
+	cfg.GitAutoGolden = autoGolden
 
 	if err := h.config.WriteTrainingConfig(cfg, trainingRootFs); err != nil {
 		return errors.Wrap(err, "can't update training config")

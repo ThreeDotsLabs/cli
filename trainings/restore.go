@@ -6,10 +6,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/ThreeDotsLabs/cli/trainings/config"
-	"github.com/ThreeDotsLabs/cli/trainings/files"
-	"github.com/ThreeDotsLabs/cli/trainings/genproto"
-	"github.com/ThreeDotsLabs/cli/trainings/git"
 	"github.com/fatih/color"
 	"github.com/schollz/progressbar/v3"
 	"github.com/sirupsen/logrus"
@@ -17,6 +13,11 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/ThreeDotsLabs/cli/trainings/config"
+	"github.com/ThreeDotsLabs/cli/trainings/files"
+	"github.com/ThreeDotsLabs/cli/trainings/genproto"
+	"github.com/ThreeDotsLabs/cli/trainings/git"
 )
 
 // isValidCompletedAt returns true when the timestamp is a real completion date

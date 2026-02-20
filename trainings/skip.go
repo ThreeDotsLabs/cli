@@ -5,10 +5,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ThreeDotsLabs/cli/trainings/config"
-	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 	"github.com/fatih/color"
 	"github.com/manifoldco/promptui"
+
+	"github.com/ThreeDotsLabs/cli/trainings/config"
+	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )
 
 const (
@@ -25,6 +26,8 @@ func (h *Handlers) Skip(ctx context.Context) error {
 	}
 
 	trainingRootFs := newTrainingRootFs(trainingRoot)
+	printGitMigrationNotice(h.config.TrainingConfig(trainingRootFs))
+
 	exerciseConfig := h.config.ExerciseConfig(trainingRootFs)
 
 	// Save progress before skipping

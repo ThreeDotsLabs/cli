@@ -32,6 +32,7 @@ func (h *Handlers) Run(ctx context.Context, detached bool) error {
 	}
 
 	trainingRootFs := newTrainingRootFs(trainingRoot)
+	printGitMigrationNotice(h.config.TrainingConfig(trainingRootFs))
 
 	if detached {
 		return h.detachedRun(ctx, trainingRootFs)
@@ -97,10 +98,11 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 			fmt.Println()
 
 			if err != nil {
-				fmt.Println(color.RedString("Failed to execute solution: %s", err.Error()))
+				userErr := formatServerError(err)
+				fmt.Println(color.RedString("Failed to execute solution: %s", userErr))
 
 				if !internal.ConfirmPromptDefaultYes("run solution again") {
-					return err
+					return userErr
 				} else {
 					continue
 				}
@@ -145,7 +147,7 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 		cfg := h.config.TrainingConfig(trainingRootFs)
 		exerciseCfg := h.config.ExerciseConfig(trainingRootFs)
 
-		if gitOps.Enabled() && !exerciseCfg.IsTextOnly {
+		if gitOps.Enabled() && !exerciseCfg.IsTextOnly && !cfg.GitAutoGolden {
 			actions = append(actions, internal.Action{Shortcut: 'g', Action: "replace your solution with golden"})
 		}
 		actions = append(actions,
@@ -181,8 +183,13 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 			}
 		}
 
-		// Always create golden branch for comparison (skip if user already pressed 'g')
-		if gitOps.Enabled() && !exerciseCfg.IsTextOnly {
+		// Auto-golden: override with golden solution automatically after passing
+		if cfg.GitAutoGolden && gitOps.Enabled() && !exerciseCfg.IsTextOnly && promptResult != 'g' {
+			h.overrideWithGolden(ctx, trainingRootFs, gitOps, exerciseCfg)
+		}
+
+		// Create golden branch for comparison (skip if user pressed 'g' or auto-golden ran)
+		if gitOps.Enabled() && !exerciseCfg.IsTextOnly && !cfg.GitAutoGolden && promptResult != 'g' {
 			goldenBranch := git.GoldenBranchName(exerciseCfg.ModuleExercisePath())
 			if !gitOps.BranchExists(goldenBranch) {
 				h.syncGoldenSolution(ctx, trainingRootFs, gitOps, exerciseCfg, "compare")

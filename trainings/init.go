@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/fatih/color"
@@ -57,6 +58,31 @@ func (h *Handlers) Init(ctx context.Context, trainingName string, dir string, no
 	// forceGit overrides the non-interactive check (used by E2E tests and scripted restore).
 	gitOps := git.NewOps(trainingRootDir, noGit || (!forceGit && !internal.IsStdinTerminal()))
 
+	if gitOps.Enabled() {
+		if err := git.CheckVersion(); err != nil {
+			var notInstalled *git.GitNotInstalledError
+			var tooOld *git.GitTooOldError
+			if errors.As(err, &notInstalled) {
+				return UserFacingError{
+					Msg: "git is not installed.",
+					SolutionHint: fmt.Sprintf(
+						"Git is required for tracking your progress.\n\n%s\n\nAlternatively, use %s to skip git integration.",
+						git.InstallHint(runtime.GOOS), color.CyanString("--no-git"),
+					),
+				}
+			} else if errors.As(err, &tooOld) {
+				return UserFacingError{
+					Msg: fmt.Sprintf("Your git version (%s) is too old.", tooOld.Detected),
+					SolutionHint: fmt.Sprintf(
+						"This CLI requires git %s or newer.\n\n%s\n\nAlternatively, use %s to skip git integration.",
+						tooOld.Required, git.InstallHint(runtime.GOOS), color.CyanString("--no-git"),
+					),
+				}
+			}
+			logrus.WithError(err).Warn("Could not verify git version")
+		}
+	}
+
 	if !alreadyInitialized {
 		if gitOps.Enabled() {
 			_, err := gitOps.Init()
@@ -72,7 +98,7 @@ func (h *Handlers) Init(ctx context.Context, trainingName string, dir string, no
 				cfg.GitConfigured = true
 				cfg.GitEnabled = true
 				cfg.GitAutoCommit = true
-				cfg.GitGoldenSync = "always"
+				cfg.GitAutoGolden = false
 				cfg.GitGoldenMode = "compare"
 
 				if err := h.config.WriteTrainingConfig(cfg, trainingRootFs); err != nil {
@@ -175,13 +201,13 @@ func showGitDefaults() {
 	fmt.Println("  Press g after passing to replace your solution with the official one.")
 	fmt.Println("  Your work is saved to a backup branch first (never destructive).")
 	fmt.Println()
-	fmt.Printf("  Defaults: auto-commit on, golden sync always.\n")
-	fmt.Printf("  To change: %s\n\n", color.CyanString("tdl training config"))
+	fmt.Printf("  Defaults: auto-commit on, auto-golden off.\n")
+	fmt.Printf("  To change: %s\n\n", color.CyanString("tdl training settings"))
 }
 
 // promptGitPreferences runs interactive prompts for git settings.
-// Used by "tdl training config" to let users change preferences.
-func promptGitPreferences() (autoCommit bool, goldenSync string, goldenMode string) {
+// Used by "tdl training settings" to let users change preferences.
+func promptGitPreferences() (autoCommit bool, autoGolden bool) {
 	fmt.Println()
 	fmt.Println(color.New(color.Bold).Sprint("Git settings"))
 	fmt.Println("Automatically commit your progress when you pass each exercise?")
@@ -197,31 +223,20 @@ func promptGitPreferences() (autoCommit bool, goldenSync string, goldenMode stri
 	autoCommit = autoCommitPrompt == '\n'
 
 	fmt.Println()
-	fmt.Println("After passing an exercise, create a branch with the official solution for comparison?")
+	fmt.Println("After passing, automatically replace your solution with the golden one?")
 
-	goldenPrompt := internal.Prompt(
+	autoGoldenPrompt := internal.Prompt(
 		internal.Actions{
-			{Shortcut: '\n', Action: "always sync golden solutions (recommended)", ShortcutAliases: []rune{'\r'}},
-			{Shortcut: 'a', Action: "ask each time"},
-			{Shortcut: 'n', Action: "never sync golden solutions"},
+			{Shortcut: '\n', Action: "skip (you can press g manually)", ShortcutAliases: []rune{'\r'}},
+			{Shortcut: 'y', Action: "enable auto-golden"},
 		},
 		os.Stdin,
 		os.Stdout,
 	)
-
-	switch goldenPrompt {
-	case '\n':
-		goldenSync = "always"
-	case 'a':
-		goldenSync = "ask"
-	default:
-		goldenSync = "never"
-	}
-
-	goldenMode = "compare" // golden branch always uses compare; `g` action does override
+	autoGolden = autoGoldenPrompt == 'y'
 
 	fmt.Println()
-	return autoCommit, goldenSync, goldenMode
+	return autoCommit, autoGolden
 }
 
 func promptForPastSolutions() bool {
