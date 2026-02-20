@@ -135,10 +135,17 @@ func newTrainingRootFs(trainingRoot string) *afero.BasePathFs {
 
 // CheckServerConnection verifies we can reach the server before running a command.
 func (h *Handlers) CheckServerConnection(ctx context.Context) error {
+	var client genproto.TrainingsClient
+	if h.config.ConfiguredGlobally() {
+		client = h.newGrpcClient()
+	} else {
+		client = h.newGrpcClientWithAddr(internal.DefaultTrainingsServer, "", false)
+	}
+
 	pingCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	_, err := h.newGrpcClient().Ping(pingCtx, &emptypb.Empty{})
+	_, err := client.Ping(pingCtx, &emptypb.Empty{})
 	if err != nil {
 		return formatConnectionError(err)
 	}

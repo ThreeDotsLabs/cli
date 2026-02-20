@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -26,6 +27,25 @@ var (
 )
 
 func main() {
+	defer func() {
+		if r := recover(); r != nil {
+			var err error
+			switch v := r.(type) {
+			case error:
+				err = v
+			default:
+				err = fmt.Errorf("%v", v)
+			}
+			formatUnexpectedError(err)
+			var st stackTracer
+			if !errors.As(err, &st) {
+				fmt.Println(color.HiBlackString("\nPanic stack:"))
+				fmt.Println(color.HiBlackString(string(debug.Stack())))
+			}
+			os.Exit(1)
+		}
+	}()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

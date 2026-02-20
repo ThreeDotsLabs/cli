@@ -10,7 +10,7 @@ import (
 func (h *Handlers) List(ctx context.Context) error {
 	trainings, err := h.newGrpcClient().GetTrainings(context.Background(), &empty.Empty{})
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	for _, training := range trainings.Trainings {
