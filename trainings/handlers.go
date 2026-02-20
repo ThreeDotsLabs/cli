@@ -134,9 +134,12 @@ func newTrainingRootFs(trainingRoot string) *afero.BasePathFs {
 }
 
 // CheckServerConnection verifies we can reach the server before running a command.
-func (h *Handlers) CheckServerConnection(ctx context.Context) error {
+// Explicit serverAddr/region/insecure params take priority over global config, which takes priority over defaults.
+func (h *Handlers) CheckServerConnection(ctx context.Context, serverAddr, region string, insecure bool) error {
 	var client genproto.TrainingsClient
-	if h.config.ConfiguredGlobally() {
+	if serverAddr != "" {
+		client = h.newGrpcClientWithAddr(serverAddr, region, insecure)
+	} else if h.config.ConfiguredGlobally() {
 		client = h.newGrpcClient()
 	} else {
 		client = h.newGrpcClientWithAddr(internal.DefaultTrainingsServer, "", false)

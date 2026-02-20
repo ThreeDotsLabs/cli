@@ -134,10 +134,10 @@ var app = &cli.App{
 			Usage:   fmt.Sprintf("commands for %s commands", internal.WebsiteAddress),
 			Before: func(c *cli.Context) error {
 				sub := c.Args().First()
-				if sub == "settings" {
+				if sub == "init" || sub == "configure" {
 					return nil
 				}
-				return newHandlers(c).CheckServerConnection(c.Context)
+				return newHandlers(c).CheckServerConnection(c.Context, "", "", false)
 			},
 			Subcommands: []*cli.Command{
 				{
@@ -145,6 +145,14 @@ var app = &cli.App{
 					Usage:     "connect your environment with https://academy.threedots.tech/ account",
 					ArgsUsage: fmt.Sprintf("<%s>", tokenDocs),
 					Flags:     configureFlags,
+					Before: func(c *cli.Context) error {
+						return newHandlers(c).CheckServerConnection(
+							c.Context,
+							c.String("server"),
+							c.String("region"),
+							c.Bool("insecure"),
+						)
+					},
 					Action: func(c *cli.Context) error {
 						token := c.Args().First()
 
@@ -183,6 +191,14 @@ var app = &cli.App{
 						},
 					),
 					Usage: "initialise training files in your current directory",
+					Before: func(c *cli.Context) error {
+						return newHandlers(c).CheckServerConnection(
+							c.Context,
+							c.String("server"),
+							c.String("region"),
+							c.Bool("insecure"),
+						)
+					},
 					Action: func(c *cli.Context) error {
 						trainingID := c.Args().First()
 
