@@ -22,7 +22,7 @@ func (h *Handlers) Checkout(ctx context.Context) error {
 	}
 
 	trainingRootFs := newTrainingRootFs(trainingRoot)
-	printGitMigrationNotice(h.config.TrainingConfig(trainingRootFs))
+	printGitNotices(h.config.TrainingConfig(trainingRootFs))
 
 	resp, err := h.newGrpcClient().GetSolutions(ctx, &genproto.GetSolutionsRequest{
 		ExerciseId: h.config.ExerciseConfig(trainingRootFs).ExerciseID,

@@ -15,7 +15,7 @@ func (h *Handlers) Reset(ctx context.Context) error {
 	}
 
 	trainingRootFs := newTrainingRootFs(trainingRoot)
-	printGitMigrationNotice(h.config.TrainingConfig(trainingRootFs))
+	printGitNotices(h.config.TrainingConfig(trainingRootFs))
 
 	// Warn about uncommitted changes before reset
 	gitOps := h.newGitOps()

@@ -32,7 +32,7 @@ func (h *Handlers) Run(ctx context.Context, detached bool) error {
 	}
 
 	trainingRootFs := newTrainingRootFs(trainingRoot)
-	printGitMigrationNotice(h.config.TrainingConfig(trainingRootFs))
+	printGitNotices(h.config.TrainingConfig(trainingRootFs))
 
 	if detached {
 		return h.detachedRun(ctx, trainingRootFs)

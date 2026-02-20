@@ -21,7 +21,7 @@ func (h *Handlers) SelectExercise(ctx context.Context) (string, error) {
 		return "", nil
 	}
 	trainingRootFs := newTrainingRootFs(trainingRoot)
-	printGitMigrationNotice(h.config.TrainingConfig(trainingRootFs))
+	printGitNotices(h.config.TrainingConfig(trainingRootFs))
 
 	currentExerciseID := h.config.ExerciseConfig(trainingRootFs).ExerciseID
 
@@ -216,7 +216,7 @@ func (h *Handlers) Jump(ctx context.Context, exerciseID string) error {
 		return nil
 	}
 	trainingRootFs := newTrainingRootFs(trainingRoot)
-	printGitMigrationNotice(h.config.TrainingConfig(trainingRootFs))
+	printGitNotices(h.config.TrainingConfig(trainingRootFs))
 
 	// Save progress before jumping
 	gitOps := h.newGitOps()

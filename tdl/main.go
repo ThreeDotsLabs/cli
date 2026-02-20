@@ -370,6 +370,11 @@ Note: after completing this exercise, the next exercise will be the last one you
 }
 
 func newHandlers(c *cli.Context) *trainings.Handlers {
+	cmd := c.Command.HelpName
+	if cmd == "" {
+		cmd = c.Command.FullName()
+	}
+
 	return trainings.NewHandlers(trainings.CliMetadata{
 		Version:         version,
 		Commit:          commit,
@@ -378,7 +383,7 @@ func newHandlers(c *cli.Context) *trainings.Handlers {
 		OSVersion:       osVersion(),
 		GoVersion:       runtime.Version(),
 		GitVersion:      gitVersionString(),
-		ExecutedCommand: c.Command.HelpName,
+		ExecutedCommand: cmd,
 		Interactive:     internal.IsStdinTerminal(),
 	})
 }

@@ -17,7 +17,7 @@ func (h *Handlers) ConfigureGit() error {
 
 	trainingRootFs := newTrainingRootFs(trainingRoot)
 	cfg := h.config.TrainingConfig(trainingRootFs)
-	printGitMigrationNotice(cfg)
+	printGitNotices(cfg)
 
 	if !cfg.GitConfigured || !cfg.GitEnabled {
 		fmt.Println("Git integration is not enabled for this training.")

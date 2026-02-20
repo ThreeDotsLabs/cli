@@ -57,7 +57,7 @@ func (h *Handlers) Init(ctx context.Context, trainingName string, dir string, no
 	// Skip git entirely in non-interactive mode (pipes, CI, E2E) — we can't prompt for preferences.
 	// forceGit overrides the non-interactive check (used by E2E tests and scripted restore).
 	gitOps := git.NewOps(trainingRootDir, noGit || (!forceGit && !internal.IsStdinTerminal()))
-	gitUnavailable := false
+	gitWasUnavailable := false
 
 	if gitOps.Enabled() {
 		detectedVersion, err := git.CheckVersion()
@@ -70,7 +70,7 @@ func (h *Handlers) Init(ctx context.Context, trainingName string, dir string, no
 					return nil
 				}
 				gitOps = git.NewOps(trainingRootDir, true)
-				gitUnavailable = true
+				gitWasUnavailable = true
 			} else if errors.As(err, &tooOld) {
 				reason := fmt.Sprintf("Your git version (%s) is too old — %s or newer is required.", tooOld.Detected, tooOld.Required)
 				printGitUnavailableNotice(reason, git.InstallHint(runtime.GOOS))
@@ -78,7 +78,7 @@ func (h *Handlers) Init(ctx context.Context, trainingName string, dir string, no
 					return nil
 				}
 				gitOps = git.NewOps(trainingRootDir, true)
-				gitUnavailable = true
+				gitWasUnavailable = true
 			} else {
 				// Unparseable version — warn in logs, don't block
 				logrus.WithError(err).Warn("Could not verify git version")
@@ -134,12 +134,14 @@ func (h *Handlers) Init(ctx context.Context, trainingName string, dir string, no
 			}
 			// When previousSolutionsAvailable, staged changes remain uncommitted
 			// so restore() can create the initialize commit with the correct date.
-		} else if gitUnavailable {
+		} else {
+			// --no-git or git unavailable: mark as configured (git disabled)
 			trainingRootFs := newTrainingRootFs(trainingRootDir)
 			cfg := h.config.TrainingConfig(trainingRootFs)
 			if !cfg.GitConfigured {
 				cfg.GitConfigured = true
 				cfg.GitEnabled = false
+				cfg.GitUnavailable = gitWasUnavailable
 				if err := h.config.WriteTrainingConfig(cfg, trainingRootFs); err != nil {
 					return errors.Wrap(err, "can't update training config")
 				}

@@ -26,7 +26,7 @@ func (h *Handlers) Skip(ctx context.Context) error {
 	}
 
 	trainingRootFs := newTrainingRootFs(trainingRoot)
-	printGitMigrationNotice(h.config.TrainingConfig(trainingRootFs))
+	printGitNotices(h.config.TrainingConfig(trainingRootFs))
 
 	exerciseConfig := h.config.ExerciseConfig(trainingRootFs)
 

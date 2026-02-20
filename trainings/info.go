@@ -21,7 +21,7 @@ func (h *Handlers) Info(ctx context.Context) error {
 	trainingRootFs := newTrainingRootFs(trainingRoot)
 
 	trainingConfig := h.config.TrainingConfig(trainingRootFs)
-	printGitMigrationNotice(trainingConfig)
+	printGitNotices(trainingConfig)
 
 	exerciseConfig := h.config.ExerciseConfig(trainingRootFs)
 

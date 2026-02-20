@@ -8,6 +8,7 @@ import (
 
 	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings/config"
+	"github.com/ThreeDotsLabs/cli/trainings/git"
 )
 
 // printGitMigrationNotice prints a prominent banner for workspaces created
@@ -40,4 +41,42 @@ func printGitMigrationNotice(cfg config.TrainingConfig) {
 	fmt.Printf("    %s\n", initCmd)
 	fmt.Println(sep)
 	fmt.Println()
+}
+
+// printGitNowAvailableNotice shows a banner when git has become available
+// since the workspace was created without it (git was missing/too old).
+// Does not trigger for users who chose --no-git (GitUnavailable = false).
+func printGitNowAvailableNotice(cfg config.TrainingConfig) {
+	if !cfg.GitConfigured || cfg.GitEnabled || !cfg.GitUnavailable {
+		return
+	}
+
+	if _, err := git.CheckVersion(); err != nil {
+		// git still not usable
+		return
+	}
+
+	sep := color.HiBlackString(strings.Repeat("─", internal.TerminalWidth()))
+	title := color.New(color.Bold, color.FgHiGreen).Sprint("  *** Git is now available! ***")
+	initCmd := color.CyanString("tdl training init %s .", cfg.TrainingName)
+
+	fmt.Println(sep)
+	fmt.Println(title)
+	fmt.Println()
+	fmt.Println("  Git was not available when this workspace was created.")
+	fmt.Println("  You can enable git integration by reinitializing:")
+	fmt.Println()
+	fmt.Printf("    cd ..\n")
+	fmt.Printf("    mkdir my-training && cd my-training\n")
+	fmt.Printf("    %s\n", initCmd)
+	fmt.Println()
+	fmt.Println("  Your progress will be restored automatically.")
+	fmt.Println(sep)
+	fmt.Println()
+}
+
+// printGitNotices shows all relevant git migration/availability notices.
+func printGitNotices(cfg config.TrainingConfig) {
+	printGitMigrationNotice(cfg)
+	printGitNowAvailableNotice(cfg)
 }
