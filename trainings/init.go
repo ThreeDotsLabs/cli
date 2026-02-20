@@ -93,6 +93,8 @@ func (h *Handlers) Init(ctx context.Context, trainingName string, dir string, no
 				// No restore coming — commit now with current time.
 				if err := gitOps.Commit(initMsg); err != nil {
 					logrus.WithError(err).Warn("Could not create initial commit")
+					fmt.Println(formatGitWarning("Could not create initial git commit", err))
+					fmt.Println(color.YellowString("  Your training will work normally, but git history may be incomplete."))
 				}
 			}
 			// When previousSolutionsAvailable, staged changes remain uncommitted
@@ -111,6 +113,10 @@ func (h *Handlers) Init(ctx context.Context, trainingName string, dir string, no
 			if ok {
 				previousSolutions, err = h.restore(ctx, trainingRootDir, gitOps)
 				if err != nil {
+					var ufe UserFacingError
+					if errors.As(err, &ufe) {
+						return ufe
+					}
 					return errors.Wrap(err, "can't restore existing exercises")
 				}
 			}
@@ -120,6 +126,8 @@ func (h *Handlers) Init(ctx context.Context, trainingName string, dir string, no
 				initMsg := fmt.Sprintf("initialize %s", trainingName)
 				if err := gitOps.Commit(initMsg); err != nil {
 					logrus.WithError(err).Warn("Could not create initial commit")
+					fmt.Println(formatGitWarning("Could not create initial git commit", err))
+					fmt.Println(color.YellowString("  Your training will work normally, but git history may be incomplete."))
 				}
 			}
 		}

@@ -107,7 +107,7 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 			}
 
 			if !successful {
-				// When stuck (10+ failures), auto-create golden branch for comparison
+				// When stuck (10+ failures), create golden branch or remind about it
 				if h.solutionAvailable {
 					gitOps := h.newGitOps()
 					exerciseCfg := h.config.ExerciseConfig(trainingRootFs)
@@ -115,6 +115,10 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 						goldenBranch := git.GoldenBranchName(exerciseCfg.ModuleExercisePath())
 						if !gitOps.BranchExists(goldenBranch) {
 							h.syncGoldenSolution(ctx, trainingRootFs, gitOps, exerciseCfg, "compare")
+						} else {
+							// Branch already exists — remind the user how to compare
+							currentBranch, _ := gitOps.CurrentBranch()
+							fmt.Printf("\nCompare with our solution: %s\n\n", color.CyanString("git diff %s..%s -- %s", currentBranch, goldenBranch, exerciseCfg.Directory))
 						}
 					}
 				}
@@ -361,13 +365,21 @@ func (h *Handlers) runExercise(trainingRootFs *afero.BasePathFs) (bool, error) {
 		if response.Finished {
 			if response.SolutionAvailable {
 				h.solutionAvailable = true
+				h.stuckRunCount++
 			}
 
 			if response.Notification != "" {
-				_, ok := h.notifications[response.Notification]
-				if !ok {
-					fmt.Println(color.HiYellowString("\n%s", response.Notification))
-					h.notifications[response.Notification] = struct{}{}
+				if response.SolutionAvailable {
+					// Show periodically when stuck (first time + every 3 attempts)
+					if h.stuckRunCount%3 == 1 {
+						fmt.Println(color.HiYellowString("\n%s", response.Notification))
+					}
+				} else {
+					_, ok := h.notifications[response.Notification]
+					if !ok {
+						fmt.Println(color.HiYellowString("\n%s", response.Notification))
+						h.notifications[response.Notification] = struct{}{}
+					}
 				}
 			} else if !h.solutionHintDisplayed && !response.Successful && response.SolutionAvailable {
 				// Legacy behavior
@@ -462,12 +474,19 @@ func (h *Handlers) overrideWithGolden(ctx context.Context, trainingRootFs *afero
 		return
 	}
 
-	// Save user's solution to a timestamped backup branch
+	// Save user's solution to a timestamped backup branch.
+	// If this fails, abort — we must not overwrite files without a backup.
+	trainingName := h.config.TrainingConfig(trainingRootFs).TrainingName
 	backupBranch := git.BackupBranchName(moduleExercisePath)
 	if err := gitOps.CreateBranchFromHead(backupBranch); err != nil {
 		logrus.WithError(err).Warn("Could not save solution to backup branch")
+		fmt.Println(formatGitError("Could not save your solution to a backup branch", err, trainingName))
+		fmt.Println(color.YellowString("  Aborting golden override to protect your code."))
+		return
 	}
 	gitOps.PrintInfo(fmt.Sprintf("git branch %s", backupBranch))
+	fmt.Printf("  Your code saved to branch %s\n", color.MagentaString(backupBranch))
+	fmt.Println("  Restore anytime with: " + color.CyanString("git checkout %s -- %s", backupBranch, exerciseDir))
 
 	// Write golden files directly to exercise directory
 	f := files.NewFilesSilentDeleteUnused()
@@ -489,8 +508,6 @@ func (h *Handlers) overrideWithGolden(ctx context.Context, trainingRootFs *afero
 		}
 	}
 
-	fmt.Printf("  Your code saved to branch %s\n", color.MagentaString(backupBranch))
-	fmt.Println("  Restore anytime with: " + color.CyanString("git checkout %s -- %s", backupBranch, exerciseDir))
 	fmt.Println(color.GreenString("  Your code replaced with golden solution."))
 }
 

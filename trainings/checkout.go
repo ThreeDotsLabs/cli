@@ -93,7 +93,9 @@ func (h *Handlers) Checkout(ctx context.Context) error {
 	gitOps := h.newGitOps()
 	if gitOps.Enabled() && getResp.Dir != "" {
 		if err := gitOps.AddAll(getResp.Dir); err == nil && gitOps.HasStagedChanges() {
-			_ = gitOps.Commit(fmt.Sprintf("restore solution for %s", getResp.Dir))
+			if err := gitOps.Commit(fmt.Sprintf("restore solution for %s", getResp.Dir)); err != nil {
+				fmt.Println(formatGitWarning("Could not auto-commit your progress", err))
+			}
 		}
 	}
 

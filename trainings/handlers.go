@@ -26,6 +26,7 @@ type Handlers struct {
 
 	solutionHintDisplayed bool
 	solutionAvailable     bool
+	stuckRunCount         int
 	notifications         map[string]struct{}
 }
 

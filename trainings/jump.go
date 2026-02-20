@@ -222,7 +222,9 @@ func (h *Handlers) Jump(ctx context.Context, exerciseID string) error {
 		exerciseCfg := h.config.ExerciseConfig(trainingRootFs)
 		if !exerciseCfg.IsTextOnly && exerciseCfg.Directory != "" {
 			if err := gitOps.AddAll(exerciseCfg.Directory); err == nil && gitOps.HasStagedChanges() {
-				_ = gitOps.Commit(fmt.Sprintf("save progress on %s", exerciseCfg.ModuleExercisePath()))
+				if err := gitOps.Commit(fmt.Sprintf("save progress on %s", exerciseCfg.ModuleExercisePath())); err != nil {
+					fmt.Println(formatGitWarning("Could not auto-commit your progress", err))
+				}
 			}
 		}
 	}

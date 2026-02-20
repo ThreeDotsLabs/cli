@@ -31,7 +31,9 @@ func (h *Handlers) Skip(ctx context.Context) error {
 	gitOps := h.newGitOps()
 	if gitOps.Enabled() && !exerciseConfig.IsTextOnly && exerciseConfig.Directory != "" {
 		if err := gitOps.AddAll(exerciseConfig.Directory); err == nil && gitOps.HasStagedChanges() {
-			_ = gitOps.Commit(fmt.Sprintf("save progress on %s", exerciseConfig.ModuleExercisePath()))
+			if err := gitOps.Commit(fmt.Sprintf("save progress on %s", exerciseConfig.ModuleExercisePath())); err != nil {
+				fmt.Println(formatGitWarning("Could not auto-commit your progress", err))
+			}
 		}
 	}
 

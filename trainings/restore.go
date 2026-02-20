@@ -83,12 +83,18 @@ func (h *Handlers) restore(ctx context.Context, trainingRoot string, gitOps *git
 				ctx, trainingRootFs, gitOps, trainingRoot,
 				solution, moduleExercisePath, prevModuleExercisePath,
 			); err != nil {
-				return nil, fmt.Errorf("restoring %s: %w", moduleExercisePath, err)
+				return nil, UserFacingError{
+					Msg: fmt.Sprintf("Restore failed at exercise %s.", moduleExercisePath),
+					SolutionHint: fmt.Sprintf(
+						"Some exercises were restored, but the process stopped.\n\n%s",
+						recoveryHint(trainingName),
+					),
+				}
 			}
 			prevModuleExercisePath = moduleExercisePath
 		} else {
 			// Text-only or no-git fallback: write files directly
-			f := files.NewFilesWithConfig(false, true)
+			f := files.NewFilesSilent()
 			if err := h.writeExerciseFiles(f, solution, trainingRootFs); err != nil {
 				return nil, err
 			}

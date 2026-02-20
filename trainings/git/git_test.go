@@ -65,7 +65,7 @@ func TestInit_ExistingRepo(t *testing.T) {
 }
 
 func TestAllOps_Disabled(t *testing.T) {
-	ops := NewOps("/nonexistent", true)
+	ops := NewOps(filepath.Join(t.TempDir(), "nonexistent"), true)
 
 	assert.False(t, ops.Enabled())
 	assert.False(t, ops.IsRepo())
@@ -87,8 +87,9 @@ func TestAllOps_Disabled(t *testing.T) {
 	assert.NoError(t, ops.Commit("msg"))
 	assert.NoError(t, ops.CommitAll("msg"))
 	assert.NoError(t, ops.DeleteBranch("b"))
-	assert.NoError(t, ops.WorktreeAdd("/tmp", "b"))
-	assert.NoError(t, ops.WorktreeRemove("/tmp"))
+	wtDir := filepath.Join(t.TempDir(), "wt")
+	assert.NoError(t, ops.WorktreeAdd(wtDir, "b"))
+	assert.NoError(t, ops.WorktreeRemove(wtDir))
 	assert.NoError(t, ops.CheckoutBranch("b"))
 	assert.NoError(t, ops.Merge("b", "msg"))
 	assert.NoError(t, ops.MergeAbort())

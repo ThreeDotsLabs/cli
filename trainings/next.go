@@ -27,6 +27,7 @@ func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string, t
 func (h *Handlers) nextExerciseWithSkipped(ctx context.Context, currentExerciseID string, trainingRoot string, skipExerciseIDs []string) (finished bool, err error) {
 	h.solutionHintDisplayed = false
 	h.solutionAvailable = false
+	h.stuckRunCount = 0
 	clear(h.notifications)
 
 	// We should never trust the remote server.
@@ -283,18 +284,32 @@ func (h *Handlers) setExerciseWithGit(
 		// Merge conflict — working tree has conflict markers
 		if conflictPrompt == 'g' && len(previewedConflictFiles) > 0 {
 			// User chose "replace all exercise files" — save their work, then overwrite entire exercise dir
-			_ = gitOps.CreateBranchFromHead(previewBackupBranch)
-			gitOps.PrintInfo(fmt.Sprintf("git branch %s", previewBackupBranch))
-			_ = gitOps.CheckoutFiles(initBranch, exerciseDir)
-			_ = gitOps.AddAll(exerciseDir)
-			_ = gitOps.Commit(mergeMsg)
-			fmt.Printf("  Your code saved to branch %s\n", color.MagentaString(previewBackupBranch))
-			fmt.Println("  Restore anytime with: " + color.CyanString("git checkout %s -- %s", previewBackupBranch, exerciseDir))
+			trainingName := h.config.TrainingConfig(fs).TrainingName
+			if err := gitOps.CreateBranchFromHead(previewBackupBranch); err != nil {
+				fmt.Println(formatGitWarning("Could not save your solution to a backup branch", err))
+			} else {
+				gitOps.PrintInfo(fmt.Sprintf("git branch %s", previewBackupBranch))
+				fmt.Printf("  Your code saved to branch %s\n", color.MagentaString(previewBackupBranch))
+				fmt.Println("  Restore anytime with: " + color.CyanString("git checkout %s -- %s", previewBackupBranch, exerciseDir))
+			}
+			if err := gitOps.CheckoutFiles(initBranch, exerciseDir); err != nil {
+				fmt.Println(formatGitError("Could not replace exercise files", err, trainingName))
+				return err
+			}
+			if err := gitOps.AddAll(exerciseDir); err != nil {
+				fmt.Println(formatGitWarning("Could not stage replaced files", err))
+			}
+			if err := gitOps.Commit(mergeMsg); err != nil {
+				fmt.Println(formatGitWarning("Could not commit replaced files", err))
+				fmt.Println()
+				fmt.Println(recoveryHint(trainingName))
+			}
 			fmt.Println(color.GreenString("  All exercise files replaced with our versions."))
 			fmt.Println()
 		} else if internal.IsStdinTerminal() {
 			// Interactive conflict resolution loop
-			if err := resolveConflictsInteractive(gitOps, initBranch, mergeMsg, moduleExercisePath, exerciseDir); err != nil {
+			trainingName := h.config.TrainingConfig(fs).TrainingName
+			if err := resolveConflictsInteractive(gitOps, initBranch, mergeMsg, moduleExercisePath, exerciseDir, trainingName); err != nil {
 				return err
 			}
 		} else {
@@ -439,7 +454,7 @@ func nextExerciseResponseToExerciseSolution(resp *genproto.NextExerciseResponse)
 // IMPORTANT: The 'g' (replace) path is destructive — it overwrites user files.
 // We MUST save their code to a backup branch before replacing.
 // The user explicitly confirms this action.
-func resolveConflictsInteractive(gitOps *git.Ops, initBranch, mergeMsg, moduleExercisePath, exerciseDir string) error {
+func resolveConflictsInteractive(gitOps *git.Ops, initBranch, mergeMsg, moduleExercisePath, exerciseDir, trainingName string) error {
 	conflictFiles, _ := gitOps.UnmergedFiles()
 	fmt.Println(color.YellowString("\n  Merge conflict detected."))
 	fmt.Println(color.YellowString("  Files with conflicts:"))
@@ -486,13 +501,25 @@ func resolveConflictsInteractive(gitOps *git.Ops, initBranch, mergeMsg, moduleEx
 
 		case 'g':
 			// Save user's work, then replace all exercise files from init branch
-			_ = gitOps.CreateBranchFromHead(backupBranch)
-			gitOps.PrintInfo(fmt.Sprintf("git branch %s", backupBranch))
-			_ = gitOps.CheckoutFiles(initBranch, exerciseDir)
-			_ = gitOps.AddAll(".")
-			_ = gitOps.Commit(mergeMsg)
-			fmt.Printf("  Your code saved to branch %s\n", color.MagentaString(backupBranch))
-			fmt.Println("  Restore anytime with: " + color.CyanString("git checkout %s -- %s", backupBranch, exerciseDir))
+			if err := gitOps.CreateBranchFromHead(backupBranch); err != nil {
+				fmt.Println(formatGitWarning("Could not save your solution to a backup branch", err))
+			} else {
+				gitOps.PrintInfo(fmt.Sprintf("git branch %s", backupBranch))
+				fmt.Printf("  Your code saved to branch %s\n", color.MagentaString(backupBranch))
+				fmt.Println("  Restore anytime with: " + color.CyanString("git checkout %s -- %s", backupBranch, exerciseDir))
+			}
+			if err := gitOps.CheckoutFiles(initBranch, exerciseDir); err != nil {
+				fmt.Println(formatGitError("Could not replace exercise files", err, trainingName))
+				return err
+			}
+			if err := gitOps.AddAll("."); err != nil {
+				fmt.Println(formatGitWarning("Could not stage replaced files", err))
+			}
+			if err := gitOps.Commit(mergeMsg); err != nil {
+				fmt.Println(formatGitWarning("Could not commit replaced files", err))
+				fmt.Println()
+				fmt.Println(recoveryHint(trainingName))
+			}
 			fmt.Println(color.GreenString("  All exercise files replaced with our versions."))
 			fmt.Println()
 			return nil
