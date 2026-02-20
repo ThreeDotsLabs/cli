@@ -27,7 +27,7 @@ func (h *Handlers) ConfigureGit() error {
 
 	fmt.Printf("Current settings for %s:\n", color.CyanString(cfg.TrainingName))
 	fmt.Printf("  Auto-commit:  %s\n", formatBool(cfg.GitAutoCommit))
-	fmt.Printf("  Auto-golden:  %s\n\n", formatBool(cfg.GitAutoGolden))
+	fmt.Printf("  Auto-sync:    %s\n\n", formatBool(cfg.GitAutoGolden))
 
 	autoCommit, autoGolden := promptGitPreferences()
 

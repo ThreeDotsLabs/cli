@@ -109,7 +109,7 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 			}
 
 			if !successful {
-				// When stuck (10+ failures), create golden branch or remind about it
+				// When stuck (10+ failures), create example solution branch or remind about it
 				if h.solutionAvailable {
 					gitOps := h.newGitOps()
 					exerciseCfg := h.config.ExerciseConfig(trainingRootFs)
@@ -120,7 +120,7 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 						} else {
 							// Branch already exists — remind the user how to compare
 							currentBranch, _ := gitOps.CurrentBranch()
-							fmt.Printf("\nCompare with our solution: %s\n\n", color.CyanString("git diff %s..%s -- %s", currentBranch, goldenBranch, exerciseCfg.Directory))
+							fmt.Printf("\nCompare with our solution: %s\n\n", color.CyanString("git diff %s..%s -- %s", currentBranch, goldenBranch, compareDir(gitOps, exerciseCfg.Directory)))
 						}
 					}
 				}
@@ -148,7 +148,7 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 		exerciseCfg := h.config.ExerciseConfig(trainingRootFs)
 
 		if gitOps.Enabled() && !exerciseCfg.IsTextOnly && !cfg.GitAutoGolden {
-			actions = append(actions, internal.Action{Shortcut: 'g', Action: "replace your solution with golden"})
+			actions = append(actions, internal.Action{Shortcut: 's', Action: "sync with example solution"})
 		}
 		actions = append(actions,
 			internal.Action{Shortcut: 'r', Action: "re-run solution"},
@@ -162,9 +162,9 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 		if promptResult == 'r' {
 			continue
 		}
-		if promptResult == 'g' {
+		if promptResult == 's' {
 			h.overrideWithGolden(ctx, trainingRootFs, gitOps, exerciseCfg)
-			// Fall through to next exercise (golden already committed, no staged changes)
+			// Fall through to next exercise (example solution already committed, no staged changes)
 		}
 
 		// Auto-commit on advancing to next exercise
@@ -183,13 +183,13 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 			}
 		}
 
-		// Auto-golden: override with golden solution automatically after passing
-		if cfg.GitAutoGolden && gitOps.Enabled() && !exerciseCfg.IsTextOnly && promptResult != 'g' {
+		// Auto-sync: override with example solution automatically after passing
+		if cfg.GitAutoGolden && gitOps.Enabled() && !exerciseCfg.IsTextOnly && promptResult != 's' {
 			h.overrideWithGolden(ctx, trainingRootFs, gitOps, exerciseCfg)
 		}
 
-		// Create golden branch for comparison (skip if user pressed 'g' or auto-golden ran)
-		if gitOps.Enabled() && !exerciseCfg.IsTextOnly && !cfg.GitAutoGolden && promptResult != 'g' {
+		// Create example solution branch for comparison (skip if user pressed 's' or auto-sync ran)
+		if gitOps.Enabled() && !exerciseCfg.IsTextOnly && !cfg.GitAutoGolden && promptResult != 's' {
 			goldenBranch := git.GoldenBranchName(exerciseCfg.ModuleExercisePath())
 			if !gitOps.BranchExists(goldenBranch) {
 				h.syncGoldenSolution(ctx, trainingRootFs, gitOps, exerciseCfg, "compare")
@@ -403,6 +403,20 @@ func (h *Handlers) runExercise(trainingRootFs *afero.BasePathFs) (bool, error) {
 	}
 }
 
+// compareDir returns exerciseDir relative to the user's cwd, so that the
+// displayed "git diff ... -- <path>" command works when copied from any directory.
+func compareDir(gitOps *git.Ops, exerciseDir string) string {
+	wd, err := os.Getwd()
+	if err != nil {
+		return exerciseDir
+	}
+	rel, err := filepath.Rel(wd, filepath.Join(gitOps.RootDir(), exerciseDir))
+	if err != nil {
+		return exerciseDir
+	}
+	return rel
+}
+
 func printCommand(command string) {
 	fmt.Print(color.CyanString("••• ") + command)
 }
@@ -443,13 +457,13 @@ func (h *Handlers) generateRunTerminalPath(trainingRootFs *afero.BasePathFs) str
 	return terminalPath
 }
 
-// overrideWithGolden replaces the user's exercise files with the golden solution.
+// overrideWithGolden replaces the user's exercise files with the example solution.
 // Unlike syncGoldenSolution (which uses worktrees for branch-based comparison),
-// this writes golden files directly to the exercise directory.
+// this writes example solution files directly to the exercise directory.
 //
 // IMPORTANT: This is a destructive operation — user's code is overwritten.
 // We MUST save their work to a backup branch before replacing files.
-// The user explicitly chose this action ('g' key).
+// The user explicitly chose this action ('s' key).
 func (h *Handlers) overrideWithGolden(ctx context.Context, trainingRootFs *afero.BasePathFs, gitOps *git.Ops, exerciseCfg config.ExerciseConfig) {
 	exerciseDir := exerciseCfg.Directory
 	moduleExercisePath := exerciseCfg.ModuleExercisePath()
@@ -466,7 +480,7 @@ func (h *Handlers) overrideWithGolden(ctx context.Context, trainingRootFs *afero
 		}
 	}
 
-	// Fetch golden solution via gRPC
+	// Fetch example solution via gRPC
 	resp, err := h.newGrpcClient().GetGoldenSolution(
 		ctx,
 		&genproto.GetGoldenSolutionRequest{
@@ -477,7 +491,7 @@ func (h *Handlers) overrideWithGolden(ctx context.Context, trainingRootFs *afero
 	)
 	if err != nil {
 		logrus.WithError(err).Warn("Could not fetch golden solution")
-		fmt.Println(color.YellowString("  Could not fetch golden solution"))
+		fmt.Println(color.YellowString("  Could not fetch example solution"))
 		return
 	}
 
@@ -488,18 +502,18 @@ func (h *Handlers) overrideWithGolden(ctx context.Context, trainingRootFs *afero
 	if err := gitOps.CreateBranchFromHead(backupBranch); err != nil {
 		logrus.WithError(err).Warn("Could not save solution to backup branch")
 		fmt.Println(formatGitError("Could not save your solution to a backup branch", err, trainingName))
-		fmt.Println(color.YellowString("  Aborting golden override to protect your code."))
+		fmt.Println(color.YellowString("  Aborting example solution override to protect your code."))
 		return
 	}
 	gitOps.PrintInfo(fmt.Sprintf("git branch %s", backupBranch))
 	fmt.Printf("  Your code saved to branch %s\n", color.MagentaString(backupBranch))
 	fmt.Println("  Restore anytime with: " + color.CyanString("git checkout %s -- %s", backupBranch, exerciseDir))
 
-	// Write golden files directly to exercise directory
+	// Write example solution files directly to exercise directory
 	f := files.NewFilesSilentDeleteUnused()
 	if err := f.WriteExerciseFiles(resp.Files, trainingRootFs, exerciseDir); err != nil {
 		logrus.WithError(err).Warn("Could not write golden files")
-		fmt.Println(color.YellowString("  Could not write golden solution files"))
+		fmt.Println(color.YellowString("  Could not write example solution files"))
 		return
 	}
 
@@ -509,19 +523,19 @@ func (h *Handlers) overrideWithGolden(ctx context.Context, trainingRootFs *afero
 		return
 	}
 	if gitOps.HasStagedChanges() {
-		if err := gitOps.Commit(fmt.Sprintf("override with golden solution for %s", moduleExercisePath)); err != nil {
+		if err := gitOps.Commit(fmt.Sprintf("override with example solution for %s", moduleExercisePath)); err != nil {
 			logrus.WithError(err).Warn("Could not commit golden override")
 			return
 		}
 	}
 
-	fmt.Println(color.GreenString("  Your code replaced with golden solution."))
+	fmt.Println(color.GreenString("  Your code replaced with example solution."))
 }
 
-// syncGoldenSolution creates a branch with the official solution for comparison.
+// syncGoldenSolution creates a branch with the example solution for comparison.
 // Uses git worktree to avoid touching the user's working tree.
-// Golden branch is based on HEAD (user's completed commit) so that
-// `git diff master..golden -- <dir>` only shows exercise-specific changes.
+// Example solution branch is based on HEAD (user's completed commit) so that
+// `git diff master..example -- <dir>` only shows exercise-specific changes.
 func (h *Handlers) syncGoldenSolution(ctx context.Context, trainingRootFs *afero.BasePathFs, gitOps *git.Ops, exerciseCfg config.ExerciseConfig, modeOverride string) {
 	h.syncGoldenSolutionImpl(ctx, trainingRootFs, gitOps, exerciseCfg, modeOverride, false, time.Time{})
 }
@@ -530,10 +544,10 @@ func (h *Handlers) syncGoldenSolutionQuiet(ctx context.Context, trainingRootFs *
 	h.syncGoldenSolutionImpl(ctx, trainingRootFs, gitOps, exerciseCfg, "compare", true, commitDate)
 }
 
-// syncGoldenSolutionImpl creates a branch with the official solution for comparison.
+// syncGoldenSolutionImpl creates a branch with the example solution for comparison.
 // Uses git worktree to avoid touching the user's working tree.
-// Golden branch is based on HEAD (user's completed commit) so that
-// `git diff master..golden -- <dir>` only shows exercise-specific changes.
+// Example solution branch is based on HEAD (user's completed commit) so that
+// `git diff master..example -- <dir>` only shows exercise-specific changes.
 // When quiet is true, all user-facing output is suppressed (for restore mode).
 func (h *Handlers) syncGoldenSolutionImpl(ctx context.Context, trainingRootFs *afero.BasePathFs, gitOps *git.Ops, exerciseCfg config.ExerciseConfig, modeOverride string, quiet bool, commitDate time.Time) {
 	if !gitOps.Enabled() {
@@ -544,7 +558,7 @@ func (h *Handlers) syncGoldenSolutionImpl(ctx context.Context, trainingRootFs *a
 	moduleExercisePath := exerciseCfg.ModuleExercisePath()
 	currentBranch, _ := gitOps.CurrentBranch()
 
-	// Ensure solution is committed before creating golden branch
+	// Ensure solution is committed before creating example solution branch
 	if gitOps.HasUncommittedChanges(exerciseDir) {
 		if err := gitOps.AddAll(exerciseDir); err != nil {
 			logrus.WithError(err).Warn("Could not stage solution files for golden sync")
@@ -556,7 +570,7 @@ func (h *Handlers) syncGoldenSolutionImpl(ctx context.Context, trainingRootFs *a
 		}
 	}
 
-	// Fetch golden solution via gRPC
+	// Fetch example solution via gRPC
 	resp, err := h.newGrpcClient().GetGoldenSolution(
 		ctx,
 		&genproto.GetGoldenSolutionRequest{
@@ -568,16 +582,16 @@ func (h *Handlers) syncGoldenSolutionImpl(ctx context.Context, trainingRootFs *a
 	if err != nil {
 		logrus.WithError(err).Warn("Could not fetch golden solution")
 		if !quiet {
-			fmt.Println(color.YellowString("  Could not fetch golden solution"))
+			fmt.Println(color.YellowString("  Could not fetch example solution"))
 		}
 		return
 	}
 
-	// Create golden branch via worktree — based on HEAD for clean diffs.
+	// Create example solution branch via worktree — based on HEAD for clean diffs.
 	goldenBranch := git.GoldenBranchName(moduleExercisePath)
 	if gitOps.BranchExists(goldenBranch) {
 		if quiet {
-			// Quiet mode: silently recreate golden branch
+			// Quiet mode: silently recreate example solution branch
 			if err := gitOps.DeleteBranch(goldenBranch); err != nil {
 				logrus.WithError(err).Warn("Could not delete existing golden branch")
 				return
@@ -608,7 +622,7 @@ func (h *Handlers) syncGoldenSolutionImpl(ctx context.Context, trainingRootFs *a
 	worktreeExercisePath := filepath.Join(tmpDir, exerciseDir)
 	os.MkdirAll(worktreeExercisePath, 0755)
 
-	// Write golden files silently (worktree is internal)
+	// Write example solution files silently (worktree is internal)
 	worktreeFs := afero.NewBasePathFs(afero.NewOsFs(), tmpDir).(*afero.BasePathFs)
 	f := files.NewFilesSilent()
 	if err := f.WriteExerciseFiles(resp.Files, worktreeFs, exerciseDir); err != nil {
@@ -616,15 +630,15 @@ func (h *Handlers) syncGoldenSolutionImpl(ctx context.Context, trainingRootFs *a
 		return
 	}
 
-	// Commit on golden branch (quiet — internal operation)
+	// Commit on example solution branch (quiet — internal operation)
 	worktreeOps := git.NewQuietOps(tmpDir)
 	if err := worktreeOps.AddAll(exerciseDir); err != nil {
 		logrus.WithError(err).Warn("Could not stage golden files")
 		return
 	}
-	goldenCommitMsg := fmt.Sprintf("golden solution for %s", moduleExercisePath)
+	goldenCommitMsg := fmt.Sprintf("example solution for %s", moduleExercisePath)
 	if !worktreeOps.HasStagedChanges() {
-		// Golden identical to user's solution — create empty commit so the branch
+		// Example solution identical to user's solution — create empty commit so the branch
 		// exists for comparison (git diff shows nothing, which is correct).
 		if err := worktreeOps.CommitAllowEmpty(goldenCommitMsg); err != nil {
 			logrus.WithError(err).Warn("Could not create golden commit")
@@ -647,11 +661,11 @@ func (h *Handlers) syncGoldenSolutionImpl(ctx context.Context, trainingRootFs *a
 		return
 	}
 
-	// Show simulated fetch for golden (user sees "git fetch" instead of internal worktree details)
+	// Show simulated fetch for example solution (user sees "git fetch" instead of internal worktree details)
 	gitOps.PrintInfo(fmt.Sprintf("git fetch cli %s", goldenBranch))
 	fmt.Println()
 
-	// Apply golden sync mode
+	// Apply sync mode
 	var goldenMode string
 	if modeOverride != "" {
 		goldenMode = modeOverride
@@ -664,11 +678,11 @@ func (h *Handlers) syncGoldenSolutionImpl(ctx context.Context, trainingRootFs *a
 
 	switch goldenMode {
 	case "merge":
-		if err := gitOps.Merge(goldenBranch, fmt.Sprintf("merge golden solution for %s", moduleExercisePath)); err != nil {
-			fmt.Println(color.YellowString("  Golden merge has conflicts. Resolve them with:"))
+		if err := gitOps.Merge(goldenBranch, fmt.Sprintf("merge example solution for %s", moduleExercisePath)); err != nil {
+			fmt.Println(color.YellowString("  Example solution merge has conflicts. Resolve them with:"))
 			fmt.Println(color.CyanString("    git add -A && git commit"))
 		} else {
-			fmt.Println(color.GreenString("  Golden solution merged into your branch."))
+			fmt.Println(color.GreenString("  Example solution merged into your branch."))
 		}
 	default: // "compare"
 		// Show diff stat between current branch and golden, restricted to exercise dir
@@ -677,6 +691,6 @@ func (h *Handlers) syncGoldenSolutionImpl(ctx context.Context, trainingRootFs *a
 			fmt.Println()
 		}
 
-		fmt.Printf("Compare with our solution: %s\n\n", color.CyanString("git diff %s..%s -- %s", currentBranch, goldenBranch, exerciseDir))
+		fmt.Printf("Compare with our solution: %s\n\n", color.CyanString("git diff %s..%s -- %s", currentBranch, goldenBranch, compareDir(gitOps, exerciseDir)))
 	}
 }

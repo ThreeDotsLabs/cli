@@ -49,8 +49,8 @@ func (h *Handlers) appendTrainingHeaders(md metadata.MD) {
 
 	md.Set("git-enabled", fmt.Sprint(cfg.GitConfigured && cfg.GitEnabled))
 	md.Set("git-auto-commit", fmt.Sprint(cfg.GitAutoCommit))
-	md.Set("git-auto-golden", fmt.Sprint(cfg.GitAutoGolden))
-	md.Set("git-golden-mode", cfg.GitGoldenMode)
+	md.Set("git-auto-sync", fmt.Sprint(cfg.GitAutoGolden))
+	md.Set("git-sync-mode", cfg.GitGoldenMode)
 }
 
 func (h *Handlers) unaryInterceptor() grpc.UnaryClientInterceptor {

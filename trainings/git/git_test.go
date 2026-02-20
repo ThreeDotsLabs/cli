@@ -311,7 +311,7 @@ func TestHasUncommittedChanges(t *testing.T) {
 
 func TestBranchNames(t *testing.T) {
 	assert.Equal(t, "tdl/init/01-module/01-exercise", InitBranchName("01-module/01-exercise"))
-	assert.Equal(t, "tdl/golden/01-module/01-exercise", GoldenBranchName("01-module/01-exercise"))
+	assert.Equal(t, "tdl/example/01-module/01-exercise", GoldenBranchName("01-module/01-exercise"))
 }
 
 func TestCurrentBranch(t *testing.T) {
@@ -669,58 +669,58 @@ func TestGoldenBasedOnHEAD(t *testing.T) {
 	runGit(t, dir, "add", ".")
 	runGit(t, dir, "-c", "commit.gpgsign=false", "commit", "-m", "user solution")
 
-	// Create golden branch FROM HEAD (user's completed commit)
-	goldenBranch := "tdl/golden/01-mod/01-ex"
+	// Create example solution branch FROM HEAD (user's completed commit)
+	goldenBranch := "tdl/example/01-mod/01-ex"
 	tmpDir2 := t.TempDir()
 	wt2 := filepath.Join(tmpDir2, "wt")
 	require.NoError(t, ops.WorktreeAdd(wt2, goldenBranch))
 
-	// No directory cleaning — syncGoldenSolution writes golden files over the worktree.
+	// No directory cleaning — syncGoldenSolution writes example solution files over the worktree.
 	exerciseDir := filepath.Join(wt2, "01-mod", "01-ex")
 	os.MkdirAll(exerciseDir, 0755)
 
-	// Write golden files
-	writeFile(t, wt2, "01-mod/01-ex/main.go", "package main\n\nfunc main() {\n\t// golden solution\n}\n")
+	// Write example solution files
+	writeFile(t, wt2, "01-mod/01-ex/main.go", "package main\n\nfunc main() {\n\t// example solution\n}\n")
 	wt2Ops := NewQuietOps(wt2)
 	require.NoError(t, wt2Ops.AddAll("01-mod/01-ex"))
-	require.NoError(t, wt2Ops.Commit("golden solution"))
+	require.NoError(t, wt2Ops.Commit("example solution"))
 	require.NoError(t, ops.WorktreeRemove(wt2))
 
-	// Verify golden is based on HEAD (user's commit)
+	// Verify example solution is based on HEAD (user's commit)
 	mainHash, err := ops.RevParse("HEAD")
 	require.NoError(t, err)
 
 	mergeBase := strings.TrimSpace(runGit(t, dir, "merge-base", "HEAD", goldenBranch))
-	assert.Equal(t, mainHash, mergeBase, "golden should be based on HEAD (user's completed commit)")
+	assert.Equal(t, mainHash, mergeBase, "example solution should be based on HEAD (user's completed commit)")
 
-	// Verify diff restricted to exercise dir only shows exercise files
+	// Verify diff restricted to exercise dir only shows exercise-specific files
 	diffOutput := strings.TrimSpace(runGit(t, dir, "diff", "--name-only", "HEAD.."+goldenBranch))
 	for _, f := range strings.Split(diffOutput, "\n") {
 		if f == "" {
 			continue
 		}
 		assert.True(t, strings.HasPrefix(f, "01-mod/01-ex/"),
-			"golden diff should only contain exercise dir files, got: %s", f)
+			"example solution diff should only contain exercise dir files, got: %s", f)
 	}
 
-	// Only main.go should appear in diff (the actual golden solution change).
+	// Only main.go should appear in diff (the actual example solution change).
 	// Without directory cleaning, unchanged files (helper.go, main_test.go)
-	// persist from HEAD on the golden branch — they shouldn't appear in diff.
+	// persist from HEAD on the example solution branch — they shouldn't appear in diff.
 	assert.Contains(t, diffOutput, "01-mod/01-ex/main.go",
-		"golden diff should include the changed solution file")
+		"example solution diff should include the changed solution file")
 	assert.NotContains(t, diffOutput, "01-mod/01-ex/helper.go",
 		"user's extra files should not appear in diff (preserved from HEAD)")
 	assert.NotContains(t, diffOutput, "01-mod/01-ex/main_test.go",
 		"shared files (like test files) should not appear in diff (preserved from HEAD)")
 
-	// Verify all files still exist on the golden branch
+	// Verify all files still exist on the example solution branch
 	goldenTreeOutput := strings.TrimSpace(runGit(t, dir, "ls-tree", "--name-only", goldenBranch, "--", "01-mod/01-ex/"))
 	assert.Contains(t, goldenTreeOutput, "main.go",
-		"golden branch should have solution file")
+		"example solution branch should have solution file")
 	assert.Contains(t, goldenTreeOutput, "main_test.go",
-		"golden branch should preserve test files from init")
+		"example solution branch should preserve test files from init")
 	assert.Contains(t, goldenTreeOutput, "helper.go",
-		"golden branch should preserve user files from HEAD")
+		"example solution branch should preserve user files from HEAD")
 }
 
 func TestDiffStat_Alignment(t *testing.T) {
@@ -954,7 +954,7 @@ func TestOverrideWithBackupSave(t *testing.T) {
 	userHead, err := ops.RevParse("HEAD")
 	require.NoError(t, err)
 
-	// Create golden branch via worktree (simulating syncGoldenSolution)
+	// Create example solution branch via worktree (simulating syncGoldenSolution)
 	goldenBranch := GoldenBranchName("01-module/01-exercise")
 	goldenDir := t.TempDir()
 	require.NoError(t, ops.WorktreeAdd(goldenDir, goldenBranch))
@@ -963,13 +963,13 @@ func TestOverrideWithBackupSave(t *testing.T) {
 	require.NoError(t, os.MkdirAll(goldenExercisePath, 0755))
 	require.NoError(t, os.WriteFile(
 		filepath.Join(goldenExercisePath, "main.go"),
-		[]byte("package main // golden solution\n"),
+		[]byte("package main // example solution\n"),
 		0644,
 	))
 
 	goldenOps := NewQuietOps(goldenDir)
 	require.NoError(t, goldenOps.AddAll(exerciseDir))
-	require.NoError(t, goldenOps.Commit("golden solution for 01-module/01-exercise"))
+	require.NoError(t, goldenOps.Commit("example solution for 01-module/01-exercise"))
 	require.NoError(t, ops.WorktreeRemove(goldenDir))
 
 	// --- Override flow (what `g` does) ---
@@ -978,13 +978,13 @@ func TestOverrideWithBackupSave(t *testing.T) {
 	backupBranch := BackupBranchName("01-module/01-exercise")
 	require.NoError(t, ops.CreateBranchFromHead(backupBranch))
 
-	// 2. Checkout golden files into working tree
+	// 2. Checkout example solution files into working tree
 	require.NoError(t, ops.CheckoutFiles(goldenBranch, exerciseDir))
 
 	// 3. Stage + commit
 	require.NoError(t, ops.AddAll(exerciseDir))
-	assert.True(t, ops.HasStagedChanges(), "golden files should differ from user's")
-	require.NoError(t, ops.Commit("override with golden solution for 01-module/01-exercise"))
+	assert.True(t, ops.HasStagedChanges(), "example solution files should differ from user's")
+	require.NoError(t, ops.Commit("override with example solution for 01-module/01-exercise"))
 
 	// --- Verify ---
 
@@ -993,14 +993,14 @@ func TestOverrideWithBackupSave(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, userHead, backupHash, "backup branch should point at user's original HEAD")
 
-	// Working tree has golden content
+	// Working tree has example solution content
 	content := readFile(t, dir, filepath.Join(exerciseDir, "main.go"))
-	assert.Equal(t, "package main // golden solution\n", content, "working tree should have golden content")
+	assert.Equal(t, "package main // example solution\n", content, "working tree should have example solution content")
 
 	// HEAD commit message matches expected pattern
 	log, err := ops.Log(1)
 	require.NoError(t, err)
-	assert.Contains(t, log, "override with golden solution for 01-module/01-exercise")
+	assert.Contains(t, log, "override with example solution for 01-module/01-exercise")
 }
 
 func TestInit_DefaultBranchMain(t *testing.T) {

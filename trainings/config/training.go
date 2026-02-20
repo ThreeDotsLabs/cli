@@ -17,8 +17,8 @@ type TrainingConfig struct {
 	GitConfigured  bool   `toml:"git_configured,omitempty"`
 	GitEnabled     bool   `toml:"git_enabled,omitempty"`
 	GitAutoCommit  bool   `toml:"git_auto_commit,omitempty"`
-	GitAutoGolden  bool   `toml:"git_auto_golden,omitempty"`
-	GitGoldenMode  string `toml:"git_golden_mode,omitempty"` // "compare" | "merge" | "override"
+	GitAutoGolden  bool   `toml:"git_auto_sync,omitempty"`
+	GitGoldenMode  string `toml:"git_sync_mode,omitempty"`   // "compare" | "merge" | "override"
 	GitUnavailable bool   `toml:"git_unavailable,omitempty"` // git was missing/too old at init
 }
 

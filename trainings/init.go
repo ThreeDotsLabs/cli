@@ -217,12 +217,12 @@ func showGitDefaults() {
 	fmt.Printf("    %s git merge tdl/init/<exercise>\n", color.MagentaString("•••"))
 	fmt.Println()
 	fmt.Println("  After passing, the official solution is saved for comparison:")
-	fmt.Println(color.CyanString("    git diff <your-branch>..tdl/golden/<exercise> -- <exercise-dir>"))
+	fmt.Println(color.CyanString("    git diff <your-branch>..tdl/example/<exercise> -- <exercise-dir>"))
 	fmt.Println()
-	fmt.Println("  Press g after passing to replace your solution with the official one.")
+	fmt.Println("  Press s after passing to replace your solution with the official one.")
 	fmt.Println("  Your work is saved to a backup branch first (never destructive).")
 	fmt.Println()
-	fmt.Printf("  Defaults: auto-commit on, auto-golden off.\n")
+	fmt.Printf("  Defaults: auto-commit on, auto-sync off.\n")
 	fmt.Printf("  To change: %s\n\n", color.CyanString("tdl training settings"))
 }
 
@@ -286,12 +286,12 @@ func promptGitPreferences() (autoCommit bool, autoGolden bool) {
 	autoCommit = autoCommitPrompt == '\n'
 
 	fmt.Println()
-	fmt.Println("After passing, automatically replace your solution with the golden one?")
+	fmt.Println("After passing, automatically sync with the example solution?")
 
 	autoGoldenPrompt := internal.Prompt(
 		internal.Actions{
-			{Shortcut: '\n', Action: "skip (you can press g manually)", ShortcutAliases: []rune{'\r'}},
-			{Shortcut: 'y', Action: "enable auto-golden"},
+			{Shortcut: '\n', Action: "skip (you can press s manually)", ShortcutAliases: []rune{'\r'}},
+			{Shortcut: 'y', Action: "enable auto-sync"},
 		},
 		os.Stdin,
 		os.Stdout,

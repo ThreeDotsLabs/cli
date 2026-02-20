@@ -50,7 +50,7 @@ func NewFilesSilent() Files {
 
 // NewFilesSilentDeleteUnused creates a Files that writes silently and deletes
 // files not present in the server response. Use for override operations where
-// the exercise directory should exactly match the golden solution.
+// the exercise directory should exactly match the example solution.
 func NewFilesSilentDeleteUnused() Files {
 	return Files{
 		forceOverwrite:    true,

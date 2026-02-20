@@ -347,7 +347,7 @@ Note: after completing this exercise, the next exercise will be the last one you
 				},
 				{
 					Name:  "settings",
-					Usage: "Change git integration settings (auto-commit, auto-golden)",
+					Usage: "Change git integration settings (auto-commit, auto-sync)",
 					Action: func(c *cli.Context) error {
 						return newHandlers(c).ConfigureGit()
 					},

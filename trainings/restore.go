@@ -28,7 +28,7 @@ func isValidCompletedAt(t time.Time) bool {
 
 // restore restores all solution files for the training in the given directory.
 // When git is enabled, each exercise gets the full git structure (init branch,
-// merge commit, solution commit with date, golden branch) matching the normal flow.
+// merge commit, solution commit with date, example solution branch) matching the normal flow.
 func (h *Handlers) restore(ctx context.Context, trainingRoot string, gitOps *git.Ops) ([]string, error) {
 	trainingRootFs := newTrainingRootFs(trainingRoot)
 	trainingName := h.config.TrainingConfig(trainingRootFs).TrainingName
@@ -127,7 +127,7 @@ func earliestSolutionDate(solutions []*genproto.ExerciseSolution) time.Time {
 }
 
 // restoreExerciseWithGit produces the same git structure as the normal exercise flow:
-// init branch → merge → solution commit (with date) → golden branch.
+// init branch → merge → solution commit (with date) → example solution branch.
 func (h *Handlers) restoreExerciseWithGit(
 	ctx context.Context,
 	trainingRootFs *afero.BasePathFs,
@@ -237,7 +237,7 @@ func (h *Handlers) restoreExerciseWithGit(
 		}
 	}
 
-	// 6. Create golden branch (silent) — only for completed exercises with available scaffold
+	// 6. Create example solution branch (silent) — only for completed exercises with available scaffold
 	if scaffoldResp != nil && completed {
 		exerciseCfg := config.ExerciseConfig{
 			ExerciseID:   solution.ExerciseId,

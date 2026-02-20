@@ -5,7 +5,7 @@
 // The CLI must not stash, revert, reset, or otherwise alter user files silently.
 // Operations that prepare exercise scaffolds should use isolated worktrees, not
 // the user's working tree. When a destructive operation is unavoidable (e.g.
-// replacing exercise files with golden solution or resolving conflicts by
+// replacing exercise files with example solution or resolving conflicts by
 // accepting ours), we MUST:
 //  1. Ask the user for confirmation first.
 //  2. Save their current code to a backup branch (tdl/backup/...) before overwriting.
@@ -577,9 +577,9 @@ func InitBranchName(exerciseDir string) string {
 	return "tdl/init/" + filepath.ToSlash(exerciseDir)
 }
 
-// GoldenBranchName returns the golden branch name for the given exercise directory.
+// GoldenBranchName returns the example solution branch name for the given exercise directory.
 func GoldenBranchName(exerciseDir string) string {
-	return "tdl/golden/" + filepath.ToSlash(exerciseDir)
+	return "tdl/example/" + filepath.ToSlash(exerciseDir)
 }
 
 // BackupBranchName returns a timestamped backup branch name.
