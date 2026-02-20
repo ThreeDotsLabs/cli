@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/fatih/color"
@@ -70,14 +71,17 @@ var app = &cli.App{
 
 		userFacingErr := trainings.UserFacingError{}
 		if errors.As(err, &userFacingErr) {
+			separator := color.HiBlackString(strings.Repeat("─", internal.TerminalWidth()))
+			fmt.Println(separator)
 			fmt.Printf(color.RedString("ERROR: ") + userFacingErr.Msg + "\n")
+			fmt.Println(separator)
 			fmt.Printf(color.GreenString("\nHow to solve: \n") + userFacingErr.SolutionHint + "\n")
 			os.Exit(1)
 			return
 		}
 
 		if err != nil {
-			fmt.Printf("%+v\n", err)
+			formatUnexpectedError(err)
 		}
 
 		os.Exit(1)
@@ -336,4 +340,32 @@ type missingArgumentError struct {
 
 func (m missingArgumentError) Error() string {
 	return m.msg
+}
+
+type stackTracer interface {
+	StackTrace() errors.StackTrace
+}
+
+func formatUnexpectedError(err error) {
+	separator := color.HiBlackString(strings.Repeat("─", internal.TerminalWidth()))
+
+	fmt.Println(separator)
+	fmt.Printf(color.RedString("ERROR: ") + err.Error() + "\n")
+	fmt.Println(separator)
+
+	var st stackTracer
+	if errors.As(err, &st) {
+		fmt.Println(color.HiBlackString("\nStack trace:"))
+		for _, frame := range st.StackTrace() {
+			// %+v produces "funcName\n\tfile:line" — flatten to single line
+			raw := fmt.Sprintf("%+v", frame)
+			var parts []string
+			for _, l := range strings.Split(raw, "\n") {
+				if trimmed := strings.TrimSpace(l); trimmed != "" {
+					parts = append(parts, trimmed)
+				}
+			}
+			fmt.Println(color.HiBlackString("  " + strings.Join(parts, " ")))
+		}
+	}
 }

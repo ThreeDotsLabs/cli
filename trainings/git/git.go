@@ -1,3 +1,20 @@
+// Package git provides git operations for the training CLI.
+//
+// PRINCIPLE: Never modify user's code without explicit permission.
+//
+// The CLI must not stash, revert, reset, or otherwise alter user files silently.
+// Operations that prepare exercise scaffolds should use isolated worktrees, not
+// the user's working tree. When a destructive operation is unavoidable (e.g.
+// replacing exercise files with golden solution or resolving conflicts by
+// accepting ours), we MUST:
+//  1. Ask the user for confirmation first.
+//  2. Save their current code to a backup branch (tdl/backup/...) before overwriting.
+//  3. Tell the user how to restore their code from the backup branch.
+//
+// Read-only operations (status, diff, log, merge-tree) are always safe.
+// Worktree operations are safe because they work in an isolated temp directory.
+// Commits of user's own work (auto-commit on exercise completion) are safe because
+// they preserve, not destroy, user code.
 package git
 
 import (
@@ -14,6 +31,9 @@ import (
 
 // Ops provides git operations for the training CLI.
 // All methods are no-ops when enabled is false.
+//
+// Before adding a method that writes to the user's working tree, read the
+// package-level doc comment above — it describes the backup-first principle.
 type Ops struct {
 	rootDir string
 	enabled bool
@@ -460,6 +480,11 @@ func (g *Ops) MergeTreeCheck(branch string) (conflictFiles []string, err error) 
 	// If we got an error but no conflict lines, merge-tree may not be available
 	return nil, fmt.Errorf("git merge-tree failed: %s: %w", output, err)
 }
+
+// --- Working tree mutations ---
+// These methods modify files in the user's working tree. They must ONLY be called
+// after saving user's code to a backup branch and obtaining user confirmation.
+// See package-level doc for the full principle.
 
 // CheckoutTheirs resolves a merge conflict by accepting the incoming (theirs) version.
 func (g *Ops) CheckoutTheirs(path string) error {

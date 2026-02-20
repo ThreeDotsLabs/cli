@@ -9,17 +9,18 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ThreeDotsLabs/cli/internal"
-	"github.com/ThreeDotsLabs/cli/trainings/config"
-	"github.com/ThreeDotsLabs/cli/trainings/files"
-	"github.com/ThreeDotsLabs/cli/trainings/genproto"
-	"github.com/ThreeDotsLabs/cli/trainings/git"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/ThreeDotsLabs/cli/internal"
+	"github.com/ThreeDotsLabs/cli/trainings/config"
+	"github.com/ThreeDotsLabs/cli/trainings/files"
+	"github.com/ThreeDotsLabs/cli/trainings/genproto"
+	"github.com/ThreeDotsLabs/cli/trainings/git"
 )
 
 func (h *Handlers) Init(ctx context.Context, trainingName string, dir string, noGit bool, forceGit bool) error {
@@ -34,7 +35,7 @@ func (h *Handlers) Init(ctx context.Context, trainingName string, dir string, no
 	trainingRootDir := path.Join(wd, dir)
 
 	// trainingRootDir may be different when doing init in already existing workspace
-	trainingRootDir, previousSolutionsAvailable, err := h.startTraining(ctx, trainingName, trainingRootDir)
+	trainingRootDir, alreadyInitialized, previousSolutionsAvailable, err := h.startTraining(ctx, trainingName, trainingRootDir)
 	if errors.Is(err, ErrInterrupted) {
 		fmt.Println("Interrupted")
 		return nil
@@ -42,79 +43,97 @@ func (h *Handlers) Init(ctx context.Context, trainingName string, dir string, no
 		return err
 	}
 
+	if alreadyInitialized {
+		trainingRootFs := newTrainingRootFs(trainingRootDir)
+		if files.DirOrFileExists(trainingRootFs, ".tdl-exercise") {
+			fmt.Println("Training is already initialised, nothing to do.")
+			return nil
+		}
+		// Partial init: exercise not yet set up, fall through to nextExercise.
+	}
+
 	// Git integration: init repo, configure preferences, initial commit
 	// Skip git entirely in non-interactive mode (pipes, CI, E2E) — we can't prompt for preferences.
 	// forceGit overrides the non-interactive check (used by E2E tests and scripted restore).
 	gitOps := git.NewOps(trainingRootDir, noGit || (!forceGit && !internal.IsStdinTerminal()))
-	if gitOps.Enabled() {
-		_, err := gitOps.Init()
-		if err != nil {
-			logrus.WithError(err).Warn("Could not initialize git repository")
-		}
 
-		trainingRootFs := newTrainingRootFs(trainingRootDir)
-		cfg := h.config.TrainingConfig(trainingRootFs)
-
-		if !cfg.GitConfigured {
-			showGitDefaults()
-			cfg.GitConfigured = true
-			cfg.GitEnabled = true
-			cfg.GitAutoCommit = true
-			cfg.GitGoldenSync = "always"
-			cfg.GitGoldenMode = "compare"
-
-			if err := h.config.WriteTrainingConfig(cfg, trainingRootFs); err != nil {
-				return errors.Wrap(err, "can't update training config with git preferences")
-			}
-		}
-
-		filesToCommit := []string{".tdl-training", ".gitignore"}
-		if hasGoWorkspace(trainingRootDir) {
-			filesToCommit = append(filesToCommit, "go.work")
-		}
-		if err := gitOps.AddFiles(filesToCommit...); err != nil {
-			logrus.WithError(err).Warn("Could not stage initial files")
-		}
-		initMsg := fmt.Sprintf("initialize %s", trainingName)
-
-		if gitOps.HasStagedChanges() && !previousSolutionsAvailable {
-			// No restore coming — commit now with current time.
-			if err := gitOps.Commit(initMsg); err != nil {
-				logrus.WithError(err).Warn("Could not create initial commit")
-			}
-		}
-		// When previousSolutionsAvailable, staged changes remain uncommitted
-		// so restore() can create the initialize commit with the correct date.
-	}
-
-	var previousSolutions []string
-
-	if previousSolutionsAvailable {
-		fmt.Println("\nIt looks like you have already started this training and have existing exercises.")
-		fmt.Println("You can clone your existing solutions to this directory.")
-
-		// forceGit implies scripted/non-interactive mode — auto-accept restore
-		ok := forceGit || promptForPastSolutions()
-
-		if ok {
-			previousSolutions, err = h.restore(ctx, trainingRootDir, gitOps)
+	if !alreadyInitialized {
+		if gitOps.Enabled() {
+			_, err := gitOps.Init()
 			if err != nil {
-				return errors.Wrap(err, "can't restore existing exercises")
+				logrus.WithError(err).Warn("Could not initialize git repository")
 			}
-		}
 
-		// If user declined restore (or restore found nothing), commit now.
-		if gitOps.Enabled() && gitOps.HasStagedChanges() {
+			trainingRootFs := newTrainingRootFs(trainingRootDir)
+			cfg := h.config.TrainingConfig(trainingRootFs)
+
+			if !cfg.GitConfigured {
+				showGitDefaults()
+				cfg.GitConfigured = true
+				cfg.GitEnabled = true
+				cfg.GitAutoCommit = true
+				cfg.GitGoldenSync = "always"
+				cfg.GitGoldenMode = "compare"
+
+				if err := h.config.WriteTrainingConfig(cfg, trainingRootFs); err != nil {
+					return errors.Wrap(err, "can't update training config with git preferences")
+				}
+			}
+
+			filesToCommit := []string{".tdl-training", ".gitignore"}
+			if hasGoWorkspace(trainingRootDir) {
+				filesToCommit = append(filesToCommit, "go.work")
+			}
+			if err := gitOps.AddFiles(filesToCommit...); err != nil {
+				logrus.WithError(err).Warn("Could not stage initial files")
+			}
 			initMsg := fmt.Sprintf("initialize %s", trainingName)
-			if err := gitOps.Commit(initMsg); err != nil {
-				logrus.WithError(err).Warn("Could not create initial commit")
+
+			if gitOps.HasStagedChanges() && !previousSolutionsAvailable {
+				// No restore coming — commit now with current time.
+				if err := gitOps.Commit(initMsg); err != nil {
+					logrus.WithError(err).Warn("Could not create initial commit")
+				}
+			}
+			// When previousSolutionsAvailable, staged changes remain uncommitted
+			// so restore() can create the initialize commit with the correct date.
+		}
+
+		var previousSolutions []string
+
+		if previousSolutionsAvailable {
+			fmt.Println("\nIt looks like you have already started this training and have existing exercises.")
+			fmt.Println("You can clone your existing solutions to this directory.")
+
+			// forceGit implies scripted/non-interactive mode — auto-accept restore
+			ok := forceGit || promptForPastSolutions()
+
+			if ok {
+				previousSolutions, err = h.restore(ctx, trainingRootDir, gitOps)
+				if err != nil {
+					return errors.Wrap(err, "can't restore existing exercises")
+				}
+			}
+
+			// If user declined restore (or restore found nothing), commit now.
+			if gitOps.Enabled() && gitOps.HasStagedChanges() {
+				initMsg := fmt.Sprintf("initialize %s", trainingName)
+				if err := gitOps.Commit(initMsg); err != nil {
+					logrus.WithError(err).Warn("Could not create initial commit")
+				}
 			}
 		}
-	}
 
-	_, err = h.nextExerciseWithSkipped(ctx, "", trainingRootDir, previousSolutions)
-	if err != nil {
-		return err
+		_, err = h.nextExerciseWithSkipped(ctx, "", trainingRootDir, previousSolutions)
+		if err != nil {
+			return err
+		}
+	} else {
+		// Partial init (alreadyInitialized but no .tdl-exercise): fetch the first exercise.
+		_, err = h.nextExerciseWithSkipped(ctx, "", trainingRootDir, nil)
+		if err != nil {
+			return err
+		}
 	}
 
 	if !isInTrainingRoot(trainingRootDir) {
@@ -237,28 +256,29 @@ func (h *Handlers) startTraining(
 	ctx context.Context,
 	trainingName string,
 	trainingRootDir string,
-) (string, bool, error) {
+) (string, bool, bool, error) {
 	alreadyExistingTrainingRoot, err := h.config.FindTrainingRoot()
 	if err == nil {
 		fmt.Println(color.BlueString("Training was already initialised. Training root:" + alreadyExistingTrainingRoot))
 		trainingRootDir = alreadyExistingTrainingRoot
 	} else if !errors.Is(err, config.TrainingRootNotFoundError) {
-		return "", false, errors.Wrap(err, "can't check if training root exists")
+		return "", false, false, errors.Wrap(err, "can't check if training root exists")
 	} else {
 		if err := h.showTrainingStartPrompt(trainingRootDir); err != nil {
-			return "", false, err
+			return "", false, false, err
 		}
 
 		// we will create training root in current working directory
 		logrus.Debug("No training root yet")
 	}
 
+	alreadyInitialized := alreadyExistingTrainingRoot != ""
 	trainingRootFs := newTrainingRootFs(trainingRootDir)
 
-	if alreadyExistingTrainingRoot != "" {
+	if alreadyInitialized {
 		cfg := h.config.TrainingConfig(trainingRootFs)
 		if cfg.TrainingName != trainingName {
-			return "", false, fmt.Errorf(
+			return "", false, false, fmt.Errorf(
 				"training %s was already started in this directory, please go to other directory and run `tdl training init`",
 				cfg.TrainingName,
 			)
@@ -266,7 +286,7 @@ func (h *Handlers) startTraining(
 	} else {
 		err := os.MkdirAll(trainingRootDir, 0755)
 		if err != nil {
-			return "", false, errors.Wrap(err, "can't create training root dir")
+			return "", false, false, errors.Wrap(err, "can't create training root dir")
 		}
 
 		err = createGoWorkspace(trainingRootDir)
@@ -284,23 +304,25 @@ func (h *Handlers) startTraining(
 	)
 	if err != nil {
 		if st, ok := status.FromError(err); ok && st.Code() == codes.NotFound {
-			return "", false, UserFacingError{
+			return "", false, false, UserFacingError{
 				Msg:          fmt.Sprintf("Training '%v' not found", trainingName),
 				SolutionHint: "Please check the correct training name on the website.\n\nIf you wanted to init the training in a separate directory, use this format:\n\n\ttdl training init <name> <directory>",
 			}
 		}
-		return "", false, errors.Wrap(err, "start training gRPC call failed")
+		return "", false, false, errors.Wrap(err, "start training gRPC call failed")
 	}
 
-	if err := h.config.WriteTrainingConfig(config.TrainingConfig{TrainingName: trainingName}, trainingRootFs); err != nil {
-		return "", false, errors.Wrap(err, "can't write training config")
+	if !alreadyInitialized {
+		if err := h.config.WriteTrainingConfig(config.TrainingConfig{TrainingName: trainingName}, trainingRootFs); err != nil {
+			return "", false, false, errors.Wrap(err, "can't write training config")
+		}
+
+		if err := writeGitignore(trainingRootFs); err != nil {
+			return "", false, false, err
+		}
 	}
 
-	if err := writeGitignore(trainingRootFs); err != nil {
-		return "", false, err
-	}
-
-	return trainingRootDir, resp.PreviousSolutionsAvailable, nil
+	return trainingRootDir, alreadyInitialized, resp.PreviousSolutionsAvailable, nil
 }
 
 var gitignore = strings.Join(

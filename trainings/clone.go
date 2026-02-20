@@ -6,12 +6,13 @@ import (
 	"os"
 	"path"
 
-	"github.com/ThreeDotsLabs/cli/trainings/config"
-	"github.com/ThreeDotsLabs/cli/trainings/files"
-	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
+
+	"github.com/ThreeDotsLabs/cli/trainings/config"
+	"github.com/ThreeDotsLabs/cli/trainings/files"
+	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )
 
 func (h *Handlers) Clone(ctx context.Context, executionID string, directory string) error {
@@ -34,7 +35,7 @@ func (h *Handlers) Clone(ctx context.Context, executionID string, directory stri
 
 	absoluteDirToClone = path.Join(absoluteDirToClone, directory)
 
-	if _, _, err := h.startTraining(ctx, resp.TrainingName, absoluteDirToClone); err != nil {
+	if _, _, _, err := h.startTraining(ctx, resp.TrainingName, absoluteDirToClone); err != nil {
 		return err
 	}
 

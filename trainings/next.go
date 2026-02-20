@@ -26,6 +26,7 @@ func (h *Handlers) nextExercise(ctx context.Context, currentExerciseID string, t
 
 func (h *Handlers) nextExerciseWithSkipped(ctx context.Context, currentExerciseID string, trainingRoot string, skipExerciseIDs []string) (finished bool, err error) {
 	h.solutionHintDisplayed = false
+	h.solutionAvailable = false
 	clear(h.notifications)
 
 	// We should never trust the remote server.
@@ -434,6 +435,10 @@ func nextExerciseResponseToExerciseSolution(resp *genproto.NextExerciseResponse)
 
 // resolveConflictsInteractive runs a loop where the user can fix conflicts in their editor,
 // replace all exercise files with init branch versions (saving to a backup branch), or quit.
+//
+// IMPORTANT: The 'g' (replace) path is destructive — it overwrites user files.
+// We MUST save their code to a backup branch before replacing.
+// The user explicitly confirms this action.
 func resolveConflictsInteractive(gitOps *git.Ops, initBranch, mergeMsg, moduleExercisePath, exerciseDir string) error {
 	conflictFiles, _ := gitOps.UnmergedFiles()
 	fmt.Println(color.YellowString("\n  Merge conflict detected."))

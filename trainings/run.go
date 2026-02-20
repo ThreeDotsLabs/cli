@@ -107,6 +107,18 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 			}
 
 			if !successful {
+				// When stuck (10+ failures), auto-create golden branch for comparison
+				if h.solutionAvailable {
+					gitOps := h.newGitOps()
+					exerciseCfg := h.config.ExerciseConfig(trainingRootFs)
+					if gitOps.Enabled() && !exerciseCfg.IsTextOnly {
+						goldenBranch := git.GoldenBranchName(exerciseCfg.ModuleExercisePath())
+						if !gitOps.BranchExists(goldenBranch) {
+							h.syncGoldenSolution(ctx, trainingRootFs, gitOps, exerciseCfg, "compare")
+						}
+					}
+				}
+
 				if !internal.ConfirmPromptDefaultYes("run solution again") {
 					return nil
 				} else {
@@ -347,6 +359,10 @@ func (h *Handlers) runExercise(trainingRootFs *afero.BasePathFs) (bool, error) {
 		}
 
 		if response.Finished {
+			if response.SolutionAvailable {
+				h.solutionAvailable = true
+			}
+
 			if response.Notification != "" {
 				_, ok := h.notifications[response.Notification]
 				if !ok {
@@ -411,6 +427,10 @@ func (h *Handlers) generateRunTerminalPath(trainingRootFs *afero.BasePathFs) str
 // overrideWithGolden replaces the user's exercise files with the golden solution.
 // Unlike syncGoldenSolution (which uses worktrees for branch-based comparison),
 // this writes golden files directly to the exercise directory.
+//
+// IMPORTANT: This is a destructive operation — user's code is overwritten.
+// We MUST save their work to a backup branch before replacing files.
+// The user explicitly chose this action ('g' key).
 func (h *Handlers) overrideWithGolden(ctx context.Context, trainingRootFs *afero.BasePathFs, gitOps *git.Ops, exerciseCfg config.ExerciseConfig) {
 	exerciseDir := exerciseCfg.Directory
 	moduleExercisePath := exerciseCfg.ModuleExercisePath()

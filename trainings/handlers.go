@@ -25,6 +25,7 @@ type Handlers struct {
 	cliMetadata CliMetadata
 
 	solutionHintDisplayed bool
+	solutionAvailable     bool
 	notifications         map[string]struct{}
 }
 
