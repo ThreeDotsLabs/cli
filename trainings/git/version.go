@@ -29,9 +29,14 @@ func (v Version) AtLeast(min Version) bool {
 	return v.Patch >= min.Patch
 }
 
-// MinVersion is the minimum git version required by the CLI.
-// Driven by `git merge-tree --write-tree` (Git 2.38+).
-var MinVersion = Version{2, 38, 0}
+// MinVersion is the hard minimum git version required for core features.
+// Driven by `git init --initial-branch` (Git 2.28+).
+var MinVersion = Version{2, 28, 0}
+
+// RecommendedVersion is the version needed for optional features like
+// conflict preview via `git merge-tree --write-tree` (Git 2.38+).
+// Below this version the CLI works but some features are unavailable.
+var RecommendedVersion = Version{2, 38, 0}
 
 // GitNotInstalledError indicates that the git binary was not found in PATH.
 type GitNotInstalledError struct{}
@@ -102,43 +107,48 @@ func InstallHint(goos string) string {
 }
 
 var (
-	checkOnce   sync.Once
-	checkResult error
+	checkOnce    sync.Once
+	checkVersion Version
+	checkErr     error
 )
 
 // CheckVersion verifies that git is installed and meets the minimum version requirement.
-// Results are cached — the check runs at most once per process.
-func CheckVersion() error {
+// On success, returns the detected version. On failure, returns a GitNotInstalledError,
+// GitTooOldError, or a parse error. Results are cached — the check runs at most once per process.
+func CheckVersion() (Version, error) {
 	checkOnce.Do(func() {
 		_, err := exec.LookPath("git")
 		if err != nil {
-			checkResult = &GitNotInstalledError{}
+			checkErr = &GitNotInstalledError{}
 			return
 		}
 
 		out, err := exec.Command("git", "version").CombinedOutput()
 		if err != nil {
-			checkResult = fmt.Errorf("could not run git version: %w", err)
+			checkErr = fmt.Errorf("could not run git version: %w", err)
 			return
 		}
 
 		v, err := parseGitVersion(string(out))
 		if err != nil {
-			checkResult = err
+			checkErr = err
 			return
 		}
 
 		if !v.AtLeast(MinVersion) {
-			checkResult = &GitTooOldError{Detected: v, Required: MinVersion}
+			checkErr = &GitTooOldError{Detected: v, Required: MinVersion}
 			return
 		}
+
+		checkVersion = v
 	})
 
-	return checkResult
+	return checkVersion, checkErr
 }
 
 // ResetCheckVersion resets the cached version check (for testing only).
 func ResetCheckVersion() {
 	checkOnce = sync.Once{}
-	checkResult = nil
+	checkVersion = Version{}
+	checkErr = nil
 }

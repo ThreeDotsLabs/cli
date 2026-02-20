@@ -1,16 +1,19 @@
 package trainings
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"runtime"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings/config"
@@ -36,8 +39,12 @@ type CliMetadata struct {
 
 	Architecture string
 	OS           string
+	OSVersion    string
+	GoVersion    string
+	GitVersion   string
 
 	ExecutedCommand string
+	Interactive     bool
 }
 
 func NewHandlers(cliVersion CliMetadata) *Handlers {
@@ -85,6 +92,11 @@ func (h *Handlers) newGrpcClientWithAddr(addr string, region string, insecure bo
 			opts = append(opts, grpc.WithTransportCredentials(creds))
 		}
 
+		opts = append(opts,
+			grpc.WithUnaryInterceptor(h.unaryInterceptor()),
+			grpc.WithStreamInterceptor(h.streamInterceptor()),
+		)
+
 		conn, err := grpc.NewClient(addr, opts...)
 
 		if err != nil {
@@ -119,4 +131,16 @@ func newTrainingRootFs(trainingRoot string) *afero.BasePathFs {
 	//
 	// To avoid that we are using afero.BasePathFs with base on training root for all operations in trainings dir.
 	return afero.NewBasePathFs(afero.NewOsFs(), trainingRoot).(*afero.BasePathFs)
+}
+
+// CheckServerConnection verifies we can reach the server before running a command.
+func (h *Handlers) CheckServerConnection(ctx context.Context) error {
+	pingCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	_, err := h.newGrpcClient().Ping(pingCtx, &emptypb.Empty{})
+	if err != nil {
+		return formatConnectionError(err)
+	}
+	return nil
 }

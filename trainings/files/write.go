@@ -227,6 +227,11 @@ func (f Files) shouldWriteAllFiles(fs afero.Fs, exerciseDir string, filesToCreat
 	var filesToPrint []fileItem
 
 	for _, filePath := range allPathsSorted {
+		// Always override exercise.md without approval (matches shouldWriteFile behavior)
+		if strings.Contains(filePath, ExerciseFile) {
+			continue
+		}
+
 		exists, err := afero.Exists(fs, filePath)
 		if err != nil {
 			return false, errors.Wrapf(err, "can't check if %s exists", filePath)

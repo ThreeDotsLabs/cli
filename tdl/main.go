@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"runtime"
 	"strings"
 	"time"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings"
+	"github.com/ThreeDotsLabs/cli/trainings/git"
 )
 
 var (
@@ -110,6 +112,13 @@ var app = &cli.App{
 			Name:    "training",
 			Aliases: []string{"tr"},
 			Usage:   fmt.Sprintf("commands for %s commands", internal.WebsiteAddress),
+			Before: func(c *cli.Context) error {
+				sub := c.Args().First()
+				if sub == "settings" {
+					return nil
+				}
+				return newHandlers(c).CheckServerConnection(c.Context)
+			},
 			Subcommands: []*cli.Command{
 				{
 					Name:      "configure",
@@ -330,8 +339,28 @@ func newHandlers(c *cli.Context) *trainings.Handlers {
 		Commit:          commit,
 		Architecture:    runtime.GOARCH,
 		OS:              runtime.GOOS,
+		OSVersion:       osVersion(),
+		GoVersion:       runtime.Version(),
+		GitVersion:      gitVersionString(),
 		ExecutedCommand: c.Command.HelpName,
+		Interactive:     internal.IsStdinTerminal(),
 	})
+}
+
+func osVersion() string {
+	out, err := exec.Command("uname", "-r").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func gitVersionString() string {
+	v, err := git.CheckVersion()
+	if err != nil {
+		return ""
+	}
+	return v.String()
 }
 
 type missingArgumentError struct {

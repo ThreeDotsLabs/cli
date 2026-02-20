@@ -57,29 +57,38 @@ func (h *Handlers) Init(ctx context.Context, trainingName string, dir string, no
 	// Skip git entirely in non-interactive mode (pipes, CI, E2E) — we can't prompt for preferences.
 	// forceGit overrides the non-interactive check (used by E2E tests and scripted restore).
 	gitOps := git.NewOps(trainingRootDir, noGit || (!forceGit && !internal.IsStdinTerminal()))
+	gitUnavailable := false
 
 	if gitOps.Enabled() {
-		if err := git.CheckVersion(); err != nil {
+		detectedVersion, err := git.CheckVersion()
+		if err != nil {
 			var notInstalled *git.GitNotInstalledError
 			var tooOld *git.GitTooOldError
 			if errors.As(err, &notInstalled) {
-				return UserFacingError{
-					Msg: "git is not installed.",
-					SolutionHint: fmt.Sprintf(
-						"Git is required for tracking your progress.\n\n%s\n\nAlternatively, use %s to skip git integration.",
-						git.InstallHint(runtime.GOOS), color.CyanString("--no-git"),
-					),
+				printGitUnavailableNotice("Git is not installed.", git.InstallHint(runtime.GOOS))
+				if !promptContinueWithoutGit() {
+					return nil
 				}
+				gitOps = git.NewOps(trainingRootDir, true)
+				gitUnavailable = true
 			} else if errors.As(err, &tooOld) {
-				return UserFacingError{
-					Msg: fmt.Sprintf("Your git version (%s) is too old.", tooOld.Detected),
-					SolutionHint: fmt.Sprintf(
-						"This CLI requires git %s or newer.\n\n%s\n\nAlternatively, use %s to skip git integration.",
-						tooOld.Required, git.InstallHint(runtime.GOOS), color.CyanString("--no-git"),
-					),
+				reason := fmt.Sprintf("Your git version (%s) is too old — %s or newer is required.", tooOld.Detected, tooOld.Required)
+				printGitUnavailableNotice(reason, git.InstallHint(runtime.GOOS))
+				if !promptContinueWithoutGit() {
+					return nil
 				}
+				gitOps = git.NewOps(trainingRootDir, true)
+				gitUnavailable = true
+			} else {
+				// Unparseable version — warn in logs, don't block
+				logrus.WithError(err).Warn("Could not verify git version")
 			}
-			logrus.WithError(err).Warn("Could not verify git version")
+		} else if !detectedVersion.AtLeast(git.RecommendedVersion) {
+			// Above minimum but below recommended — soft info
+			fmt.Printf("  %s Git %s detected (minimum: %s). Upgrade to %s for conflict preview when loading exercises.\n\n",
+				color.YellowString("ℹ"),
+				detectedVersion, git.MinVersion, git.RecommendedVersion,
+			)
 		}
 	}
 
@@ -125,6 +134,16 @@ func (h *Handlers) Init(ctx context.Context, trainingName string, dir string, no
 			}
 			// When previousSolutionsAvailable, staged changes remain uncommitted
 			// so restore() can create the initialize commit with the correct date.
+		} else if gitUnavailable {
+			trainingRootFs := newTrainingRootFs(trainingRootDir)
+			cfg := h.config.TrainingConfig(trainingRootFs)
+			if !cfg.GitConfigured {
+				cfg.GitConfigured = true
+				cfg.GitEnabled = false
+				if err := h.config.WriteTrainingConfig(cfg, trainingRootFs); err != nil {
+					return errors.Wrap(err, "can't update training config")
+				}
+			}
 		}
 
 		var previousSolutions []string
@@ -203,6 +222,48 @@ func showGitDefaults() {
 	fmt.Println()
 	fmt.Printf("  Defaults: auto-commit on, auto-golden off.\n")
 	fmt.Printf("  To change: %s\n\n", color.CyanString("tdl training settings"))
+}
+
+// printGitUnavailableNotice shows a recommendation banner when git is missing or too old.
+func printGitUnavailableNotice(reason string, installHint string) {
+	sep := color.HiBlackString(strings.Repeat("─", internal.TerminalWidth()))
+	title := color.New(color.Bold, color.FgHiYellow).Sprint("  *** Git Recommended ***")
+
+	fmt.Println(sep)
+	fmt.Println(title)
+	fmt.Println()
+	fmt.Println("  " + reason)
+	fmt.Println()
+	fmt.Println("  Git integration gives you:")
+	fmt.Println("  • Progress tracking — each completed exercise is committed automatically")
+	fmt.Println("  • Solution comparison — diff your code with the official solution")
+	fmt.Println("  • Safe exercise loading — preview conflicts before merging new exercises")
+	fmt.Println()
+	for _, line := range strings.Split(installHint, "\n") {
+		if line == "" {
+			fmt.Println()
+		} else {
+			fmt.Println("  " + line)
+		}
+	}
+	fmt.Println()
+	fmt.Println("  You can continue without git — you can always migrate later.")
+	fmt.Println(sep)
+	fmt.Println()
+}
+
+// promptContinueWithoutGit asks the user whether to continue without git or quit to install.
+// Returns true if the user chose to continue.
+func promptContinueWithoutGit() bool {
+	choice := internal.Prompt(
+		internal.Actions{
+			{Shortcut: '\n', Action: "continue without git", ShortcutAliases: []rune{'\r'}},
+			{Shortcut: 'q', Action: "quit and install git first"},
+		},
+		os.Stdin,
+		os.Stdout,
+	)
+	return choice == '\n'
 }
 
 // promptGitPreferences runs interactive prompts for git settings.
@@ -319,7 +380,7 @@ func (h *Handlers) startTraining(
 	}
 
 	resp, err := h.newGrpcClient().StartTraining(
-		ctxWithRequestHeader(ctx, h.cliMetadata),
+		ctx,
 		&genproto.StartTrainingRequest{
 			TrainingName: trainingName,
 			Token:        h.config.GlobalConfig().Token,

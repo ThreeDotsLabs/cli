@@ -158,7 +158,7 @@ func (h *Handlers) getNextExercise(
 ) (resp *genproto.NextExerciseResponse, err error) {
 	cfg := h.config.TrainingConfig(trainingRootFs)
 	resp, err = h.newGrpcClient().NextExercise(
-		ctxWithRequestHeader(ctx, h.cliMetadata),
+		ctx,
 		&genproto.NextExerciseRequest{
 			TrainingName:      cfg.TrainingName,
 			CurrentExerciseId: currentExerciseID,

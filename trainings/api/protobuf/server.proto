@@ -25,6 +25,8 @@ service Trainings {
   rpc SkipExercise(SkipExerciseRequest) returns (SkipExerciseResponse) {};
 
   rpc GetGoldenSolution(GetGoldenSolutionRequest) returns (GetGoldenSolutionResponse) {};
+
+  rpc Ping(google.protobuf.Empty) returns (google.protobuf.Empty) {};
 }
 
 enum TrainingDifficulty {

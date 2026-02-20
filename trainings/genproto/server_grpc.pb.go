@@ -8,7 +8,6 @@ package genproto
 
 import (
 	context "context"
-
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -34,6 +33,7 @@ const (
 	Trainings_CanSkipExercise_FullMethodName     = "/Trainings/CanSkipExercise"
 	Trainings_SkipExercise_FullMethodName        = "/Trainings/SkipExercise"
 	Trainings_GetGoldenSolution_FullMethodName   = "/Trainings/GetGoldenSolution"
+	Trainings_Ping_FullMethodName                = "/Trainings/Ping"
 )
 
 // TrainingsClient is the client API for Trainings service.
@@ -53,6 +53,7 @@ type TrainingsClient interface {
 	CanSkipExercise(ctx context.Context, in *CanSkipExerciseRequest, opts ...grpc.CallOption) (*CanSkipExerciseResponse, error)
 	SkipExercise(ctx context.Context, in *SkipExerciseRequest, opts ...grpc.CallOption) (*SkipExerciseResponse, error)
 	GetGoldenSolution(ctx context.Context, in *GetGoldenSolutionRequest, opts ...grpc.CallOption) (*GetGoldenSolutionResponse, error)
+	Ping(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type trainingsClient struct {
@@ -202,6 +203,16 @@ func (c *trainingsClient) GetGoldenSolution(ctx context.Context, in *GetGoldenSo
 	return out, nil
 }
 
+func (c *trainingsClient) Ping(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, Trainings_Ping_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TrainingsServer is the server API for Trainings service.
 // All implementations should embed UnimplementedTrainingsServer
 // for forward compatibility.
@@ -219,6 +230,7 @@ type TrainingsServer interface {
 	CanSkipExercise(context.Context, *CanSkipExerciseRequest) (*CanSkipExerciseResponse, error)
 	SkipExercise(context.Context, *SkipExerciseRequest) (*SkipExerciseResponse, error)
 	GetGoldenSolution(context.Context, *GetGoldenSolutionRequest) (*GetGoldenSolutionResponse, error)
+	Ping(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
 }
 
 // UnimplementedTrainingsServer should be embedded to have
@@ -266,6 +278,9 @@ func (UnimplementedTrainingsServer) SkipExercise(context.Context, *SkipExerciseR
 }
 func (UnimplementedTrainingsServer) GetGoldenSolution(context.Context, *GetGoldenSolutionRequest) (*GetGoldenSolutionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetGoldenSolution not implemented")
+}
+func (UnimplementedTrainingsServer) Ping(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
 }
 func (UnimplementedTrainingsServer) testEmbeddedByValue() {}
 
@@ -514,6 +529,24 @@ func _Trainings_GetGoldenSolution_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Trainings_Ping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TrainingsServer).Ping(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Trainings_Ping_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TrainingsServer).Ping(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Trainings_ServiceDesc is the grpc.ServiceDesc for Trainings service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -568,6 +601,10 @@ var Trainings_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetGoldenSolution",
 			Handler:    _Trainings_GetGoldenSolution_Handler,
+		},
+		{
+			MethodName: "Ping",
+			Handler:    _Trainings_Ping_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

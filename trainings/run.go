@@ -468,7 +468,7 @@ func (h *Handlers) overrideWithGolden(ctx context.Context, trainingRootFs *afero
 
 	// Fetch golden solution via gRPC
 	resp, err := h.newGrpcClient().GetGoldenSolution(
-		ctxWithRequestHeader(ctx, h.cliMetadata),
+		ctx,
 		&genproto.GetGoldenSolutionRequest{
 			TrainingName: h.config.TrainingConfig(trainingRootFs).TrainingName,
 			ExerciseId:   exerciseCfg.ExerciseID,
@@ -558,7 +558,7 @@ func (h *Handlers) syncGoldenSolutionImpl(ctx context.Context, trainingRootFs *a
 
 	// Fetch golden solution via gRPC
 	resp, err := h.newGrpcClient().GetGoldenSolution(
-		ctxWithRequestHeader(ctx, h.cliMetadata),
+		ctx,
 		&genproto.GetGoldenSolutionRequest{
 			TrainingName: h.config.TrainingConfig(trainingRootFs).TrainingName,
 			ExerciseId:   exerciseCfg.ExerciseID,

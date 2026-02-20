@@ -159,7 +159,7 @@ func (h *Handlers) restoreExerciseWithGit(
 
 	// 1. Fetch scaffold files via GetExercise
 	scaffoldResp, err := h.newGrpcClient().GetExercise(
-		ctxWithRequestHeader(ctx, h.cliMetadata),
+		ctx,
 		&genproto.GetExerciseRequest{
 			TrainingName: h.config.TrainingConfig(trainingRootFs).TrainingName,
 			Token:        h.config.GlobalConfig().Token,

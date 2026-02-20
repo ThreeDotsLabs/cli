@@ -65,6 +65,21 @@ func formatServerError(err error) error {
 	}
 }
 
+// formatConnectionError wraps a failed Ping into a user-friendly connectivity error.
+func formatConnectionError(err error) error {
+	return UserFacingError{
+		Msg: "Could not connect to the server.",
+		SolutionHint: fmt.Sprintf(
+			"Please check:\n"+
+				"  1. Your internet connection\n"+
+				"  2. Firewall or VPN settings that may block outgoing connections\n"+
+				"  3. The server may be temporarily unavailable — try again in a few minutes\n\n"+
+				"%s",
+			color.HiBlackString("Raw error: %s", err),
+		),
+	}
+}
+
 // formatGitWarning formats a non-blocking git failure for user display.
 // Always shows the actual git error — never hides it.
 func formatGitWarning(operation string, err error) string {
