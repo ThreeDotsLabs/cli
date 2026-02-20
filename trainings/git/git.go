@@ -187,6 +187,21 @@ func (g *Ops) Commit(msg string) error {
 	return err
 }
 
+// CommitAllowEmpty creates a commit even when there are no staged changes.
+func (g *Ops) CommitAllowEmpty(msg string) error {
+	if !g.enabled {
+		return nil
+	}
+
+	g.printCmd(fmt.Sprintf("commit -m %q", msg))
+	_, err := g.run(
+		"-c", "commit.gpgsign=false",
+		"-c", "core.hooksPath=/dev/null",
+		"commit", "--allow-empty", "-m", msg,
+	)
+	return err
+}
+
 // CommitWithDate creates a commit with an explicit author/committer date.
 func (g *Ops) CommitWithDate(msg string, date time.Time) error {
 	if !g.enabled {

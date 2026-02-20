@@ -578,15 +578,15 @@ func (h *Handlers) syncGoldenSolutionImpl(ctx context.Context, trainingRootFs *a
 		logrus.WithError(err).Warn("Could not stage golden files")
 		return
 	}
-	if !worktreeOps.HasStagedChanges() {
-		// Golden identical to user's solution — clean up empty branch
-		gitOps.WorktreeRemove(tmpDir)
-		os.RemoveAll(tmpDir)
-		gitOps.DeleteBranch(goldenBranch)
-		return
-	}
 	goldenCommitMsg := fmt.Sprintf("golden solution for %s", moduleExercisePath)
-	if !commitDate.IsZero() {
+	if !worktreeOps.HasStagedChanges() {
+		// Golden identical to user's solution — create empty commit so the branch
+		// exists for comparison (git diff shows nothing, which is correct).
+		if err := worktreeOps.CommitAllowEmpty(goldenCommitMsg); err != nil {
+			logrus.WithError(err).Warn("Could not create golden commit")
+			return
+		}
+	} else if !commitDate.IsZero() {
 		if err := worktreeOps.CommitWithDate(goldenCommitMsg, commitDate); err != nil {
 			logrus.WithError(err).Warn("Could not commit golden solution")
 			return
