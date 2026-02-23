@@ -696,12 +696,6 @@ func (h *Handlers) syncGoldenSolutionImpl(ctx context.Context, trainingRootFs *a
 			fmt.Println(color.GreenString("  Example solution merged into your branch."))
 		}
 	default: // "compare"
-		// Show diff stat between current branch and golden, restricted to exercise dir
-		if stat, err := gitOps.DiffStatPath(currentBranch, goldenBranch, exerciseDir); err == nil && stat != "" {
-			fmt.Println(stat)
-			fmt.Println()
-		}
-
 		fmt.Printf("Compare with our solution: %s\n\n", color.CyanString("git diff %s..%s -- %s", currentBranch, goldenBranch, compareDir(gitOps, exerciseDir)))
 	}
 }
