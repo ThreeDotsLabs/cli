@@ -679,11 +679,13 @@ func TestGoldenBasedOnHEAD(t *testing.T) {
 	exerciseDir := filepath.Join(wt2, "01-mod", "01-ex")
 	os.MkdirAll(exerciseDir, 0755)
 
-	// Write example solution files
+	// Write example solution files — commit with an explicit date
+	// (mirrors production code where callers pass time.Now().Add(1s))
 	writeFile(t, wt2, "01-mod/01-ex/main.go", "package main\n\nfunc main() {\n\t// example solution\n}\n")
 	wt2Ops := NewQuietOps(wt2)
 	require.NoError(t, wt2Ops.AddAll("01-mod/01-ex"))
-	require.NoError(t, wt2Ops.Commit("example solution"))
+	goldenCommitDate := time.Date(2025, 7, 1, 12, 0, 0, 0, time.UTC)
+	require.NoError(t, wt2Ops.CommitWithDate("example solution", goldenCommitDate))
 	require.NoError(t, ops.WorktreeRemove(wt2))
 
 	// Verify example solution is based on HEAD (user's commit)
@@ -721,6 +723,13 @@ func TestGoldenBasedOnHEAD(t *testing.T) {
 		"example solution branch should preserve test files from init")
 	assert.Contains(t, goldenTreeOutput, "helper.go",
 		"example solution branch should preserve user files from HEAD")
+
+	// Verify example solution commit has the explicit date we passed.
+	goldenDateStr := strings.TrimSpace(runGit(t, dir, "log", "-1", "--format=%aI", goldenBranch))
+	goldenDate, err := time.Parse(time.RFC3339, goldenDateStr)
+	require.NoError(t, err)
+	assert.Equal(t, goldenCommitDate, goldenDate.UTC(),
+		"example solution commit should have the explicit date we passed")
 }
 
 func TestDiffStat_Alignment(t *testing.T) {

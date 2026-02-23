@@ -222,6 +222,40 @@ func (g *Ops) CommitAllowEmpty(msg string) error {
 	return err
 }
 
+// CommitAllowEmptyWithDate creates a commit even when there are no staged changes,
+// with an explicit author/committer date.
+func (g *Ops) CommitAllowEmptyWithDate(msg string, date time.Time) error {
+	if !g.enabled {
+		return nil
+	}
+
+	g.printCmd(fmt.Sprintf("commit -m %q", msg))
+
+	cmd := exec.Command("git",
+		"-c", "commit.gpgsign=false",
+		"-c", "core.hooksPath=/dev/null",
+		"commit", "--allow-empty", "-m", msg,
+	)
+	cmd.Dir = g.rootDir
+	dateStr := date.Format(time.RFC3339)
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_DATE="+dateStr,
+		"GIT_COMMITTER_DATE="+dateStr,
+	)
+
+	logrus.WithFields(logrus.Fields{
+		"args": []string{"commit", "--allow-empty", "-m", msg},
+		"dir":  g.rootDir,
+		"date": dateStr,
+	}).Debug("Running git commit --allow-empty with date")
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git commit: %s: %w", strings.TrimSpace(string(out)), err)
+	}
+	return nil
+}
+
 // CommitWithDate creates a commit with an explicit author/committer date.
 func (g *Ops) CommitWithDate(msg string, date time.Time) error {
 	if !g.enabled {

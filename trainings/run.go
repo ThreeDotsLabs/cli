@@ -116,7 +116,7 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 					if gitOps.Enabled() && !exerciseCfg.IsTextOnly {
 						goldenBranch := git.GoldenBranchName(exerciseCfg.ModuleExercisePath())
 						if !gitOps.BranchExists(goldenBranch) {
-							h.syncGoldenSolution(ctx, trainingRootFs, gitOps, exerciseCfg, "compare")
+							h.syncGoldenSolution(ctx, trainingRootFs, gitOps, exerciseCfg, "compare", time.Now().Add(1*time.Second))
 						} else {
 							// Branch already exists — remind the user how to compare
 							currentBranch, _ := gitOps.CurrentBranch()
@@ -192,7 +192,7 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 		if gitOps.Enabled() && !exerciseCfg.IsTextOnly && !cfg.GitAutoGolden && promptResult != 's' {
 			goldenBranch := git.GoldenBranchName(exerciseCfg.ModuleExercisePath())
 			if !gitOps.BranchExists(goldenBranch) {
-				h.syncGoldenSolution(ctx, trainingRootFs, gitOps, exerciseCfg, "compare")
+				h.syncGoldenSolution(ctx, trainingRootFs, gitOps, exerciseCfg, "compare", time.Now().Add(1*time.Second))
 			}
 		}
 
@@ -536,8 +536,8 @@ func (h *Handlers) overrideWithGolden(ctx context.Context, trainingRootFs *afero
 // Uses git worktree to avoid touching the user's working tree.
 // Example solution branch is based on HEAD (user's completed commit) so that
 // `git diff master..example -- <dir>` only shows exercise-specific changes.
-func (h *Handlers) syncGoldenSolution(ctx context.Context, trainingRootFs *afero.BasePathFs, gitOps *git.Ops, exerciseCfg config.ExerciseConfig, modeOverride string) {
-	h.syncGoldenSolutionImpl(ctx, trainingRootFs, gitOps, exerciseCfg, modeOverride, false, time.Time{})
+func (h *Handlers) syncGoldenSolution(ctx context.Context, trainingRootFs *afero.BasePathFs, gitOps *git.Ops, exerciseCfg config.ExerciseConfig, modeOverride string, commitDate time.Time) {
+	h.syncGoldenSolutionImpl(ctx, trainingRootFs, gitOps, exerciseCfg, modeOverride, false, commitDate)
 }
 
 func (h *Handlers) syncGoldenSolutionQuiet(ctx context.Context, trainingRootFs *afero.BasePathFs, gitOps *git.Ops, exerciseCfg config.ExerciseConfig, commitDate time.Time) {
@@ -637,20 +637,16 @@ func (h *Handlers) syncGoldenSolutionImpl(ctx context.Context, trainingRootFs *a
 		return
 	}
 	goldenCommitMsg := fmt.Sprintf("example solution for %s", moduleExercisePath)
+
 	if !worktreeOps.HasStagedChanges() {
 		// Example solution identical to user's solution — create empty commit so the branch
 		// exists for comparison (git diff shows nothing, which is correct).
-		if err := worktreeOps.CommitAllowEmpty(goldenCommitMsg); err != nil {
+		if err := worktreeOps.CommitAllowEmptyWithDate(goldenCommitMsg, commitDate); err != nil {
 			logrus.WithError(err).Warn("Could not create golden commit")
 			return
 		}
-	} else if !commitDate.IsZero() {
-		if err := worktreeOps.CommitWithDate(goldenCommitMsg, commitDate); err != nil {
-			logrus.WithError(err).Warn("Could not commit golden solution")
-			return
-		}
 	} else {
-		if err := worktreeOps.Commit(goldenCommitMsg); err != nil {
+		if err := worktreeOps.CommitWithDate(goldenCommitMsg, commitDate); err != nil {
 			logrus.WithError(err).Warn("Could not commit golden solution")
 			return
 		}
