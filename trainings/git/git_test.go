@@ -650,7 +650,7 @@ func TestGoldenBasedOnHEAD(t *testing.T) {
 	dir := initTestRepo(t)
 	ops := NewOps(dir, false)
 
-	// Create init branch and merge
+	// Create init branch with scaffold files (test file + main.go stub)
 	tmpDir1 := t.TempDir()
 	wt1 := filepath.Join(tmpDir1, "wt")
 	initBranch := "tdl/init/01-mod/01-ex"
@@ -663,26 +663,34 @@ func TestGoldenBasedOnHEAD(t *testing.T) {
 	require.NoError(t, ops.WorktreeRemove(wt1))
 	require.NoError(t, ops.Merge(initBranch, "start exercise"))
 
-	// User commits solution + extra file
+	// User commits solution + extra file.
+	// Also add a file from a DIFFERENT module that shares the same project dir.
+	// This simulates the leakage scenario: project exercises accumulate files
+	// from all modules on HEAD, and those must not leak onto the golden branch.
 	writeFile(t, dir, "01-mod/01-ex/main.go", "package main\n\nfunc main() {}\n")
 	writeFile(t, dir, "01-mod/01-ex/helper.go", "package main\n\nfunc helper() {}\n")
+	writeFile(t, dir, "01-mod/01-ex/leaked_from_other_module.go", "package main\n\n// This file belongs to a later module\n")
 	runGit(t, dir, "add", ".")
-	runGit(t, dir, "-c", "commit.gpgsign=false", "commit", "-m", "user solution")
+	runGit(t, dir, "-c", "commit.gpgsign=false", "commit", "-m", "user solution + files from other modules")
 
-	// Create example solution branch FROM HEAD (user's completed commit)
+	// Create example solution branch FROM HEAD, but with directory cleaning.
+	// This mirrors the production fix: clean exercise dir, restore from init, write golden.
 	goldenBranch := "tdl/example/01-mod/01-ex"
 	tmpDir2 := t.TempDir()
 	wt2 := filepath.Join(tmpDir2, "wt")
 	require.NoError(t, ops.WorktreeAdd(wt2, goldenBranch))
 
-	// No directory cleaning — syncGoldenSolution writes example solution files over the worktree.
+	// Clean exercise dir in worktree (prevents file leakage)
 	exerciseDir := filepath.Join(wt2, "01-mod", "01-ex")
+	os.RemoveAll(exerciseDir)
 	os.MkdirAll(exerciseDir, 0755)
 
-	// Write example solution files — commit with an explicit date
-	// (mirrors production code where callers pass time.Now().Add(1s))
-	writeFile(t, wt2, "01-mod/01-ex/main.go", "package main\n\nfunc main() {\n\t// example solution\n}\n")
+	// Restore base state from init branch
 	wt2Ops := NewQuietOps(wt2)
+	require.NoError(t, wt2Ops.CheckoutPathFrom(initBranch, "01-mod/01-ex"))
+
+	// Write example solution files on top of init state
+	writeFile(t, wt2, "01-mod/01-ex/main.go", "package main\n\nfunc main() {\n\t// example solution\n}\n")
 	require.NoError(t, wt2Ops.AddAll("01-mod/01-ex"))
 	goldenCommitDate := time.Date(2025, 7, 1, 12, 0, 0, 0, time.UTC)
 	require.NoError(t, wt2Ops.CommitWithDate("example solution", goldenCommitDate))
@@ -705,24 +713,30 @@ func TestGoldenBasedOnHEAD(t *testing.T) {
 			"example solution diff should only contain exercise dir files, got: %s", f)
 	}
 
-	// Only main.go should appear in diff (the actual example solution change).
-	// Without directory cleaning, unchanged files (helper.go, main_test.go)
-	// persist from HEAD on the example solution branch — they shouldn't appear in diff.
+	// main.go should appear in diff (the actual example solution change).
 	assert.Contains(t, diffOutput, "01-mod/01-ex/main.go",
 		"example solution diff should include the changed solution file")
-	assert.NotContains(t, diffOutput, "01-mod/01-ex/helper.go",
-		"user's extra files should not appear in diff (preserved from HEAD)")
+	// Test files from init should not appear in diff (restored from init, same content).
 	assert.NotContains(t, diffOutput, "01-mod/01-ex/main_test.go",
-		"shared files (like test files) should not appear in diff (preserved from HEAD)")
+		"init scaffold files should not appear in diff (restored from init branch)")
 
-	// Verify all files still exist on the example solution branch
-	goldenTreeOutput := strings.TrimSpace(runGit(t, dir, "ls-tree", "--name-only", goldenBranch, "--", "01-mod/01-ex/"))
+	// Files from HEAD that aren't in init or golden MUST be cleaned away.
+	// This is the core regression test for file leakage.
+	assert.Contains(t, diffOutput, "01-mod/01-ex/helper.go",
+		"user's extra file from HEAD should show as deleted in diff (cleaned)")
+	assert.Contains(t, diffOutput, "01-mod/01-ex/leaked_from_other_module.go",
+		"leaked file from other module should show as deleted in diff (cleaned)")
+
+	// Verify golden branch file listing: only init files + golden solution
+	goldenTreeOutput := strings.TrimSpace(runGit(t, dir, "ls-tree", "-r", "--name-only", goldenBranch, "--", "01-mod/01-ex/"))
 	assert.Contains(t, goldenTreeOutput, "main.go",
 		"example solution branch should have solution file")
 	assert.Contains(t, goldenTreeOutput, "main_test.go",
 		"example solution branch should preserve test files from init")
-	assert.Contains(t, goldenTreeOutput, "helper.go",
-		"example solution branch should preserve user files from HEAD")
+	assert.NotContains(t, goldenTreeOutput, "helper.go",
+		"user's extra file must NOT be on golden branch (cleaned)")
+	assert.NotContains(t, goldenTreeOutput, "leaked_from_other_module.go",
+		"leaked file from other module must NOT be on golden branch (cleaned)")
 
 	// Verify example solution commit has the explicit date we passed.
 	goldenDateStr := strings.TrimSpace(runGit(t, dir, "log", "-1", "--format=%aI", goldenBranch))

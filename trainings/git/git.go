@@ -606,6 +606,16 @@ func (g *Ops) CreateBranchFrom(name, ref string) error {
 	return err
 }
 
+// CheckoutPathFrom restores files at the given path from another branch.
+// Used to populate a worktree directory from the init branch before writing golden files.
+func (g *Ops) CheckoutPathFrom(branch, path string) error {
+	if !g.enabled {
+		return nil
+	}
+	_, err := g.run("checkout", branch, "--", path)
+	return err
+}
+
 // InitBranchName returns the init branch name for the given exercise directory.
 func InitBranchName(exerciseDir string) string {
 	return "tdl/init/" + filepath.ToSlash(exerciseDir)

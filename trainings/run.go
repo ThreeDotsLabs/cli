@@ -620,7 +620,22 @@ func (h *Handlers) syncGoldenSolutionImpl(ctx context.Context, trainingRootFs *a
 	defer gitOps.WorktreeRemove(tmpDir)
 
 	worktreeExercisePath := filepath.Join(tmpDir, exerciseDir)
+
+	// Clean exercise directory to prevent stale files from previous exercises
+	// leaking onto the golden branch (e.g., files from later modules that
+	// share the same project directory).
+	os.RemoveAll(worktreeExercisePath)
 	os.MkdirAll(worktreeExercisePath, 0755)
+
+	// Restore base state from init branch (accumulated scaffold files: tests,
+	// go.mod, config, etc.) so the golden branch has a complete project state.
+	initBranch := git.InitBranchName(moduleExercisePath)
+	if gitOps.BranchExists(initBranch) {
+		worktreeInitOps := git.NewQuietOps(tmpDir)
+		if err := worktreeInitOps.CheckoutPathFrom(initBranch, exerciseDir); err != nil {
+			logrus.WithError(err).Debug("Could not restore init files for golden branch")
+		}
+	}
 
 	// Write example solution files silently (worktree is internal)
 	worktreeFs := afero.NewBasePathFs(afero.NewOsFs(), tmpDir).(*afero.BasePathFs)
