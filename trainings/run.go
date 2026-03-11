@@ -69,7 +69,7 @@ func (h *Handlers) detachedRun(ctx context.Context, trainingRootFs *afero.BasePa
 		return err
 	}
 
-	_, err = h.nextExercise(ctx, h.config.ExerciseConfig(trainingRootFs).ExerciseID, trainingRoot)
+	_, err = h.nextExercise(withSubAction(ctx, "next"), h.config.ExerciseConfig(trainingRootFs).ExerciseID, trainingRoot)
 	if errors.Is(err, errMergeAborted) {
 		return nil // clean exit
 	}
@@ -116,7 +116,7 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 					if gitOps.Enabled() && !exerciseCfg.IsTextOnly {
 						goldenBranch := git.GoldenBranchName(exerciseCfg.ModuleExercisePath())
 						if !gitOps.BranchExists(goldenBranch) {
-							h.syncGoldenSolution(ctx, trainingRootFs, gitOps, exerciseCfg, "compare", time.Now().Add(1*time.Second))
+							h.syncGoldenSolution(withSubAction(ctx, "sync-golden-stuck"), trainingRootFs, gitOps, exerciseCfg, "compare", time.Now().Add(1*time.Second))
 						} else {
 							// Branch already exists — remind the user how to compare
 							currentBranch, _ := gitOps.CurrentBranch()
@@ -163,7 +163,7 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 			continue
 		}
 		if promptResult == 's' {
-			h.overrideWithGolden(ctx, trainingRootFs, gitOps, exerciseCfg)
+			h.overrideWithGolden(withSubAction(ctx, "sync-golden-manual"), trainingRootFs, gitOps, exerciseCfg)
 			// Fall through to next exercise (example solution already committed, no staged changes)
 		}
 
@@ -185,18 +185,18 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 
 		// Auto-sync: override with example solution automatically after passing
 		if cfg.GitAutoGolden && gitOps.Enabled() && !exerciseCfg.IsTextOnly && promptResult != 's' {
-			h.overrideWithGolden(ctx, trainingRootFs, gitOps, exerciseCfg)
+			h.overrideWithGolden(withSubAction(ctx, "sync-golden-auto"), trainingRootFs, gitOps, exerciseCfg)
 		}
 
 		// Create example solution branch for comparison (skip if user pressed 's' or auto-sync ran)
 		if gitOps.Enabled() && !exerciseCfg.IsTextOnly && !cfg.GitAutoGolden && promptResult != 's' {
 			goldenBranch := git.GoldenBranchName(exerciseCfg.ModuleExercisePath())
 			if !gitOps.BranchExists(goldenBranch) {
-				h.syncGoldenSolution(ctx, trainingRootFs, gitOps, exerciseCfg, "compare", time.Now().Add(1*time.Second))
+				h.syncGoldenSolution(withSubAction(ctx, "sync-golden-auto"), trainingRootFs, gitOps, exerciseCfg, "compare", time.Now().Add(1*time.Second))
 			}
 		}
 
-		finished, err := h.nextExercise(ctx, exerciseCfg.ExerciseID, trainingRoot)
+		finished, err := h.nextExercise(withSubAction(ctx, "next"), exerciseCfg.ExerciseID, trainingRoot)
 		if errors.Is(err, errMergeAborted) {
 			mergeAborted = true
 			continue // stay on current exercise, re-show prompt
@@ -252,7 +252,7 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 
 func (h *Handlers) run(ctx context.Context, trainingRootFs *afero.BasePathFs) (bool, error) {
 	// todo - validate if exercise id == training exercise id? to ensure about consistency
-	success, err := h.runExercise(trainingRootFs)
+	success, err := h.runExercise(ctx, trainingRootFs)
 
 	if isExerciseNoLongerAvailable(err) {
 		fmt.Println(color.YellowString("We did update of the exercise code. Your local workspace is out of sync."))
@@ -277,7 +277,7 @@ func isExerciseNoLongerAvailable(err error) bool {
 	return status.Code(errors.Cause(err)) == codes.NotFound
 }
 
-func (h *Handlers) runExercise(trainingRootFs *afero.BasePathFs) (bool, error) {
+func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePathFs) (bool, error) {
 	exerciseConfig := h.config.ExerciseConfig(trainingRootFs)
 
 	solutionFiles, err := files.NewFiles().ReadSolutionFiles(trainingRootFs, exerciseConfig.Directory)
@@ -307,7 +307,7 @@ func (h *Handlers) runExercise(trainingRootFs *afero.BasePathFs) (bool, error) {
 	reqStr := strings.ReplaceAll(req.String(), h.config.GlobalConfig().Token, "[token]")
 	logrus.WithField("req", reqStr).Info("Request prepared")
 
-	runCtx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	runCtx, cancel := context.WithTimeout(withSubAction(ctx, "verify"), time.Second*30)
 	defer cancel()
 
 	stream, err := h.newGrpcClient().VerifyExercise(runCtx, req)

@@ -10,6 +10,14 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
+type subActionKeyType struct{}
+
+var subActionKey subActionKeyType
+
+func withSubAction(ctx context.Context, name string) context.Context {
+	return context.WithValue(ctx, subActionKey, name)
+}
+
 // debugHeaders builds the metadata sent with every gRPC request.
 // Called per-RPC so training config changes mid-session are reflected.
 func (h *Handlers) debugHeaders() metadata.MD {
@@ -62,7 +70,11 @@ func (h *Handlers) unaryInterceptor() grpc.UnaryClientInterceptor {
 		invoker grpc.UnaryInvoker,
 		opts ...grpc.CallOption,
 	) error {
-		ctx = metadata.NewOutgoingContext(ctx, h.debugHeaders())
+		md := h.debugHeaders()
+		if sa, ok := ctx.Value(subActionKey).(string); ok && sa != "" {
+			md.Set("command", md.Get("command")[0]+" > "+sa)
+		}
+		ctx = metadata.NewOutgoingContext(ctx, md)
 		return invoker(ctx, method, req, reply, cc, opts...)
 	}
 }
@@ -76,7 +88,11 @@ func (h *Handlers) streamInterceptor() grpc.StreamClientInterceptor {
 		streamer grpc.Streamer,
 		opts ...grpc.CallOption,
 	) (grpc.ClientStream, error) {
-		ctx = metadata.NewOutgoingContext(ctx, h.debugHeaders())
+		md := h.debugHeaders()
+		if sa, ok := ctx.Value(subActionKey).(string); ok && sa != "" {
+			md.Set("command", md.Get("command")[0]+" > "+sa)
+		}
+		ctx = metadata.NewOutgoingContext(ctx, md)
 		return streamer(ctx, desc, cc, method, opts...)
 	}
 }

@@ -30,6 +30,8 @@ func isValidCompletedAt(t time.Time) bool {
 // When git is enabled, each exercise gets the full git structure (init branch,
 // merge commit, solution commit with date, example solution branch) matching the normal flow.
 func (h *Handlers) restore(ctx context.Context, trainingRoot string, gitOps *git.Ops) ([]string, error) {
+	ctx = withSubAction(ctx, "restore")
+
 	trainingRootFs := newTrainingRootFs(trainingRoot)
 	trainingName := h.config.TrainingConfig(trainingRootFs).TrainingName
 

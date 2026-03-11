@@ -19,6 +19,8 @@ const (
 )
 
 func (h *Handlers) Skip(ctx context.Context) error {
+	ctx = withSubAction(ctx, "skip")
+
 	trainingRoot, err := h.config.FindTrainingRoot()
 	if errors.Is(err, config.TrainingRootNotFoundError) {
 		h.printNotInATrainingDirectory()
@@ -33,14 +35,10 @@ func (h *Handlers) Skip(ctx context.Context) error {
 	// Save progress before skipping
 	gitOps := h.newGitOps()
 	if gitOps.Enabled() && !exerciseConfig.IsTextOnly && exerciseConfig.Directory != "" {
-		if err := gitOps.AddAll(exerciseConfig.Directory); err == nil && gitOps.HasStagedChanges() {
-			if err := gitOps.Commit(fmt.Sprintf("save progress on %s", exerciseConfig.ModuleExercisePath())); err != nil {
-				fmt.Println(formatGitWarning("Could not auto-commit your progress", err))
-			}
-		}
+		saveProgress(gitOps, exerciseConfig.Directory, fmt.Sprintf("save progress on %s", exerciseConfig.ModuleExercisePath()))
 	}
 
-	resp, err := h.newGrpcClient().CanSkipExercise(context.Background(), &genproto.CanSkipExerciseRequest{
+	resp, err := h.newGrpcClient().CanSkipExercise(ctx, &genproto.CanSkipExerciseRequest{
 		TrainingName: h.config.TrainingConfig(trainingRootFs).TrainingName,
 		ExerciseId:   exerciseConfig.ExerciseID,
 		Token:        h.config.GlobalConfig().Token,
@@ -101,7 +99,7 @@ func (h *Handlers) Skip(ctx context.Context) error {
 		return nil
 	}
 
-	_, err = h.newGrpcClient().SkipExercise(context.Background(), &genproto.SkipExerciseRequest{
+	_, err = h.newGrpcClient().SkipExercise(ctx, &genproto.SkipExerciseRequest{
 		TrainingName:    h.config.TrainingConfig(trainingRootFs).TrainingName,
 		ExerciseId:      exerciseConfig.ExerciseID,
 		Token:           h.config.GlobalConfig().Token,

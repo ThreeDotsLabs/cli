@@ -82,6 +82,7 @@ func TestAllOps_Disabled(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Empty(t, branch)
 
+	assert.NoError(t, ops.ResetStaging())
 	assert.NoError(t, ops.AddAll("."))
 	assert.NoError(t, ops.AddFiles("foo"))
 	assert.NoError(t, ops.Commit("msg"))
@@ -806,6 +807,40 @@ func TestDiffStatPath(t *testing.T) {
 	assert.NotContains(t, pathStat, "dir-b")
 }
 
+func TestDiffStatWorkingTree(t *testing.T) {
+	dir := initTestRepo(t)
+	ops := NewOps(dir, false)
+
+	// Commit files first so they are tracked
+	writeFile(t, dir, "dir-a/file.go", "package a\n")
+	writeFile(t, dir, "dir-b/file.go", "package b\n")
+	runGit(t, dir, "add", ".")
+	runGit(t, dir, "-c", "commit.gpgsign=false", "commit", "-m", "add files")
+
+	// Now modify them (unstaged changes)
+	writeFile(t, dir, "dir-a/file.go", "package a\n\nfunc changed() {}\n")
+	writeFile(t, dir, "dir-b/file.go", "package b\n\nfunc changed() {}\n")
+
+	// Full working tree diff should include both directories
+	fullStat, err := ops.DiffStatWorkingTree(".")
+	require.NoError(t, err)
+	assert.Contains(t, fullStat, "dir-a")
+	assert.Contains(t, fullStat, "dir-b")
+
+	// Path-restricted diff should only include dir-a
+	pathStat, err := ops.DiffStatWorkingTree("dir-a")
+	require.NoError(t, err)
+	assert.Contains(t, pathStat, "dir-a")
+	assert.NotContains(t, pathStat, "dir-b")
+}
+
+func TestDiffStatWorkingTree_Disabled(t *testing.T) {
+	ops := NewOps(t.TempDir(), true) // disabled
+	stat, err := ops.DiffStatWorkingTree(".")
+	assert.NoError(t, err)
+	assert.Empty(t, stat)
+}
+
 func TestCheckoutFiles(t *testing.T) {
 	dir := initTestRepo(t)
 	ops := NewOps(dir, false)
@@ -1087,9 +1122,83 @@ func TestMergeAutoResolveWithDate(t *testing.T) {
 	assert.FileExists(t, filepath.Join(dir, "side-only.txt"))
 }
 
+func TestListFiles(t *testing.T) {
+	dir := initTestRepo(t)
+	ops := NewOps(dir, false)
+
+	// Create a branch with files in a subdirectory
+	tmpDir := t.TempDir()
+	wt := filepath.Join(tmpDir, "wt")
+	runGit(t, dir, "branch", "list-branch", "HEAD")
+	runGit(t, dir, "worktree", "add", wt, "list-branch")
+
+	writeFile(t, wt, "exercise/main.go", "package main\n")
+	writeFile(t, wt, "exercise/sub/helper.go", "package sub\n")
+	writeFile(t, wt, "other/file.go", "package other\n")
+	runGit(t, wt, "add", ".")
+	runGit(t, wt, "-c", "commit.gpgsign=false", "commit", "-m", "add files")
+	runGit(t, dir, "worktree", "remove", wt, "--force")
+
+	// List files under exercise/
+	files, err := ops.ListFiles("list-branch", "exercise")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"exercise/main.go", "exercise/sub/helper.go"}, files)
+
+	// List files under other/
+	files, err = ops.ListFiles("list-branch", "other")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"other/file.go"}, files)
+
+	// List files under nonexistent dir
+	files, err = ops.ListFiles("list-branch", "nonexistent")
+	require.NoError(t, err)
+	assert.Empty(t, files)
+}
+
+func TestListFiles_Disabled(t *testing.T) {
+	ops := NewOps(t.TempDir(), true)
+	files, err := ops.ListFiles("branch", "dir")
+	assert.NoError(t, err)
+	assert.Nil(t, files)
+}
+
 func TestBackupBranchName_UniquePerCall(t *testing.T) {
 	name1 := BackupBranchName("mod/ex")
 	time.Sleep(time.Second)
 	name2 := BackupBranchName("mod/ex")
 	assert.NotEqual(t, name1, name2, "successive calls should produce different names")
+}
+
+// TestResetStaging_ScopesCommitToOneDir verifies that ResetStaging + AddAll(dir)
+// ensures only the target directory is included in the commit, even when other
+// directories had pre-existing staged changes.
+func TestResetStaging_ScopesCommitToOneDir(t *testing.T) {
+	dir := initTestRepo(t)
+	ops := NewOps(dir, false)
+
+	// Create files in two directories
+	writeFile(t, dir, "dir-a/file.go", "package a\n")
+	writeFile(t, dir, "dir-b/file.go", "package b\n")
+
+	// Stage dir-b (simulates pre-existing staged changes from another exercise)
+	runGit(t, dir, "add", "dir-b")
+
+	// Verify dir-b is staged
+	output := runGit(t, dir, "status", "--porcelain")
+	assert.Contains(t, output, "A  dir-b/file.go")
+
+	// Now do the scoped save-progress pattern: ResetStaging + AddAll(dir-a) + Commit
+	require.NoError(t, ops.ResetStaging())
+	require.NoError(t, ops.AddAll("dir-a"))
+	assert.True(t, ops.HasStagedChanges())
+	require.NoError(t, ops.Commit("save progress on dir-a"))
+
+	// Verify: only dir-a was committed
+	commitFiles := runGit(t, dir, "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD")
+	assert.Contains(t, commitFiles, "dir-a/file.go")
+	assert.NotContains(t, commitFiles, "dir-b/file.go",
+		"dir-b should NOT be in the commit — ResetStaging should have cleared it from staging")
+
+	// dir-b should still be in the working tree (unstaged)
+	assert.FileExists(t, filepath.Join(dir, "dir-b/file.go"))
 }

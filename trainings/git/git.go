@@ -168,6 +168,17 @@ func (g *Ops) HasStagedChanges() bool {
 	return err != nil
 }
 
+// ResetStaging unstages all staged changes without modifying the working tree.
+// Use before a scoped AddAll to ensure only the target directory ends up staged.
+func (g *Ops) ResetStaging() error {
+	if !g.enabled {
+		return nil
+	}
+
+	_, err := g.run("reset", "HEAD")
+	return err
+}
+
 // AddAll stages all changes in the given directory.
 func (g *Ops) AddAll(dir string) error {
 	if !g.enabled {
@@ -427,6 +438,15 @@ func (g *Ops) DiffStatPath(ref1, ref2, path string) (string, error) {
 	return g.run("diff", "--stat", "--color=always", ref1+".."+ref2, "--", path)
 }
 
+// DiffStatWorkingTree returns a diff stat of unstaged changes in the working tree for a path.
+func (g *Ops) DiffStatWorkingTree(path string) (string, error) {
+	if !g.enabled {
+		return "", nil
+	}
+
+	return g.run("diff", "--stat", "--color=always", "--", path)
+}
+
 // Log returns the last n commit messages in oneline format.
 func (g *Ops) Log(n int) (string, error) {
 	if !g.enabled {
@@ -434,6 +454,17 @@ func (g *Ops) Log(n int) (string, error) {
 	}
 
 	return g.run("log", "--oneline", fmt.Sprintf("-%d", n))
+}
+
+// LogGraph returns the last n commits as a graph with branch topology.
+func (g *Ops) LogGraph(n int) (string, error) {
+	if !g.enabled {
+		return "", nil
+	}
+
+	return g.run("log", "--graph", "--all", "--color=always",
+		"--pretty=format:%C(auto)%h %C(dim)%ar%C(reset) %s",
+		fmt.Sprintf("-%d", n))
 }
 
 // HasCommits returns true if the repository has at least one commit.
@@ -624,6 +655,32 @@ func InitBranchName(exerciseDir string) string {
 // GoldenBranchName returns the example solution branch name for the given exercise directory.
 func GoldenBranchName(exerciseDir string) string {
 	return "tdl/example/" + filepath.ToSlash(exerciseDir)
+}
+
+// ListFiles returns the list of files on a branch under the given directory.
+// Uses `git ls-tree --name-only -r <branch> -- <dir>`.
+func (g *Ops) ListFiles(branch, dir string) ([]string, error) {
+	if !g.enabled {
+		return nil, nil
+	}
+
+	output, err := g.run("ls-tree", "--name-only", "-r", branch, "--", dir)
+	if err != nil {
+		return nil, err
+	}
+
+	if output == "" {
+		return nil, nil
+	}
+
+	var files []string
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			files = append(files, line)
+		}
+	}
+	return files, nil
 }
 
 // BackupBranchName returns a timestamped backup branch name.

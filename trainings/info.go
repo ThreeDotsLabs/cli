@@ -37,5 +37,32 @@ func (h *Handlers) Info(ctx context.Context) error {
 	exerciseURL := internal.ExerciseURL(trainingConfig.TrainingName, exerciseConfig.ExerciseID)
 	fmt.Println("Content:", color.CyanString(exerciseURL))
 
+	if trainingConfig.GitConfigured {
+		fmt.Println()
+		fmt.Println("### Git")
+		if !trainingConfig.GitEnabled {
+			fmt.Println("Status:", color.YellowString("disabled"))
+		} else {
+			gitOps := h.newGitOps()
+			fmt.Println("Status:", color.GreenString("enabled"))
+
+			if branch, err := gitOps.CurrentBranch(); err == nil && branch != "" {
+				fmt.Println("Branch:", color.CyanString(branch))
+			}
+
+			if !exerciseConfig.IsTextOnly && exerciseConfig.Directory != "" {
+				if gitOps.HasUncommittedChanges(exerciseConfig.Directory) {
+					fmt.Println("Changes:", color.YellowString("uncommitted changes in %s", exerciseConfig.Directory))
+				} else {
+					fmt.Println("Changes:", color.HiBlackString("none"))
+				}
+			}
+
+			if log, err := gitOps.Log(1); err == nil && log != "" {
+				fmt.Println("Last commit:", color.HiBlackString(log))
+			}
+		}
+	}
+
 	return nil
 }

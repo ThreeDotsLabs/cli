@@ -104,24 +104,14 @@ func (h *Handlers) Init(ctx context.Context, trainingName string, dir string, no
 
 			if !cfg.GitConfigured {
 				showGitDefaults()
-				cfg.GitConfigured = true
-				cfg.GitEnabled = true
-				cfg.GitAutoCommit = true
-				cfg.GitAutoGolden = false
-				cfg.GitGoldenMode = "compare"
+				gitDefaultConfig(&cfg)
 
 				if err := h.config.WriteTrainingConfig(cfg, trainingRootFs); err != nil {
 					return errors.Wrap(err, "can't update training config with git preferences")
 				}
 			}
 
-			filesToCommit := []string{".tdl-training", ".gitignore"}
-			if hasGoWorkspace(trainingRootDir) {
-				filesToCommit = append(filesToCommit, "go.work")
-			}
-			if err := gitOps.AddFiles(filesToCommit...); err != nil {
-				logrus.WithError(err).Warn("Could not stage initial files")
-			}
+			stageInitialFiles(gitOps, trainingRootDir)
 			initMsg := fmt.Sprintf("initialize %s", trainingName)
 
 			if gitOps.HasStagedChanges() && !previousSolutionsAvailable {
@@ -343,6 +333,8 @@ func (h *Handlers) startTraining(
 	trainingName string,
 	trainingRootDir string,
 ) (string, bool, bool, error) {
+	ctx = withSubAction(ctx, "init")
+
 	alreadyExistingTrainingRoot, err := h.config.FindTrainingRoot()
 	if err == nil {
 		fmt.Println(color.BlueString("Training was already initialised. Training root:" + alreadyExistingTrainingRoot))

@@ -208,14 +208,7 @@ func (h *Handlers) setExerciseWithGit(
 	prevModuleExercisePath string,
 ) error {
 	exerciseDir := exercise.Dir
-	moduleExercisePath := exercise.Dir // fallback
-	if exercise.GetExercise() != nil {
-		moduleName := exercise.GetExercise().GetModule().GetName()
-		exerciseName := exercise.GetExercise().GetName()
-		if moduleName != "" && exerciseName != "" {
-			moduleExercisePath = moduleName + "/" + exerciseName
-		}
-	}
+	moduleExercisePath := moduleExercisePathFromResponse(exercise)
 
 	// 1-5. Create init branch (shared with restore flow)
 	initBranch, err := createInitBranch(
@@ -428,6 +421,19 @@ func createInitBranch(
 	}
 
 	return initBranch, nil
+}
+
+// moduleExercisePathFromResponse derives the "module/exercise" path from a NextExerciseResponse.
+// Falls back to resp.Dir if module/exercise names are missing.
+func moduleExercisePathFromResponse(resp *genproto.NextExerciseResponse) string {
+	if resp.GetExercise() != nil {
+		moduleName := resp.GetExercise().GetModule().GetName()
+		exerciseName := resp.GetExercise().GetName()
+		if moduleName != "" && exerciseName != "" {
+			return moduleName + "/" + exerciseName
+		}
+	}
+	return resp.Dir
 }
 
 func nextExerciseResponseToExerciseSolution(resp *genproto.NextExerciseResponse) *genproto.ExerciseSolution {

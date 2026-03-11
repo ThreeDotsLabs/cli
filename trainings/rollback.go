@@ -14,7 +14,9 @@ import (
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )
 
-func (h *Handlers) Checkout(ctx context.Context) error {
+func (h *Handlers) Rollback(ctx context.Context) error {
+	ctx = withSubAction(ctx, "rollback")
+
 	trainingRoot, err := h.config.FindTrainingRoot()
 	if errors.Is(err, config.TrainingRootNotFoundError) {
 		h.printNotInATrainingDirectory()
@@ -24,8 +26,10 @@ func (h *Handlers) Checkout(ctx context.Context) error {
 	trainingRootFs := newTrainingRootFs(trainingRoot)
 	printGitNotices(h.config.TrainingConfig(trainingRootFs))
 
+	exerciseCfg := h.config.ExerciseConfig(trainingRootFs)
+
 	resp, err := h.newGrpcClient().GetSolutions(ctx, &genproto.GetSolutionsRequest{
-		ExerciseId: h.config.ExerciseConfig(trainingRootFs).ExerciseID,
+		ExerciseId: exerciseCfg.ExerciseID,
 		Token:      h.config.GlobalConfig().Token,
 	})
 	if err != nil {
@@ -53,8 +57,19 @@ func (h *Handlers) Checkout(ctx context.Context) error {
 		items = append(items, text)
 	}
 
+	gitOps := h.newGitOps()
+
+	if gitOps.Enabled() {
+		fmt.Println()
+		printDimBox(
+			"💡 All your past successful solutions are also saved in git history.",
+			fmt.Sprintf("   Browse with: git log -- %s  (or in your IDE)", exerciseCfg.ModuleExercisePath()),
+		)
+		fmt.Println()
+	}
+
 	selectUI := promptui.Select{
-		Label: "Select a solution to checkout",
+		Label: "Select a solution to rollback to",
 		Items: items,
 		Size:  10,
 		Templates: &promptui.SelectTemplates{
@@ -82,23 +97,35 @@ func (h *Handlers) Checkout(ctx context.Context) error {
 		return fmt.Errorf("failed to get solution files: %w", err)
 	}
 
-	if err := h.writeExerciseFiles(files.NewFilesWithConfig(true, true), getSolutionFilesToExerciseSolution(getResp), trainingRootFs); err != nil {
-		return err
+	if gitOps.Enabled() && getResp.Dir != "" {
+		// Save uncommitted changes before overwriting
+		if gitOps.HasUncommittedChanges(getResp.Dir) {
+			saveProgress(gitOps, getResp.Dir, fmt.Sprintf("save progress before rollback for %s", getResp.Dir))
+		}
+
+		// Write files directly (skip interactive prompts — user explicitly chose this solution)
+		if err := files.NewFilesSilent().WriteExerciseFiles(getResp.FilesToCreate, trainingRootFs, getResp.Dir); err != nil {
+			return err
+		}
+
+		// Show what changed
+		if stat, err := gitOps.DiffStatWorkingTree(getResp.Dir); err == nil && stat != "" {
+			fmt.Println(stat)
+		}
+
+		// Leave files as unstaged changes for user to review
+		fmt.Println("  Solution restored. Review with " + fmt.Sprintf("`git diff %s`", getResp.Dir))
+
+	} else {
+		// No git — use existing interactive file writer
+		if err := h.writeExerciseFiles(files.NewFilesWithConfig(true, true), getSolutionFilesToExerciseSolution(getResp), trainingRootFs); err != nil {
+			return err
+		}
 	}
 
 	err = addModuleToWorkspace(trainingRoot, getResp.Dir)
 	if err != nil {
 		logrus.WithError(err).Warn("Failed to add module to workspace")
-	}
-
-	// Commit after restoring past solution
-	gitOps := h.newGitOps()
-	if gitOps.Enabled() && getResp.Dir != "" {
-		if err := gitOps.AddAll(getResp.Dir); err == nil && gitOps.HasStagedChanges() {
-			if err := gitOps.Commit(fmt.Sprintf("restore solution for %s", getResp.Dir)); err != nil {
-				fmt.Println(formatGitWarning("Could not auto-commit your progress", err))
-			}
-		}
 	}
 
 	return nil

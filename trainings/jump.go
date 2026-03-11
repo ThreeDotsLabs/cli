@@ -4,17 +4,25 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
+	"github.com/fatih/color"
 	"github.com/google/uuid"
 	"github.com/manifoldco/promptui"
+	"github.com/spf13/afero"
 
+	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings/config"
+	"github.com/ThreeDotsLabs/cli/trainings/files"
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
+	"github.com/ThreeDotsLabs/cli/trainings/git"
 )
 
 func (h *Handlers) SelectExercise(ctx context.Context) (string, error) {
+	ctx = withSubAction(ctx, "jump")
+
 	trainingRoot, err := h.config.FindTrainingRoot()
 	if errors.Is(err, config.TrainingRootNotFoundError) {
 		h.printNotInATrainingDirectory()
@@ -132,6 +140,8 @@ func (h *Handlers) SelectExercise(ctx context.Context) (string, error) {
 }
 
 func (h *Handlers) FindExercise(ctx context.Context, exerciseID string) (string, error) {
+	ctx = withSubAction(ctx, "jump")
+
 	exerciseID = strings.TrimSpace(exerciseID)
 
 	_, err := uuid.Parse(exerciseID)
@@ -210,6 +220,8 @@ func parseNumber(number string) int {
 }
 
 func (h *Handlers) Jump(ctx context.Context, exerciseID string) error {
+	ctx = withSubAction(ctx, "jump")
+
 	trainingRoot, err := h.config.FindTrainingRoot()
 	if errors.Is(err, config.TrainingRootNotFoundError) {
 		h.printNotInATrainingDirectory()
@@ -223,11 +235,7 @@ func (h *Handlers) Jump(ctx context.Context, exerciseID string) error {
 	if gitOps.Enabled() {
 		exerciseCfg := h.config.ExerciseConfig(trainingRootFs)
 		if !exerciseCfg.IsTextOnly && exerciseCfg.Directory != "" {
-			if err := gitOps.AddAll(exerciseCfg.Directory); err == nil && gitOps.HasStagedChanges() {
-				if err := gitOps.Commit(fmt.Sprintf("save progress on %s", exerciseCfg.ModuleExercisePath())); err != nil {
-					fmt.Println(formatGitWarning("Could not auto-commit your progress", err))
-				}
-			}
+			saveProgress(gitOps, exerciseCfg.Directory, fmt.Sprintf("save progress on %s", exerciseCfg.ModuleExercisePath()))
 		}
 	}
 
@@ -240,6 +248,130 @@ func (h *Handlers) Jump(ctx context.Context, exerciseID string) error {
 		return fmt.Errorf("failed to get exercise: %w", err)
 	}
 
+	// Revisit prompt: if this exercise was visited before, ask what to do
+	if gitOps.Enabled() && !resp.IsTextOnly && internal.IsStdinTerminal() {
+		moduleExercisePath := moduleExercisePathFromResponse(resp)
+		initBranch := git.InitBranchName(moduleExercisePath)
+
+		if gitOps.BranchExists(initBranch) {
+			// Check if a successful solution exists
+			var successfulVerificationId string
+			solResp, solErr := h.newGrpcClient().GetSolutions(ctx, &genproto.GetSolutionsRequest{
+				ExerciseId: exerciseID,
+				Token:      h.config.GlobalConfig().Token,
+			})
+			if solErr == nil {
+				for _, sol := range solResp.Solutions {
+					if sol.Successful {
+						successfulVerificationId = sol.VerificationId
+						break
+					}
+				}
+			}
+
+			backupBranch := git.BackupBranchName(moduleExercisePath)
+
+			// Build prompt
+			fmt.Println()
+			fmt.Println(color.YellowString("  You've worked on this exercise before."))
+			fmt.Println()
+
+			actions := internal.Actions{
+				{Shortcut: '\n', Action: "continue where you left off", ShortcutAliases: []rune{'\r'}},
+				{Shortcut: 'r', Action: "reset to original exercise files"},
+			}
+
+			fmt.Printf("  %s  Continue where you left off (your files stay as they are)\n", color.New(color.Bold).Sprint("ENTER"))
+			fmt.Printf("  %s   Reset to the original exercise files and solve it again from scratch\n", color.New(color.Bold).Sprint("   r"))
+
+			if successfulVerificationId != "" {
+				actions = append(actions, internal.Action{Shortcut: 's', Action: "restore your last successful solution"})
+				fmt.Printf("  %s   Restore your last successful solution for this exercise\n", color.New(color.Bold).Sprint("   s"))
+			}
+
+			fmt.Println()
+			if successfulVerificationId != "" {
+				fmt.Println(color.YellowString("  Both r and s roll exercise files back to an earlier state."))
+			} else {
+				fmt.Println(color.YellowString("  r rolls exercise files back to an earlier state."))
+			}
+			fmt.Printf("  %s\n", color.YellowString("Code added by later exercises will be removed, but is saved in branch"))
+			fmt.Printf("  %s%s\n", color.MagentaString(backupBranch), color.YellowString("."))
+			fmt.Println()
+
+			choice := internal.Prompt(actions, os.Stdin, os.Stdout)
+
+			switch choice {
+			case '\n':
+				// Continue — no file ops, just update config pointer
+			case 'r':
+				if err := h.resetCleanFiles(gitOps, initBranch, moduleExercisePath, resp.Dir); err != nil {
+					return err
+				}
+			case 's':
+				if err := h.checkoutSolution(ctx, gitOps, successfulVerificationId, moduleExercisePath, trainingRootFs); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
 	_, err = h.setExercise(trainingRootFs, resp, trainingRoot, false)
 	return err
+}
+
+func (h *Handlers) checkoutSolution(
+	ctx context.Context,
+	gitOps *git.Ops,
+	verificationId string,
+	moduleExercisePath string,
+	trainingRootFs *afero.BasePathFs,
+) error {
+	// 1. Fetch solution files from server
+	solResp, err := h.newGrpcClient().GetSolutionFiles(ctx, &genproto.GetSolutionFilesRequest{
+		ExecutionId: verificationId,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to get solution files: %w", err)
+	}
+
+	// 2. Create backup branch
+	backupBranch := git.BackupBranchName(moduleExercisePath)
+	if err := gitOps.CreateBranchFromHead(backupBranch); err != nil {
+		fmt.Println(formatGitWarning("Could not save your code to a backup branch", err))
+	} else {
+		gitOps.PrintInfo(fmt.Sprintf("git branch %s", backupBranch))
+	}
+
+	oldHead, _ := gitOps.RevParse("HEAD")
+
+	// 3. Write solution files, stage, commit
+	if err := files.NewFilesSilent().WriteExerciseFiles(solResp.FilesToCreate, trainingRootFs, solResp.Dir); err != nil {
+		return fmt.Errorf("failed to write solution files: %w", err)
+	}
+
+	_ = gitOps.ResetStaging()
+	if err := gitOps.AddAll(solResp.Dir); err != nil {
+		fmt.Println(formatGitWarning("Could not stage solution files", err))
+	}
+	if gitOps.HasStagedChanges() {
+		if err := gitOps.Commit(fmt.Sprintf("restore solution for %s", moduleExercisePath)); err != nil {
+			fmt.Println(formatGitWarning("Could not commit restored solution", err))
+		}
+	}
+
+	// 4. Show diff stat and backup info
+	if oldHead != "" {
+		if stat, err := gitOps.DiffStatPath(oldHead, "HEAD", solResp.Dir); err == nil && stat != "" {
+			fmt.Println(stat)
+		}
+	}
+
+	fmt.Println()
+	fmt.Println(color.GreenString("  Last successful solution restored."))
+	fmt.Printf("  Your code was saved to branch %s\n", color.MagentaString(backupBranch))
+	fmt.Println("  Restore anytime with: " + color.CyanString("git checkout %s -- %s", backupBranch, solResp.Dir))
+	fmt.Println()
+
+	return nil
 }

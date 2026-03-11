@@ -272,10 +272,10 @@ var app = &cli.App{
 					},
 				},
 				{
-					Name:  "checkout",
-					Usage: "checkout one of your past solutions for the current exercise",
+					Name:  "rollback",
+					Usage: "rollback to one of your past solutions for the current exercise",
 					Action: func(c *cli.Context) error {
-						return newHandlers(c).Checkout(c.Context)
+						return newHandlers(c).Rollback(c.Context)
 					},
 				},
 				{
