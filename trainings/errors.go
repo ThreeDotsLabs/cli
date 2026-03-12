@@ -73,7 +73,7 @@ func formatConnectionError(err error) error {
 			"Please check:\n"+
 				"  1. Your internet connection\n"+
 				"  2. Firewall or VPN settings that may block outgoing connections\n"+
-				"  3. The server may be temporarily unavailable — try again in a few minutes\n\n"+
+				"  3. The server may be temporarily unavailable: try again in a few minutes\n\n"+
 				"%s",
 			color.HiBlackString("Raw error: %s", err),
 		),

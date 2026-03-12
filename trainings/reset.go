@@ -58,8 +58,8 @@ func (h *Handlers) Reset(ctx context.Context) error {
 		fmt.Println()
 
 		boxLines := []string{
-			"💡 You also have full git history in this worktree — saved progress,",
-			"   backup branches, and example solutions. Browse: git log --oneline --all",
+			"💡 You also have full git history in this worktree: saved progress,",
+			"   backup branches, and example solutions. Browse: " + color.CyanString("git log --oneline --all"),
 		}
 		if graph, err := gitOps.LogGraph(6); err == nil && graph != "" {
 			boxLines = append(boxLines, "")
@@ -70,6 +70,8 @@ func (h *Handlers) Reset(ctx context.Context) error {
 			}
 		}
 		printColorBox(boxLines...)
+		fmt.Println()
+		fmt.Println(color.HiBlackString(strings.Repeat("─", internal.TerminalWidth())))
 		fmt.Println()
 
 		selectUI := promptui.Select{

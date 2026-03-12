@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/fatih/color"
 	"github.com/manifoldco/promptui"
 	"github.com/mergestat/timediff"
 	"github.com/pkg/errors"
@@ -61,9 +62,9 @@ func (h *Handlers) Rollback(ctx context.Context) error {
 
 	if gitOps.Enabled() {
 		fmt.Println()
-		printDimBox(
+		printColorBox(
 			"💡 All your past successful solutions are also saved in git history.",
-			fmt.Sprintf("   Browse with: git log -- %s  (or in your IDE)", exerciseCfg.ModuleExercisePath()),
+			"   Browse with: "+color.CyanString("git log -- %s", exerciseCfg.ModuleExercisePath())+"  (or in your IDE)",
 		)
 		fmt.Println()
 	}
@@ -114,7 +115,7 @@ func (h *Handlers) Rollback(ctx context.Context) error {
 		}
 
 		// Leave files as unstaged changes for user to review
-		fmt.Println("  Solution restored. Review with " + fmt.Sprintf("`git diff %s`", getResp.Dir))
+		fmt.Println("  Solution restored. Review with " + color.CyanString("git diff %s", getResp.Dir))
 
 	} else {
 		// No git — use existing interactive file writer

@@ -237,13 +237,13 @@ func (h *Handlers) setExerciseWithGit(
 			fmt.Println()
 			fmt.Println("  You can merge the changes yourself, or we'll replace all exercise files")
 			fmt.Println("  with our versions (only this exercise is affected).")
-			fmt.Printf("  Your code will be saved to %s — you can restore it anytime.\n", color.MagentaString(previewBackupBranch))
+			fmt.Printf("  Your code will be saved to %s: you can restore it anytime.\n", color.MagentaString(previewBackupBranch))
 			fmt.Println()
 			conflictPrompt = internal.Prompt(
 				internal.Actions{
 					{Shortcut: '\n', Action: "merge (resolve in editor)", ShortcutAliases: []rune{'\r'}},
 					{Shortcut: 'g', Action: "replace exercise files with ours"},
-					{Shortcut: 'q', Action: "abort — stay on current exercise"},
+					{Shortcut: 'q', Action: "abort: stay on current exercise"},
 				},
 				os.Stdin, os.Stdout,
 			)
@@ -474,14 +474,14 @@ func resolveConflictsInteractive(gitOps *git.Ops, initBranch, mergeMsg, moduleEx
 	fmt.Println()
 	fmt.Println("  Resolve the conflicts in your editor, or press 'g' to replace all exercise")
 	fmt.Println("  files with our versions (only this exercise is affected).")
-	fmt.Printf("  Your code will be saved to %s — you can restore it anytime.\n", color.MagentaString(backupBranch))
+	fmt.Printf("  Your code will be saved to %s: you can restore it anytime.\n", color.MagentaString(backupBranch))
 
 	for {
 		choice := internal.Prompt(
 			internal.Actions{
 				{Shortcut: '\n', Action: "confirm (conflicts resolved)", ShortcutAliases: []rune{'\r'}},
 				{Shortcut: 'g', Action: "replace exercise files with ours"},
-				{Shortcut: 'q', Action: "abort — cancel merge"},
+				{Shortcut: 'q', Action: "abort: cancel merge"},
 			},
 			os.Stdin, os.Stdout,
 		)

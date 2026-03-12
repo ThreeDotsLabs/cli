@@ -72,7 +72,7 @@ func (h *Handlers) Init(ctx context.Context, trainingName string, dir string, no
 				gitOps = git.NewOps(trainingRootDir, true)
 				gitWasUnavailable = true
 			} else if errors.As(err, &tooOld) {
-				reason := fmt.Sprintf("Your git version (%s) is too old — %s or newer is required.", tooOld.Detected, tooOld.Required)
+				reason := fmt.Sprintf("Your git version (%s) is too old: %s or newer is required.", tooOld.Detected, tooOld.Required)
 				printGitUnavailableNotice(reason, git.InstallHint(runtime.GOOS))
 				if !promptContinueWithoutGit() {
 					return nil
@@ -227,9 +227,9 @@ func printGitUnavailableNotice(reason string, installHint string) {
 	fmt.Println("  " + reason)
 	fmt.Println()
 	fmt.Println("  Git integration gives you:")
-	fmt.Println("  • Progress tracking — each completed exercise is committed automatically")
-	fmt.Println("  • Solution comparison — diff your code with the example solution")
-	fmt.Println("  • Safe exercise loading — preview conflicts before merging new exercises")
+	fmt.Println("  • Progress tracking: each completed exercise is committed automatically")
+	fmt.Println("  • Solution comparison: diff your code with the example solution")
+	fmt.Println("  • Safe exercise loading: preview conflicts before merging new exercises")
 	fmt.Println()
 	for _, line := range strings.Split(installHint, "\n") {
 		if line == "" {
@@ -239,7 +239,7 @@ func printGitUnavailableNotice(reason string, installHint string) {
 		}
 	}
 	fmt.Println()
-	fmt.Println("  You can continue without git — you can always migrate later.")
+	fmt.Println("  You can continue without git: you can always migrate later.")
 	fmt.Println(sep)
 	fmt.Println()
 }

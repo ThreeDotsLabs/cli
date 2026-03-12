@@ -27,7 +27,7 @@ func printGitMigrationNotice(cfg config.TrainingConfig) {
 	fmt.Println(title)
 	fmt.Println()
 	fmt.Println("  This workspace was created with an older version of the CLI.")
-	fmt.Println("  The new version tracks your progress with git — branches,")
+	fmt.Println("  The new version tracks your progress with git: branches,")
 	fmt.Println("  commits, and diff with example solutions.")
 	fmt.Println()
 	fmt.Println("  All your progress is saved on the server and will be")
