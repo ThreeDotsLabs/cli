@@ -8,10 +8,12 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/retry"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/protobuf/types/known/emptypb"
 
@@ -92,8 +94,17 @@ func (h *Handlers) newGrpcClientWithAddr(addr string, region string, insecure bo
 			opts = append(opts, grpc.WithTransportCredentials(creds))
 		}
 
+		retryOpts := []retry.CallOption{
+			retry.WithMax(3),
+			retry.WithBackoff(retry.BackoffExponential(100 * time.Millisecond)),
+			retry.WithCodes(codes.Unavailable, codes.ResourceExhausted, codes.Internal),
+		}
+
 		opts = append(opts,
-			grpc.WithUnaryInterceptor(h.unaryInterceptor()),
+			grpc.WithChainUnaryInterceptor(
+				retry.UnaryClientInterceptor(retryOpts...),
+				h.unaryInterceptor(),
+			),
 			grpc.WithStreamInterceptor(h.streamInterceptor()),
 		)
 
