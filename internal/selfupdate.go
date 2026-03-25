@@ -288,6 +288,7 @@ func updateViaCommand(ctx context.Context, tool string, opts UpdateOptions, curr
 	}
 
 	fmt.Println(color.GreenString("\nSuccessfully updated to %s.", targetVer))
+	
 	return nil
 }
 
