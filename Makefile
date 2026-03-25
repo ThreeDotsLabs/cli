@@ -23,3 +23,21 @@ test:
 fmt:
 	goimports -local github.com/ThreeDotsLabs -l -w .
 
+
+.PHONY: update-nix-hash
+update-nix-hash:
+	@echo "Resetting vendorHash in Nix files..."
+	@sed -i.bak 's/vendorHash = ".*"/vendorHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="/' flake.nix default.nix
+	@rm -f flake.nix.bak default.nix.bak
+	@echo "Calculating new vendorHash..."
+	@NEW_HASH=$$(nix build 2>&1 | awk '/got:/{print $$2}' | head -n 1) && \
+	if [ -n "$$NEW_HASH" ]; then \
+		echo "Found new hash: $$NEW_HASH"; \
+		sed -i.bak "s/vendorHash = \".*\"/vendorHash = \"$$NEW_HASH\"/" flake.nix default.nix; \
+		rm -f flake.nix.bak default.nix.bak; \
+		echo "Nix files updated successfully."; \
+	else \
+		echo "Failed to calculate new hash. Are there other Nix build errors?"; \
+		git checkout flake.nix default.nix; \
+		exit 1; \
+	fi
