@@ -65,7 +65,7 @@ func printVersionNotice(currentVersion string, availableVersion string) {
 	c := color.New(color.FgHiYellow)
 	_, _ = c.Printf("A new version of the CLI is available: %s (current: %s)\n", availableVersion, currentVersion)
 	_, _ = c.Printf("Some features may be missing or not work correctly. Please update soon!\n")
-	_, _ = c.Printf("Run %s to update, or see: %v/releases\n", SprintCommand("tdl update"), repoURL)
+	_, _ = c.Printf("Run %s to update, or see: %v/releases\n", SprintCommand(os.Args[0]+" update"), repoURL)
 	fmt.Println()
 }
 
