@@ -427,6 +427,6 @@ func printFilesList(files []fileItem) {
 			textColor = color.New(color.FgWhite)
 		}
 
-		fmt.Printf("%s %s\n", textColor.Sprintf(sign), textColor.Sprintf(file.Path))
+		fmt.Printf("%s %s\n", textColor.Sprint(sign), textColor.Sprint(file.Path))
 	}
 }

@@ -46,6 +46,12 @@ func main() {
 		}
 	}()
 
+	if version == "" || version == "dev" {
+		if bi, ok := debug.ReadBuildInfo(); ok && bi.Main.Version != "" && bi.Main.Version != "(devel)" {
+			version = strings.TrimPrefix(bi.Main.Version, "v")
+		}
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -95,9 +101,9 @@ var app = &cli.App{
 		if errors.As(err, &userFacingErr) {
 			separator := color.HiBlackString(strings.Repeat("─", internal.TerminalWidth()))
 			fmt.Println(separator)
-			fmt.Printf(color.RedString("ERROR: ") + userFacingErr.Msg + "\n")
+			fmt.Println(color.RedString("ERROR: ") + userFacingErr.Msg)
 			fmt.Println(separator)
-			fmt.Printf(color.GreenString("\nHow to solve: \n") + userFacingErr.SolutionHint + "\n")
+			fmt.Println(color.GreenString("\nHow to solve: \n") + userFacingErr.SolutionHint)
 			os.Exit(1)
 			return
 		}
@@ -366,6 +372,28 @@ Note: after completing this exercise, the next exercise will be the last one you
 				return nil
 			},
 		},
+		{
+			Name:    "update",
+			Aliases: []string{"u"},
+			Usage:   "Update tdl to the latest version",
+			Flags: []cli.Flag{
+				&cli.BoolFlag{
+					Name:    "yes",
+					Aliases: []string{"y"},
+					Usage:   "skip confirmation prompt",
+				},
+				&cli.StringFlag{
+					Name:  "version",
+					Usage: "update to a specific version or branch (e.g., v1.2.3, master)",
+				},
+			},
+			Action: func(c *cli.Context) error {
+				return internal.RunUpdate(c.Context, version, internal.UpdateOptions{
+					SkipConfirm:   c.Bool("yes"),
+					TargetVersion: c.String("version"),
+				})
+			},
+		},
 	},
 }
 
@@ -420,7 +448,7 @@ func formatUnexpectedError(err error) {
 	separator := color.HiBlackString(strings.Repeat("─", internal.TerminalWidth()))
 
 	fmt.Println(separator)
-	fmt.Printf(color.RedString("ERROR: ") + err.Error() + "\n")
+	fmt.Println(color.RedString("ERROR: ") + err.Error())
 	fmt.Println(separator)
 
 	var st stackTracer

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/fatih/color"
+	"github.com/sirupsen/logrus"
 )
 
 type releaseResponse struct {
@@ -21,7 +22,12 @@ const repoURL = "https://github.com/ThreeDotsLabs/cli"
 const releasesURL = "https://api.github.com/repos/ThreeDotsLabs/cli/releases/latest"
 
 func CheckForUpdate(currentVersion string) {
-	if currentVersion == "" || currentVersion == "dev" {
+	if os.Getenv("TDL_NO_UPDATE_CHECK") != "" {
+		logrus.Debug("Update check disabled via TDL_NO_UPDATE_CHECK")
+		return
+	}
+
+	if currentVersion == "" {
 		return
 	}
 
@@ -59,7 +65,7 @@ func printVersionNotice(currentVersion string, availableVersion string) {
 	c := color.New(color.FgHiYellow)
 	_, _ = c.Printf("A new version of the CLI is available: %s (current: %s)\n", availableVersion, currentVersion)
 	_, _ = c.Printf("Some features may be missing or not work correctly. Please update soon!\n")
-	_, _ = c.Printf("See instructions at: %v\n", repoURL)
+	_, _ = c.Printf("Run %s to update, or see: %v/releases\n", SprintCommand(os.Args[0]+" update"), repoURL)
 	fmt.Println()
 }
 
