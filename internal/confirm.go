@@ -116,7 +116,7 @@ func Prompt(actions Actions, stdin io.Reader, stdout io.Writer) rune {
 		))
 	}
 
-	_, _ = fmt.Fprintf(stdout, "Press "+formatActionsMessage(actionsStr)+" ")
+	_, _ = fmt.Fprintf(stdout, "%s", "Press "+formatActionsMessage(actionsStr)+" ")
 
 	for {
 		char, _, err := in.ReadRune()
