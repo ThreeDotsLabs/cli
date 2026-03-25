@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"runtime/debug"
 	"strings"
 
 	"github.com/creativeprojects/go-selfupdate"
@@ -143,22 +142,6 @@ func canWriteBinary(path string) bool {
 	return true
 }
 
-// ResolveVersion returns the effective version, falling back to debug.ReadBuildInfo
-// for go install builds where ldflags version is "dev".
-func ResolveVersion(ldflagsVersion string) string {
-	if ldflagsVersion != "" && ldflagsVersion != "dev" {
-		logrus.WithField("version", ldflagsVersion).Debug("Using ldflags version")
-		return ldflagsVersion
-	}
-	if bi, ok := debug.ReadBuildInfo(); ok && bi.Main.Version != "" && bi.Main.Version != "(devel)" {
-		v := strings.TrimPrefix(bi.Main.Version, "v")
-		logrus.WithField("version", v).Debug("Using version from debug.ReadBuildInfo (go install build)")
-		return v
-	}
-	logrus.Debug("No version available (dev build)")
-	return ""
-}
-
 func newUpdater() (*selfupdate.Updater, error) {
 	return selfupdate.NewUpdater(selfupdate.Config{
 		Validator: &selfupdate.ChecksumValidator{UniqueFilename: "checksums.txt"},
@@ -178,13 +161,12 @@ func RunUpdate(ctx context.Context, currentVersion string, opts UpdateOptions) e
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"ldflags_version": currentVersion,
+		"current_version": currentVersion,
 		"target_version":  opts.TargetVersion,
 		"skip_confirm":    opts.SkipConfirm,
 	}).Debug("Starting update")
 
-	effectiveVersion := ResolveVersion(currentVersion)
-	if effectiveVersion == "" {
+	if currentVersion == "" {
 		fmt.Println("You are running a development build. Update is only available for released versions.")
 		fmt.Printf("Run %s to install from source.\n", SprintCommand("go install github.com/ThreeDotsLabs/cli/tdl@latest"))
 		return nil
@@ -225,8 +207,8 @@ func RunUpdate(ctx context.Context, currentVersion string, opts UpdateOptions) e
 			return nil
 		}
 		logrus.WithField("latest", release.Version()).Debug("Latest release detected")
-		if release.LessOrEqual(effectiveVersion) {
-			fmt.Printf("You are already running the latest version (%s).\n", effectiveVersion)
+		if release.LessOrEqual(currentVersion) {
+			fmt.Printf("You are already running the latest version (%s).\n", currentVersion)
 			return nil
 		}
 	}
@@ -234,7 +216,7 @@ func RunUpdate(ctx context.Context, currentVersion string, opts UpdateOptions) e
 	targetVersion := release.Version()
 
 	// Show update info with release notes BEFORE confirmation
-	fmt.Printf("\nUpdate available: %s → %s\n", effectiveVersion, targetVersion)
+	fmt.Printf("\nUpdate available: %s → %s\n", currentVersion, targetVersion)
 
 	if notes := release.ReleaseNotes; notes != "" {
 		formatted := formatReleaseNotes(notes, 15)
@@ -251,7 +233,7 @@ func RunUpdate(ctx context.Context, currentVersion string, opts UpdateOptions) e
 	// Branch on install method
 	switch method {
 	case InstallMethodHomebrew:
-		return updateViaCommand(ctx, "brew", opts, effectiveVersion, targetVersion,
+		return updateViaCommand(ctx, "brew", opts, currentVersion, targetVersion,
 			[]string{"upgrade", "tdl"})
 
 	case InstallMethodGoInstall:
@@ -259,19 +241,19 @@ func RunUpdate(ctx context.Context, currentVersion string, opts UpdateOptions) e
 		if opts.TargetVersion != "" {
 			ref = "v" + strings.TrimPrefix(opts.TargetVersion, "v")
 		}
-		return updateViaCommand(ctx, "go", opts, effectiveVersion, targetVersion,
+		return updateViaCommand(ctx, "go", opts, currentVersion, targetVersion,
 			[]string{"install", "github.com/ThreeDotsLabs/cli/tdl@" + ref})
 
 	case InstallMethodNix:
-		return updateViaCommand(ctx, "nix", opts, effectiveVersion, targetVersion,
+		return updateViaCommand(ctx, "nix", opts, currentVersion, targetVersion,
 			[]string{"profile", "upgrade", "--flake", "github:ThreeDotsLabs/cli"})
 
 	case InstallMethodScoop:
-		return updateViaCommand(ctx, "scoop", opts, effectiveVersion, targetVersion,
+		return updateViaCommand(ctx, "scoop", opts, currentVersion, targetVersion,
 			[]string{"update", "tdl"})
 
 	case InstallMethodDirectBinary, InstallMethodUnknown:
-		return updateDirectBinary(ctx, updater, effectiveVersion, targetVersion, release, opts)
+		return updateDirectBinary(ctx, updater, currentVersion, targetVersion, release, opts)
 	}
 
 	return nil

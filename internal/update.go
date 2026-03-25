@@ -27,7 +27,6 @@ func CheckForUpdate(currentVersion string) {
 		return
 	}
 
-	currentVersion = ResolveVersion(currentVersion)
 	if currentVersion == "" {
 		return
 	}
