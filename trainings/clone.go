@@ -5,16 +5,21 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"runtime"
+
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
 
 	"github.com/ThreeDotsLabs/cli/trainings/config"
 	"github.com/ThreeDotsLabs/cli/trainings/files"
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
-	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
+	"github.com/ThreeDotsLabs/cli/trainings/git"
 )
 
 func (h *Handlers) Clone(ctx context.Context, executionID string, directory string) error {
+	ctx = withSubAction(ctx, "clone")
+
 	resp, err := h.newGrpcClient().GetSolutionFiles(ctx, &genproto.GetSolutionFilesRequest{
 		ExecutionId: executionID,
 	})
@@ -34,7 +39,7 @@ func (h *Handlers) Clone(ctx context.Context, executionID string, directory stri
 
 	absoluteDirToClone = path.Join(absoluteDirToClone, directory)
 
-	if _, _, err := h.startTraining(ctx, resp.TrainingName, absoluteDirToClone); err != nil {
+	if _, _, _, err := h.startTraining(ctx, resp.TrainingName, absoluteDirToClone); err != nil {
 		return err
 	}
 
@@ -51,6 +56,50 @@ func (h *Handlers) Clone(ctx context.Context, executionID string, directory stri
 	err = addModuleToWorkspace(absoluteDirToClone, resp.Dir)
 	if err != nil {
 		logrus.WithError(err).Warn("Failed to add module to workspace")
+	}
+
+	// Initialize git repo (mirrors init.go git setup)
+	cfg := h.config.TrainingConfig(trainingRootFs)
+	if !cfg.GitConfigured {
+		gitOps := git.NewOps(absoluteDirToClone, false)
+		_, versionErr := git.CheckVersion()
+		if versionErr != nil {
+			var notInstalled *git.GitNotInstalledError
+			var tooOld *git.GitTooOldError
+			if errors.As(versionErr, &notInstalled) || errors.As(versionErr, &tooOld) {
+				logrus.WithError(versionErr).Debug("Git unavailable for clone")
+				_ = git.InstallHint(runtime.GOOS) // consume for logging
+				cfg.GitConfigured = true
+				cfg.GitEnabled = false
+				cfg.GitUnavailable = true
+				if err := h.config.WriteTrainingConfig(cfg, trainingRootFs); err != nil {
+					return errors.Wrap(err, "can't update training config")
+				}
+				return nil
+			}
+			logrus.WithError(versionErr).Warn("Could not verify git version")
+		}
+
+		if _, err := gitOps.Init(); err != nil {
+			logrus.WithError(err).Warn("Could not initialize git repository for clone")
+			return nil
+		}
+
+		gitDefaultConfig(&cfg)
+		if err := h.config.WriteTrainingConfig(cfg, trainingRootFs); err != nil {
+			return errors.Wrap(err, "can't update training config with git preferences")
+		}
+
+		var extraFiles []string
+		if resp.Dir != "" {
+			extraFiles = append(extraFiles, resp.Dir)
+		}
+		stageInitialFiles(gitOps, absoluteDirToClone, extraFiles...)
+		if gitOps.HasStagedChanges() {
+			if err := gitOps.Commit(fmt.Sprintf("clone solution for %s", resp.TrainingName)); err != nil {
+				fmt.Println(formatGitWarning("Could not create initial git commit", err))
+			}
+		}
 	}
 
 	return nil

@@ -75,7 +75,7 @@ func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, trainingRootFs
 		}
 	}
 
-	if f.showFullDiff {
+	if f.showFullDiff && !f.forceOverwrite {
 		proceed, err := f.shouldWriteAllFiles(trainingRootFs, exerciseDir, filesToCreate, filesToDelete)
 		if err != nil {
 			return err
@@ -95,7 +95,7 @@ func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, trainingRootFs
 		fullFilePath := filepath.Join(exerciseDir, fileFromServer.Path)
 		fullFileDir := filepath.Dir(fullFilePath)
 
-		if !f.showFullDiff {
+		if !f.showFullDiff && !f.forceOverwrite {
 			shouldWrite, err := f.shouldWriteFile(trainingRootFs, fullFilePath, fileFromServer)
 			if err != nil {
 				return err
@@ -143,7 +143,7 @@ func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, trainingRootFs
 	if f.deleteUnusedFiles {
 		var deletedFiles []string
 		for path := range filesToDelete {
-			if !f.showFullDiff {
+			if !f.showFullDiff && !f.forceOverwrite {
 				shouldDelete := internal.FConfirmPrompt(fmt.Sprintf("File %s is not used anymore, should it be deleted?", path), f.stdin, f.stdout)
 				if !shouldDelete {
 					continue
@@ -227,6 +227,11 @@ func (f Files) shouldWriteAllFiles(fs afero.Fs, exerciseDir string, filesToCreat
 	var filesToPrint []fileItem
 
 	for _, filePath := range allPathsSorted {
+		// Always override exercise.md without approval (matches shouldWriteFile behavior)
+		if strings.Contains(filePath, ExerciseFile) {
+			continue
+		}
+
 		exists, err := afero.Exists(fs, filePath)
 		if err != nil {
 			return false, errors.Wrapf(err, "can't check if %s exists", filePath)

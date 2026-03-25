@@ -1,19 +1,26 @@
 package trainings
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"runtime"
+	"time"
 
+	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/retry"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings/config"
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
+	"github.com/ThreeDotsLabs/cli/trainings/git"
 )
 
 type Handlers struct {
@@ -23,6 +30,8 @@ type Handlers struct {
 	cliMetadata CliMetadata
 
 	solutionHintDisplayed bool
+	solutionAvailable     bool
+	stuckRunCount         int
 	notifications         map[string]struct{}
 }
 
@@ -32,8 +41,12 @@ type CliMetadata struct {
 
 	Architecture string
 	OS           string
+	OSVersion    string
+	GoVersion    string
+	GitVersion   string
 
 	ExecutedCommand string
+	Interactive     bool
 }
 
 func NewHandlers(cliVersion CliMetadata) *Handlers {
@@ -81,6 +94,20 @@ func (h *Handlers) newGrpcClientWithAddr(addr string, region string, insecure bo
 			opts = append(opts, grpc.WithTransportCredentials(creds))
 		}
 
+		retryOpts := []retry.CallOption{
+			retry.WithMax(3),
+			retry.WithBackoff(retry.BackoffExponential(100 * time.Millisecond)),
+			retry.WithCodes(codes.Unavailable, codes.ResourceExhausted, codes.Internal),
+		}
+
+		opts = append(opts,
+			grpc.WithChainUnaryInterceptor(
+				retry.UnaryClientInterceptor(retryOpts...),
+				h.unaryInterceptor(),
+			),
+			grpc.WithStreamInterceptor(h.streamInterceptor()),
+		)
+
 		conn, err := grpc.NewClient(addr, opts...)
 
 		if err != nil {
@@ -93,6 +120,19 @@ func (h *Handlers) newGrpcClientWithAddr(addr string, region string, insecure bo
 	return h.grpcClient
 }
 
+func (h *Handlers) newGitOps() *git.Ops {
+	trainingRoot, err := h.config.FindTrainingRoot()
+	if err != nil {
+		logrus.WithError(err).Debug("Can't find training root for git ops")
+		return git.NewOps("", true) // disabled
+	}
+
+	trainingRootFs := newTrainingRootFs(trainingRoot)
+	cfg := h.config.TrainingConfig(trainingRootFs)
+	disabled := !cfg.GitConfigured || !cfg.GitEnabled
+	return git.NewOps(trainingRoot, disabled)
+}
+
 func newTrainingRootFs(trainingRoot string) *afero.BasePathFs {
 	// Privacy of your files is our priority.
 	//
@@ -102,4 +142,26 @@ func newTrainingRootFs(trainingRoot string) *afero.BasePathFs {
 	//
 	// To avoid that we are using afero.BasePathFs with base on training root for all operations in trainings dir.
 	return afero.NewBasePathFs(afero.NewOsFs(), trainingRoot).(*afero.BasePathFs)
+}
+
+// CheckServerConnection verifies we can reach the server before running a command.
+// Explicit serverAddr/region/insecure params take priority over global config, which takes priority over defaults.
+func (h *Handlers) CheckServerConnection(ctx context.Context, serverAddr, region string, insecure bool) error {
+	var client genproto.TrainingsClient
+	if serverAddr != "" {
+		client = h.newGrpcClientWithAddr(serverAddr, region, insecure)
+	} else if h.config.ConfiguredGlobally() {
+		client = h.newGrpcClient()
+	} else {
+		client = h.newGrpcClientWithAddr(internal.DefaultTrainingsServer, "", false)
+	}
+
+	pingCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	_, err := client.Ping(pingCtx, &emptypb.Empty{})
+	if err != nil {
+		return formatConnectionError(err)
+	}
+	return nil
 }

@@ -8,9 +8,11 @@ import (
 )
 
 func (h *Handlers) List(ctx context.Context) error {
-	trainings, err := h.newGrpcClient().GetTrainings(context.Background(), &empty.Empty{})
+	ctx = withSubAction(ctx, "list")
+
+	trainings, err := h.newGrpcClient().GetTrainings(ctx, &empty.Empty{})
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	for _, training := range trainings.Trainings {

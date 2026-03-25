@@ -2,8 +2,10 @@ package trainings
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/fatih/color"
 
@@ -13,7 +15,8 @@ import (
 
 func (h *Handlers) printCurrentExercise(moduleName string, exerciseName string) {
 	name := fmt.Sprintf("%v/%v", moduleName, exerciseName)
-	fmt.Printf("\n%s\n", color.New(color.Bold, color.FgCyan).Sprint(name))
+	fmt.Printf("\n%s\n", color.HiBlackString(strings.Repeat("─", internal.TerminalWidth())))
+	fmt.Println(color.New(color.Bold, color.FgCyan).Sprint(name))
 }
 
 func (h *Handlers) printNotInATrainingDirectory() {
@@ -45,6 +48,66 @@ func printTextOnlyExerciseInfo(trainingName, exerciseID string) {
 		color.GreenString("This lesson is text-only.\nYou can read it in your browser:"),
 		internal.ExerciseURL(trainingName, exerciseID)+"\n",
 	)
+}
+
+// textWidth returns the approximate display width of s in a terminal.
+// Most characters are 1 column wide, but emoji like 💡 occupy 2 columns.
+// We add +1 for characters in Unicode's Supplementary Multilingual Plane (≥ U+1F000)
+// where most emoji live, to avoid a full East Asian Width table dependency.
+func textWidth(s string) int {
+	n := utf8.RuneCountInString(s)
+	for _, r := range s {
+		if r >= 0x1F000 {
+			n++
+		}
+	}
+	return n
+}
+
+var ansiRegex = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+func stripANSI(s string) string {
+	return ansiRegex.ReplaceAllString(s, "")
+}
+
+// printColorBox prints lines inside a dim-bordered box, preserving ANSI colors in content.
+func printColorBox(lines ...string) {
+	maxWidth := 0
+	for _, line := range lines {
+		if w := textWidth(stripANSI(line)); w > maxWidth {
+			maxWidth = w
+		}
+	}
+
+	border := strings.Repeat("─", maxWidth+3)
+	dim := color.HiBlackString
+
+	fmt.Println(dim("  ┌" + border + "┐"))
+	for _, line := range lines {
+		pad := strings.Repeat(" ", maxWidth-textWidth(stripANSI(line)))
+		fmt.Printf("  %s  %s%s %s\n", dim("│"), line, pad, dim("│"))
+	}
+	fmt.Println(dim("  └" + border + "┘"))
+}
+
+// printDimBox prints lines inside a dim bordered box, indented by 2 spaces.
+func printDimBox(lines ...string) {
+	maxWidth := 0
+	for _, line := range lines {
+		if w := textWidth(line); w > maxWidth {
+			maxWidth = w
+		}
+	}
+
+	border := strings.Repeat("─", maxWidth+3)
+	dim := color.HiBlackString
+
+	fmt.Println(dim("  ┌" + border + "┐"))
+	for _, line := range lines {
+		pad := strings.Repeat(" ", maxWidth-textWidth(line))
+		fmt.Println(dim("  │  " + line + pad + " │"))
+	}
+	fmt.Println(dim("  └" + border + "┘"))
 }
 
 func PrintScenarios(scenarios []*genproto.ScenarioResult) {

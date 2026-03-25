@@ -5,10 +5,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ThreeDotsLabs/cli/trainings/config"
-	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 	"github.com/fatih/color"
 	"github.com/manifoldco/promptui"
+
+	"github.com/ThreeDotsLabs/cli/trainings/config"
+	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )
 
 const (
@@ -18,6 +19,8 @@ const (
 )
 
 func (h *Handlers) Skip(ctx context.Context) error {
+	ctx = withSubAction(ctx, "skip")
+
 	trainingRoot, err := h.config.FindTrainingRoot()
 	if errors.Is(err, config.TrainingRootNotFoundError) {
 		h.printNotInATrainingDirectory()
@@ -25,9 +28,17 @@ func (h *Handlers) Skip(ctx context.Context) error {
 	}
 
 	trainingRootFs := newTrainingRootFs(trainingRoot)
+	printGitNotices(h.config.TrainingConfig(trainingRootFs))
+
 	exerciseConfig := h.config.ExerciseConfig(trainingRootFs)
 
-	resp, err := h.newGrpcClient().CanSkipExercise(context.Background(), &genproto.CanSkipExerciseRequest{
+	// Save progress before skipping
+	gitOps := h.newGitOps()
+	if gitOps.Enabled() && !exerciseConfig.IsTextOnly && exerciseConfig.Directory != "" {
+		saveProgress(gitOps, exerciseConfig.Directory, fmt.Sprintf("save progress on %s", exerciseConfig.ModuleExercisePath()))
+	}
+
+	resp, err := h.newGrpcClient().CanSkipExercise(ctx, &genproto.CanSkipExerciseRequest{
 		TrainingName: h.config.TrainingConfig(trainingRootFs).TrainingName,
 		ExerciseId:   exerciseConfig.ExerciseID,
 		Token:        h.config.GlobalConfig().Token,
@@ -88,7 +99,7 @@ func (h *Handlers) Skip(ctx context.Context) error {
 		return nil
 	}
 
-	_, err = h.newGrpcClient().SkipExercise(context.Background(), &genproto.SkipExerciseRequest{
+	_, err = h.newGrpcClient().SkipExercise(ctx, &genproto.SkipExerciseRequest{
 		TrainingName:    h.config.TrainingConfig(trainingRootFs).TrainingName,
 		ExerciseId:      exerciseConfig.ExerciseID,
 		Token:           h.config.GlobalConfig().Token,

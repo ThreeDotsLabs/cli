@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"runtime"
+	"runtime/debug"
+	"strings"
 	"time"
 
 	"github.com/fatih/color"
@@ -15,6 +18,7 @@ import (
 
 	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings"
+	"github.com/ThreeDotsLabs/cli/trainings/git"
 )
 
 var (
@@ -23,6 +27,25 @@ var (
 )
 
 func main() {
+	defer func() {
+		if r := recover(); r != nil {
+			var err error
+			switch v := r.(type) {
+			case error:
+				err = v
+			default:
+				err = fmt.Errorf("%v", v)
+			}
+			formatUnexpectedError(err)
+			var st stackTracer
+			if !errors.As(err, &st) {
+				fmt.Println(color.HiBlackString("\nPanic stack:"))
+				fmt.Println(color.HiBlackString(string(debug.Stack())))
+			}
+			os.Exit(1)
+		}
+	}()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -70,14 +93,17 @@ var app = &cli.App{
 
 		userFacingErr := trainings.UserFacingError{}
 		if errors.As(err, &userFacingErr) {
+			separator := color.HiBlackString(strings.Repeat("─", internal.TerminalWidth()))
+			fmt.Println(separator)
 			fmt.Printf(color.RedString("ERROR: ") + userFacingErr.Msg + "\n")
+			fmt.Println(separator)
 			fmt.Printf(color.GreenString("\nHow to solve: \n") + userFacingErr.SolutionHint + "\n")
 			os.Exit(1)
 			return
 		}
 
 		if err != nil {
-			fmt.Printf("%+v\n", err)
+			formatUnexpectedError(err)
 		}
 
 		os.Exit(1)
@@ -106,12 +132,27 @@ var app = &cli.App{
 			Name:    "training",
 			Aliases: []string{"tr"},
 			Usage:   fmt.Sprintf("commands for %s commands", internal.WebsiteAddress),
+			Before: func(c *cli.Context) error {
+				sub := c.Args().First()
+				if sub == "init" || sub == "configure" {
+					return nil
+				}
+				return newHandlers(c).CheckServerConnection(c.Context, "", "", false)
+			},
 			Subcommands: []*cli.Command{
 				{
 					Name:      "configure",
 					Usage:     "connect your environment with https://academy.threedots.tech/ account",
 					ArgsUsage: fmt.Sprintf("<%s>", tokenDocs),
 					Flags:     configureFlags,
+					Before: func(c *cli.Context) error {
+						return newHandlers(c).CheckServerConnection(
+							c.Context,
+							c.String("server"),
+							c.String("region"),
+							c.Bool("insecure"),
+						)
+					},
 					Action: func(c *cli.Context) error {
 						token := c.Args().First()
 
@@ -134,11 +175,30 @@ var app = &cli.App{
 						"<trainingID from %s> [directory, if empty defaults to trainingID]",
 						internal.WebsiteAddress,
 					),
-					Flags: append(configureFlags, &cli.StringFlag{
-						Name:  "token",
-						Usage: tokenDocs,
-					}),
+					Flags: append(configureFlags,
+						&cli.StringFlag{
+							Name:  "token",
+							Usage: tokenDocs,
+						},
+						&cli.BoolFlag{
+							Name:  "no-git",
+							Usage: "disable git integration",
+						},
+						&cli.BoolFlag{
+							Name:   "force-git",
+							Usage:  "enable git integration even in non-interactive mode",
+							Hidden: true,
+						},
+					),
 					Usage: "initialise training files in your current directory",
+					Before: func(c *cli.Context) error {
+						return newHandlers(c).CheckServerConnection(
+							c.Context,
+							c.String("server"),
+							c.String("region"),
+							c.Bool("insecure"),
+						)
+					},
 					Action: func(c *cli.Context) error {
 						trainingID := c.Args().First()
 
@@ -166,7 +226,7 @@ var app = &cli.App{
 							}
 						}
 
-						return handlers.Init(c.Context, trainingID, dir)
+						return handlers.Init(c.Context, trainingID, dir, c.Bool("no-git"), c.Bool("force-git"))
 					},
 				},
 				{
@@ -212,10 +272,10 @@ var app = &cli.App{
 					},
 				},
 				{
-					Name:  "checkout",
-					Usage: "checkout one of your past solutions for the current exercise",
+					Name:  "rollback",
+					Usage: "rollback to one of your past solutions for the current exercise",
 					Action: func(c *cli.Context) error {
-						return newHandlers(c).Checkout(c.Context)
+						return newHandlers(c).Rollback(c.Context)
 					},
 				},
 				{
@@ -285,6 +345,13 @@ Note: after completing this exercise, the next exercise will be the last one you
 						return newHandlers(c).Skip(c.Context)
 					},
 				},
+				{
+					Name:  "settings",
+					Usage: "Change git integration settings (auto-commit, auto-sync)",
+					Action: func(c *cli.Context) error {
+						return newHandlers(c).ConfigureGit()
+					},
+				},
 			},
 		},
 		{
@@ -303,13 +370,38 @@ Note: after completing this exercise, the next exercise will be the last one you
 }
 
 func newHandlers(c *cli.Context) *trainings.Handlers {
+	cmd := c.Command.HelpName
+	if cmd == "" {
+		cmd = c.Command.FullName()
+	}
+
 	return trainings.NewHandlers(trainings.CliMetadata{
 		Version:         version,
 		Commit:          commit,
 		Architecture:    runtime.GOARCH,
 		OS:              runtime.GOOS,
-		ExecutedCommand: c.Command.HelpName,
+		OSVersion:       osVersion(),
+		GoVersion:       runtime.Version(),
+		GitVersion:      gitVersionString(),
+		ExecutedCommand: cmd,
+		Interactive:     internal.IsStdinTerminal(),
 	})
+}
+
+func osVersion() string {
+	out, err := exec.Command("uname", "-r").Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func gitVersionString() string {
+	v, err := git.CheckVersion()
+	if err != nil {
+		return ""
+	}
+	return v.String()
 }
 
 type missingArgumentError struct {
@@ -318,4 +410,32 @@ type missingArgumentError struct {
 
 func (m missingArgumentError) Error() string {
 	return m.msg
+}
+
+type stackTracer interface {
+	StackTrace() errors.StackTrace
+}
+
+func formatUnexpectedError(err error) {
+	separator := color.HiBlackString(strings.Repeat("─", internal.TerminalWidth()))
+
+	fmt.Println(separator)
+	fmt.Printf(color.RedString("ERROR: ") + err.Error() + "\n")
+	fmt.Println(separator)
+
+	var st stackTracer
+	if errors.As(err, &st) {
+		fmt.Println(color.HiBlackString("\nStack trace:"))
+		for _, frame := range st.StackTrace() {
+			// %+v produces "funcName\n\tfile:line" — flatten to single line
+			raw := fmt.Sprintf("%+v", frame)
+			var parts []string
+			for _, l := range strings.Split(raw, "\n") {
+				if trimmed := strings.TrimSpace(l); trimmed != "" {
+					parts = append(parts, trimmed)
+				}
+			}
+			fmt.Println(color.HiBlackString("  " + strings.Join(parts, " ")))
+		}
+	}
 }
