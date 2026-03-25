@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	semver "github.com/Masterminds/semver/v3"
 	"github.com/fatih/color"
 	"github.com/sirupsen/logrus"
 )
@@ -45,8 +46,8 @@ func CheckForUpdate(currentVersion string, commandName string, forcePrompt bool)
 
 	updateInfo, _ := getUpdateInfo()
 
-	// Fast path: cached update available for this version — no API call needed
-	if updateInfo.UpdateAvailable && updateInfo.CurrentVersion == currentVersion {
+	// Fast path: cached update available — no API call needed
+	if updateInfo.UpdateAvailable && isNewerVersion(updateInfo.AvailableVersion, currentVersion) {
 		showUpdatePromptOrNotice(updateInfo, currentVersion, isUpdateCommand, forcePrompt)
 		return
 	}
@@ -61,7 +62,10 @@ func CheckForUpdate(currentVersion string, commandName string, forcePrompt bool)
 		return
 	}
 
-	if release.Version != "" && release.Version != currentVersion {
+	isNewer := release.Version != "" && isNewerVersion(release.Version, currentVersion)
+	isDifferent := release.Version != "" && release.Version != currentVersion
+
+	if isNewer || (forcePrompt && isDifferent) {
 		updateInfo.CurrentVersion = currentVersion
 		updateInfo.AvailableVersion = release.Version
 		updateInfo.UpdateAvailable = true
@@ -144,23 +148,38 @@ func showBlockingUpdatePrompt(updateInfo UpdateInfo, currentVersion string) {
 		}
 		if err != nil || !canWriteBinary(binaryPath) {
 			cmdName := os.Args[0]
+			var updateCmd string
 			if runtime.GOOS == "windows" {
+				updateCmd = fmt.Sprintf("%s update", cmdName)
 				fmt.Println("The binary requires elevated permissions to update.")
-				fmt.Println("Please re-open your terminal as Administrator and run:")
-				fmt.Println("  " + SprintCommand(fmt.Sprintf("%s update", cmdName)))
+				fmt.Println("To update, re-open your terminal as Administrator and run:")
 			} else {
+				updateCmd = fmt.Sprintf("sudo %s update", cmdName)
 				fmt.Printf("The binary at %s requires elevated permissions to update.\n", binaryPath)
-				fmt.Println("Please run:")
-				fmt.Println("  " + SprintCommand(fmt.Sprintf("sudo %s update", cmdName)))
+				fmt.Println("To update, run:")
 			}
+			fmt.Println("  " + SprintCommand(updateCmd))
 			fmt.Printf("\nOr download from: %s/releases/latest\n", repoURL)
+			fmt.Println()
 
-			// Store dismissal so this doesn't block every invocation
+			result := Prompt(
+				Actions{
+					{Shortcut: '\n', Action: "exit", ShortcutAliases: []rune{'\r'}},
+					{Shortcut: 's', Action: "skip and continue"},
+				},
+				os.Stdin,
+				os.Stdout,
+			)
+
+			// Store dismissal regardless of choice
 			updateInfo.DismissedVersion = updateInfo.AvailableVersion
 			updateInfo.DismissedAt = time.Now()
 			_ = storeUpdateInfo(updateInfo)
 
-			os.Exit(0)
+			if result == '\n' {
+				os.Exit(0)
+			}
+			fmt.Println()
 			return
 		}
 	}
@@ -192,7 +211,7 @@ func showBlockingUpdatePrompt(updateInfo UpdateInfo, currentVersion string) {
 	// User pressed ENTER — run update with SkipConfirm (no double confirmation)
 	fmt.Println()
 	ctx := context.Background()
-	err := RunUpdate(ctx, currentVersion, UpdateOptions{SkipConfirm: true})
+	err := RunUpdate(ctx, currentVersion, UpdateOptions{SkipConfirm: true, ForceUpdate: true})
 	if err != nil {
 		fmt.Println(color.RedString("Update failed: %v", err))
 		fmt.Println(color.HiBlackString("Continuing with current version..."))
@@ -305,6 +324,18 @@ func storeUpdateInfo(info UpdateInfo) error {
 	}
 
 	return nil
+}
+
+func isNewerVersion(latest, current string) bool {
+	latestV, err := semver.NewVersion(latest)
+	if err != nil {
+		return latest != current
+	}
+	currentV, err := semver.NewVersion(current)
+	if err != nil {
+		return latest != current
+	}
+	return latestV.GreaterThan(currentV)
 }
 
 func fileExists(path string) bool {

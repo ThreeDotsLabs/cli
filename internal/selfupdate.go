@@ -52,6 +52,7 @@ func (m InstallMethod) String() string {
 type UpdateOptions struct {
 	SkipConfirm   bool
 	TargetVersion string // e.g., "v1.2.3", "master", or "" for latest
+	ForceUpdate   bool   // skip "already on latest" check
 }
 
 // DetectInstallMethod determines the installation method by examining the binary path.
@@ -207,7 +208,7 @@ func RunUpdate(ctx context.Context, currentVersion string, opts UpdateOptions) e
 			return nil
 		}
 		logrus.WithField("latest", release.Version()).Debug("Latest release detected")
-		if release.LessOrEqual(currentVersion) {
+		if !opts.ForceUpdate && release.LessOrEqual(currentVersion) {
 			fmt.Printf("You are already running the latest version (%s).\n", currentVersion)
 			return nil
 		}
@@ -215,18 +216,20 @@ func RunUpdate(ctx context.Context, currentVersion string, opts UpdateOptions) e
 
 	targetVersion := release.Version()
 
-	// Show update info with release notes BEFORE confirmation
-	fmt.Printf("\nUpdate available: %s → %s\n", currentVersion, targetVersion)
+	// Show update info with release notes BEFORE confirmation (skip if caller already showed it)
+	if !opts.SkipConfirm {
+		fmt.Printf("\nUpdate available: %s → %s\n", currentVersion, targetVersion)
 
-	if notes := release.ReleaseNotes; notes != "" {
-		formatted := formatReleaseNotes(notes, 15)
-		if formatted != "" {
-			fmt.Println()
-			fmt.Println("Release notes:")
-			fmt.Println(formatted)
+		if notes := release.ReleaseNotes; notes != "" {
+			formatted := formatReleaseNotes(notes, 15)
+			if formatted != "" {
+				fmt.Println()
+				fmt.Println("Release notes:")
+				fmt.Println(formatted)
+			}
 		}
+		fmt.Println()
 	}
-	fmt.Println()
 
 	logrus.WithField("method", method.String()).Debug("Updating via install method")
 
