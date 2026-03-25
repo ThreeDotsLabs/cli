@@ -306,20 +306,16 @@ func updateDirectBinary(ctx context.Context, updater *selfupdate.Updater, curren
 	if !canWriteBinary(binaryPath) {
 		fmt.Printf("The binary at %s requires elevated permissions to update.\n\n", binaryPath)
 
+		cmdName := os.Args[0]
 		if runtime.GOOS == "windows" {
 			fmt.Println("Please re-open your terminal as Administrator and run:")
-			fmt.Println("  " + color.CyanString("tdl update"))
+			fmt.Println("  " + color.CyanString("%s update", cmdName))
 		} else {
 			fmt.Println("Please run:")
-			fmt.Println("  " + color.CyanString("sudo tdl update"))
+			fmt.Println("  " + color.CyanString("sudo %s update", cmdName))
 		}
 
-		fmt.Printf("\nOr download from: %s/releases/latest\n\n", repoURL)
-
-		if IsStdinTerminal() {
-			fmt.Println("Press " + color.New(color.Bold).Sprint("ENTER") + " to exit.")
-			ConfirmPromptDefaultYes("exit")
-		}
+		fmt.Printf("\nOr download from: %s/releases/latest\n", repoURL)
 
 		return nil
 	}
