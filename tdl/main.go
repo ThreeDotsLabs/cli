@@ -120,6 +120,11 @@ var app = &cli.App{
 			Aliases: []string{"v"},
 			EnvVars: []string{"VERBOSE"},
 		},
+		&cli.BoolFlag{
+			Name:   "force-update-prompt",
+			Usage:  "force the update prompt to appear (for testing)",
+			Hidden: true,
+		},
 	},
 	Before: func(c *cli.Context) error {
 		if verbose := c.Bool("verbose"); verbose {
@@ -129,7 +134,15 @@ var app = &cli.App{
 			logrus.SetLevel(logrus.WarnLevel)
 		}
 
-		internal.CheckForUpdate(version)
+		commandName := ""
+		for _, arg := range os.Args[1:] {
+			if !strings.HasPrefix(arg, "-") {
+				commandName = arg
+				break
+			}
+		}
+
+		internal.CheckForUpdate(version, commandName, c.Bool("force-update-prompt"))
 
 		return nil
 	},

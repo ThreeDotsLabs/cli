@@ -4,6 +4,7 @@ go 1.24.11
 
 require (
 	github.com/BurntSushi/toml v0.4.1
+	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/creativeprojects/go-selfupdate v1.5.2
 	github.com/fatih/color v1.16.0
 	github.com/golang/protobuf v1.5.4
@@ -26,7 +27,6 @@ require (
 require (
 	code.gitea.io/sdk/gitea v0.22.1 // indirect
 	github.com/42wim/httpsig v1.2.3 // indirect
-	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
