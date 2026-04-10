@@ -144,7 +144,6 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 
 	// Single stdin reader goroutine for the entire interactive session.
 	// Only needed when MCP is active (to select between stdin and MCP commands).
-	var stdinCh <-chan rune
 	if h.loopState != nil {
 		ch := make(chan rune, 1)
 		go func() {
@@ -157,7 +156,8 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 				ch <- r
 			}
 		}()
-		stdinCh = ch
+		h.stdinCh = ch
+		defer func() { h.stdinCh = nil }()
 	}
 
 	retries := 0
@@ -193,7 +193,6 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 
 				h.setLoopState(mcppkg.StateFailed)
 				action, fromMCP := h.waitForAction(
-					stdinCh,
 					internal.Actions{
 						{Shortcut: '\n', Action: "run solution again", ShortcutAliases: []rune{'\r'}},
 						{Shortcut: 'q', Action: "quit"},
@@ -203,12 +202,19 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 						'q':  loopActionQuit,
 					},
 					map[mcppkg.CommandType]loopAction{
-						mcppkg.CmdRunSolution: loopActionRun,
+						mcppkg.CmdRunSolution:   loopActionRun,
+						mcppkg.CmdResetExercise: loopActionResetExercise,
 					},
 				)
 				ctx = withMCPTriggered(ctx, fromMCP)
 				if action == loopActionQuit {
 					return userErr
+				}
+				if action == loopActionResetExercise {
+					if err := h.resetExerciseFromLoop(ctx, trainingRootFs); err != nil {
+						h.sendPendingMCPResult(mcppkg.MCPResult{Error: fmt.Sprintf("Reset failed: %v", err)})
+					}
+					continue
 				}
 				continue
 			}
@@ -232,7 +238,6 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 
 				h.setLoopState(mcppkg.StateFailed)
 				action, fromMCP := h.waitForAction(
-					stdinCh,
 					internal.Actions{
 						{Shortcut: '\n', Action: "run solution again", ShortcutAliases: []rune{'\r'}},
 						{Shortcut: 'q', Action: "quit"},
@@ -242,12 +247,19 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 						'q':  loopActionQuit,
 					},
 					map[mcppkg.CommandType]loopAction{
-						mcppkg.CmdRunSolution: loopActionRun,
+						mcppkg.CmdRunSolution:   loopActionRun,
+						mcppkg.CmdResetExercise: loopActionResetExercise,
 					},
 				)
 				ctx = withMCPTriggered(ctx, fromMCP)
 				if action == loopActionQuit {
 					return nil
+				}
+				if action == loopActionResetExercise {
+					if err := h.resetExerciseFromLoop(ctx, trainingRootFs); err != nil {
+						h.sendPendingMCPResult(mcppkg.MCPResult{Error: fmt.Sprintf("Reset failed: %v", err)})
+					}
+					continue
 				}
 				continue
 			}
@@ -283,13 +295,13 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 
 		h.setLoopState(mcppkg.StateSucceeded)
 		chosenAction, fromMCP := h.waitForAction(
-			stdinCh,
 			actions,
 			actionMap,
 			map[mcppkg.CommandType]loopAction{
 				mcppkg.CmdRunSolution:         loopActionRun,
 				mcppkg.CmdNextExercise:        loopActionNextExercise,
 				mcppkg.CmdSyncAndNextExercise: loopActionSyncSolution,
+				mcppkg.CmdResetExercise:       loopActionResetExercise,
 			},
 		)
 		ctx = withMCPTriggered(ctx, fromMCP)
@@ -298,6 +310,12 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 			os.Exit(0)
 		}
 		if chosenAction == loopActionRun {
+			continue
+		}
+		if chosenAction == loopActionResetExercise {
+			if err := h.resetExerciseFromLoop(ctx, trainingRootFs); err != nil {
+				h.sendPendingMCPResult(mcppkg.MCPResult{Error: fmt.Sprintf("Reset failed: %v", err)})
+			}
 			continue
 		}
 
@@ -579,75 +597,44 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 type loopAction int
 
 const (
-	loopActionRun          loopAction = iota // Run (or re-run) the solution
-	loopActionNextExercise                   // Advance to next exercise
-	loopActionSyncSolution                   // Sync with example solution
-	loopActionQuit                           // Quit the loop
+	loopActionRun           loopAction = iota // Run (or re-run) the solution
+	loopActionNextExercise                    // Advance to next exercise
+	loopActionSyncSolution                    // Sync with example solution
+	loopActionQuit                            // Quit the loop
+	loopActionResetExercise                   // Reset exercise to clean files
 )
 
 // waitForAction prints a prompt and waits for input from either stdin or the MCP command channel.
 // When MCP is disabled (loopState == nil), it reads stdin synchronously (like internal.Prompt).
 // When MCP is enabled, stdinCh must be a long-lived channel fed by a single goroutine in interactiveRun.
 func (h *Handlers) waitForAction(
-	stdinCh <-chan rune,
 	actions internal.Actions,
 	actionMap map[rune]loopAction,
 	validMCPCmds map[mcppkg.CommandType]loopAction,
 ) (loopAction, bool) {
-	defer fmt.Println()
-
-	// Format prompt string (replicates internal.Prompt display logic)
-	var actionsStr []string
-	for _, action := range actions {
-		actionsStr = append(actionsStr, fmt.Sprintf(
-			"%s to %s",
-			color.New(color.Bold).Sprint(action.KeyString()),
-			action.Action,
-		))
+	if h.loopState == nil {
+		// No MCP — delegate to promptRune for the actual reading.
+		key := h.promptRune(actions)
+		if action, ok := actionMap[key]; ok {
+			return action, false
+		}
+		return loopActionQuit, false
 	}
-	fmt.Printf("%s", "Press "+formatActionsMessage(actionsStr)+" ")
 
-	// Put terminal in raw mode for single-keypress reading
+	// MCP mode — need to select on both stdinCh and MCP commands.
+	defer fmt.Println()
+	printPrompt(actions)
+
 	termState, rawErr := term.MakeRaw(0)
 	if rawErr == nil {
 		defer term.Restore(0, termState)
 	}
 
-	if h.loopState == nil {
-		// No MCP — read stdin synchronously (no goroutine needed).
-		reader := bufio.NewReader(os.Stdin)
-		for {
-			ch, _, err := reader.ReadRune()
-			if err != nil {
-				return loopActionQuit, false
-			}
-			if string(ch) == "\x03" {
-				if rawErr == nil {
-					term.Restore(0, termState)
-				}
-				os.Exit(0)
-			}
-			if key, ok := actions.ReadKeyFromInput(ch); ok {
-				if action, mapped := actionMap[key]; mapped {
-					return action, false
-				}
-			}
-		}
-	}
-
-	// MCP mode — drain any stale keypresses from between prompts.
-	for {
-		select {
-		case <-stdinCh:
-		default:
-			goto drained
-		}
-	}
-drained:
+	drainChannel(h.stdinCh)
 
 	for {
 		select {
-		case ch := <-stdinCh:
+		case ch := <-h.stdinCh:
 			if string(ch) == "\x03" {
 				if rawErr == nil {
 					term.Restore(0, termState)
@@ -661,8 +648,8 @@ drained:
 			}
 		case cmd := <-h.loopState.CommandCh():
 			if mappedAction, ok := validMCPCmds[cmd.Type]; ok {
-				if cmd.Type == mcppkg.CmdNextExercise || cmd.Type == mcppkg.CmdSyncAndNextExercise {
-					// Defer result until the full transition completes (blocking for MCP client).
+				if cmd.Type == mcppkg.CmdNextExercise || cmd.Type == mcppkg.CmdSyncAndNextExercise || cmd.Type == mcppkg.CmdResetExercise {
+					// Defer result until the full operation completes (blocking for MCP client).
 					h.pendingMCPResultCh = cmd.ResultCh
 				} else {
 					cmd.ResultCh <- mcppkg.MCPResult{Success: true, Message: "command accepted"}
@@ -672,6 +659,30 @@ drained:
 			cmd.ResultCh <- mcppkg.MCPResult{
 				Error: fmt.Sprintf("command '%s' not valid in current state (%s)", cmd.Type, h.loopState.GetState()),
 			}
+		}
+	}
+}
+
+// printPrompt formats and prints the action prompt line.
+func printPrompt(actions internal.Actions) {
+	var actionsStr []string
+	for _, action := range actions {
+		actionsStr = append(actionsStr, fmt.Sprintf(
+			"%s to %s",
+			color.New(color.Bold).Sprint(action.KeyString()),
+			action.Action,
+		))
+	}
+	fmt.Printf("%s", "Press "+formatActionsMessage(actionsStr)+" ")
+}
+
+// drainChannel discards any buffered values from a channel.
+func drainChannel(ch <-chan rune) {
+	for {
+		select {
+		case <-ch:
+		default:
+			return
 		}
 	}
 }
@@ -704,6 +715,75 @@ func (h *Handlers) buildAdvanceResult() mcppkg.MCPResult {
 		ModuleName:   info.ModuleName,
 		ExerciseName: info.ExerciseName,
 		Content:      content,
+	}
+
+	data, _ := json.MarshalIndent(resp, "", "  ")
+	return mcppkg.MCPResult{Success: true, Message: string(data)}
+}
+
+// resetExerciseFromLoop performs a clean-files reset of the current exercise,
+// then sends the deferred MCP result. Called from the interactive loop when
+// CmdResetExercise is received.
+func (h *Handlers) resetExerciseFromLoop(ctx context.Context, trainingRootFs *afero.BasePathFs) error {
+	exerciseCfg := h.config.ExerciseConfig(trainingRootFs)
+	gitOps := h.newGitOps()
+
+	if !gitOps.Enabled() || exerciseCfg.IsTextOnly || exerciseCfg.Directory == "" {
+		return fmt.Errorf("cannot reset: git is not enabled or exercise is text-only")
+	}
+
+	moduleExercisePath := exerciseCfg.ModuleExercisePath()
+	initBranch := git.InitBranchName(moduleExercisePath)
+
+	if !gitOps.BranchExists(initBranch) {
+		return fmt.Errorf("cannot reset: init branch %s does not exist", initBranch)
+	}
+
+	// Auto-commit uncommitted changes before reset
+	if gitOps.HasUncommittedChanges(exerciseCfg.Directory) {
+		saveProgress(gitOps, exerciseCfg.Directory, fmt.Sprintf("save progress on %s", moduleExercisePath))
+	}
+
+	// Perform the clean-files reset
+	backupBranch, err := h.resetCleanFiles(gitOps, initBranch, moduleExercisePath, exerciseCfg.Directory)
+	if err != nil {
+		return err
+	}
+
+	// Fetch exercise.md from server (it's gitignored)
+	cfg := h.config.TrainingConfig(trainingRootFs)
+	scaffoldResp, grpcErr := h.newGrpcClient().GetExercise(ctx, &genproto.GetExerciseRequest{
+		TrainingName: cfg.TrainingName,
+		Token:        h.config.GlobalConfig().Token,
+		ExerciseId:   exerciseCfg.ExerciseID,
+	})
+	if grpcErr != nil {
+		logrus.WithError(grpcErr).Warn("Could not fetch exercise scaffold for exercise.md")
+	} else {
+		writeExerciseMd(scaffoldResp.FilesToCreate, trainingRootFs, exerciseCfg.Directory)
+	}
+
+	// Send deferred MCP result with reset details
+	h.sendPendingMCPResult(h.buildResetResult(backupBranch, exerciseCfg))
+
+	return nil
+}
+
+func (h *Handlers) buildResetResult(backupBranch string, exerciseCfg config.ExerciseConfig) mcppkg.MCPResult {
+	resp := struct {
+		Status       string `json:"status"`
+		ExerciseID   string `json:"exercise_id"`
+		Directory    string `json:"directory"`
+		ModuleName   string `json:"module_name"`
+		ExerciseName string `json:"exercise_name"`
+		BackupBranch string `json:"backup_branch,omitempty"`
+	}{
+		Status:       "reset",
+		ExerciseID:   exerciseCfg.ExerciseID,
+		Directory:    exerciseCfg.Directory,
+		ModuleName:   exerciseCfg.ModuleName,
+		ExerciseName: exerciseCfg.ExerciseName,
+		BackupBranch: backupBranch,
 	}
 
 	data, _ := json.MarshalIndent(resp, "", "  ")

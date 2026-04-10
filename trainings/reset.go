@@ -99,7 +99,7 @@ func (h *Handlers) Reset(ctx context.Context) error {
 
 	switch resetMode {
 	case 0:
-		if err := h.resetCleanFiles(gitOps, initBranch, moduleExercisePath, exerciseCfg.Directory); err != nil {
+		if _, err := h.resetCleanFiles(gitOps, initBranch, moduleExercisePath, exerciseCfg.Directory); err != nil {
 			return err
 		}
 	case 1:
@@ -127,7 +127,7 @@ func (h *Handlers) Reset(ctx context.Context) error {
 	return nil
 }
 
-func (h *Handlers) resetCleanFiles(gitOps *git.Ops, initBranch, moduleExercisePath, exerciseDir string) error {
+func (h *Handlers) resetCleanFiles(gitOps *git.Ops, initBranch, moduleExercisePath, exerciseDir string) (string, error) {
 	// Save user's work to backup branch
 	backupBranch := git.BackupBranchName(moduleExercisePath)
 	if err := gitOps.CreateBranchFromHead(backupBranch); err != nil {
@@ -140,7 +140,7 @@ func (h *Handlers) resetCleanFiles(gitOps *git.Ops, initBranch, moduleExercisePa
 
 	// Restore all exercise files from init branch
 	if err := gitOps.CheckoutFiles(initBranch, exerciseDir); err != nil {
-		return fmt.Errorf("could not restore exercise files: %w", err)
+		return "", fmt.Errorf("could not restore exercise files: %w", err)
 	}
 
 	_ = gitOps.ResetStaging()
@@ -165,7 +165,7 @@ func (h *Handlers) resetCleanFiles(gitOps *git.Ops, initBranch, moduleExercisePa
 	fmt.Println("  Restore anytime with: " + color.CyanString("git checkout %s -- %s", backupBranch, exerciseDir))
 	fmt.Println()
 
-	return nil
+	return backupBranch, nil
 }
 
 func (h *Handlers) resetMissingOnly(gitOps *git.Ops, initBranch, moduleExercisePath, exerciseDir, trainingRoot string) error {

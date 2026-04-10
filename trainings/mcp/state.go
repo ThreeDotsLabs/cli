@@ -50,6 +50,7 @@ const (
 	CmdRunSolution CommandType = iota
 	CmdNextExercise
 	CmdSyncAndNextExercise
+	CmdResetExercise
 )
 
 func (c CommandType) String() string {
@@ -60,6 +61,8 @@ func (c CommandType) String() string {
 		return "next_exercise"
 	case CmdSyncAndNextExercise:
 		return "sync_and_next_exercise"
+	case CmdResetExercise:
+		return "reset_exercise"
 	default:
 		return "unknown"
 	}

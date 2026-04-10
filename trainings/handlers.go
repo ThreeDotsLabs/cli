@@ -37,6 +37,7 @@ type Handlers struct {
 
 	loopState *mcppkg.LoopState // nil if MCP disabled
 	mcpPort   int               // 0 = MCP disabled
+	stdinCh   <-chan rune       // centralized stdin channel; non-nil only during interactiveRun with MCP
 
 	pendingMCPResultCh chan<- mcppkg.MCPResult // deferred result for blocking MCP commands (e.g. next exercise)
 }

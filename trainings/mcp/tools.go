@@ -48,6 +48,15 @@ func registerTools(srv *server.MCPServer, state *LoopState) {
 	)
 
 	srv.AddTool(
+		mcp.NewTool("training_reset_exercise",
+			mcp.WithDescription("Resets the current exercise to clean files. Your current code is saved to a git backup branch. Only works when the interactive loop is waiting at a prompt (failed or succeeded state). After reset, the exercise is re-run automatically."),
+			mcp.WithDestructiveHintAnnotation(true),
+			mcp.WithReadOnlyHintAnnotation(false),
+		),
+		handleResetExercise(state),
+	)
+
+	srv.AddTool(
 		mcp.NewTool("training_send_feedback",
 			mcp.WithDescription("Submits user feedback about a training exercise"),
 			mcp.WithReadOnlyHintAnnotation(false),
@@ -128,9 +137,8 @@ func handleRunSolution(state *LoopState) server.ToolHandlerFunc {
 		case StateFailed, StateSucceeded:
 			// Valid states for running
 		default:
-			return mcp.NewToolResultError(fmt.Sprintf(
-				"Cannot run solution: current state is '%s'. Must be 'failed' or 'succeeded'.",
-				currentState,
+			return mcp.NewToolResultError(stateError(
+				"Cannot run solution", currentState, "failed' or 'succeeded", state,
 			)), nil
 		}
 
@@ -143,9 +151,8 @@ func handleNextExercise(state *LoopState) server.ToolHandlerFunc {
 		currentState := state.GetState()
 
 		if currentState != StateSucceeded {
-			return mcp.NewToolResultError(fmt.Sprintf(
-				"Cannot advance to next exercise: current state is '%s'. Must be 'succeeded'.",
-				currentState,
+			return mcp.NewToolResultError(stateError(
+				"Cannot advance to next exercise", currentState, "succeeded", state,
 			)), nil
 		}
 
@@ -159,6 +166,28 @@ func handleNextExercise(state *LoopState) server.ToolHandlerFunc {
 		}
 
 		return sendCommand(state, cmdType, msg, 5*time.Minute)
+	}
+}
+
+func handleResetExercise(state *LoopState) server.ToolHandlerFunc {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		currentState := state.GetState()
+
+		switch currentState {
+		case StateFailed, StateSucceeded:
+			// Valid states for reset
+		default:
+			return mcp.NewToolResultError(stateError(
+				"Cannot reset exercise", currentState, "failed' or 'succeeded", state,
+			)), nil
+		}
+
+		info := state.GetExerciseInfo()
+		if info.IsTextOnly {
+			return mcp.NewToolResultError("Cannot reset exercise: text-only exercises have no files to reset."), nil
+		}
+
+		return sendCommand(state, CmdResetExercise, "Exercise reset triggered", 2*time.Minute)
 	}
 }
 
@@ -251,6 +280,16 @@ func handleSendFeedback(state *LoopState) server.ToolHandlerFunc {
 	}
 }
 
+// stateError builds an error message for state-gated tool calls, appending
+// the pending action (e.g. "Merge conflict decision needed. Go to CLI.") when one exists.
+func stateError(action string, current ExerciseState, expected string, state *LoopState) string {
+	msg := fmt.Sprintf("%s: current state is '%s'. Must be '%s'.", action, current, expected)
+	if pa := state.GetPendingAction(); pa != "" {
+		msg += " Pending action: " + pa
+	}
+	return msg
+}
+
 func sendCommand(state *LoopState, cmdType CommandType, successMsg string, responseTimeout time.Duration) (*mcp.CallToolResult, error) {
 	resultCh := make(chan MCPResult, 1)
 
@@ -279,6 +318,10 @@ func sendCommand(state *LoopState, cmdType CommandType, successMsg string, respo
 		}
 		return mcp.NewToolResultText(msg), nil
 	case <-time.After(responseTimeout):
-		return mcp.NewToolResultError("Timed out waiting for the training loop to respond."), nil
+		msg := "Timed out waiting for the training loop to respond."
+		if pa := state.GetPendingAction(); pa != "" {
+			msg += " Pending action: " + pa
+		}
+		return mcp.NewToolResultError(msg), nil
 	}
 }

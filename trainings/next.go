@@ -1,6 +1,7 @@
 package trainings
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"os"
@@ -11,14 +12,62 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
+	"golang.org/x/term"
 
 	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings/config"
 	"github.com/ThreeDotsLabs/cli/trainings/files"
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 	"github.com/ThreeDotsLabs/cli/trainings/git"
-	mcppkg "github.com/ThreeDotsLabs/cli/trainings/mcp"
 )
+
+// promptRune displays a prompt for the given actions and reads a single valid keypress.
+// Uses h.stdinCh when MCP is active, otherwise reads os.Stdin directly.
+// This is the MCP-safe replacement for internal.Prompt when called from within interactiveRun.
+func (h *Handlers) promptRune(actions internal.Actions) rune {
+	defer fmt.Println()
+
+	printPrompt(actions)
+
+	termState, rawErr := term.MakeRaw(0)
+	if rawErr == nil {
+		defer term.Restore(0, termState)
+	}
+
+	if h.stdinCh == nil {
+		reader := bufio.NewReader(os.Stdin)
+		for {
+			ch, _, err := reader.ReadRune()
+			if err != nil {
+				return 'q'
+			}
+			if string(ch) == "\x03" {
+				if rawErr == nil {
+					term.Restore(0, termState)
+				}
+				os.Exit(0)
+			}
+			if key, ok := actions.ReadKeyFromInput(ch); ok {
+				return key
+			}
+		}
+	}
+
+	drainChannel(h.stdinCh)
+
+	for {
+		ch := <-h.stdinCh
+		if string(ch) == "\x03" {
+			if rawErr == nil {
+				term.Restore(0, termState)
+			}
+			os.Exit(0)
+		}
+		if key, ok := actions.ReadKeyFromInput(ch); ok {
+			return key
+		}
+	}
+}
 
 var errMergeAborted = fmt.Errorf("merge aborted by user")
 
@@ -247,13 +296,12 @@ func (h *Handlers) setExerciseWithGit(
 			if h.loopState != nil {
 				h.loopState.SetPendingAction("Merge conflict decision needed. Go to CLI.")
 			}
-			conflictPrompt = internal.Prompt(
+			conflictPrompt = h.promptRune(
 				internal.Actions{
 					{Shortcut: '\n', Action: "merge (resolve in editor)", ShortcutAliases: []rune{'\r'}},
 					{Shortcut: 'g', Action: "replace exercise files with ours"},
 					{Shortcut: 'q', Action: "abort: stay on current exercise"},
 				},
-				os.Stdin, os.Stdout,
 			)
 			if h.loopState != nil {
 				h.loopState.ClearPendingAction()
@@ -283,7 +331,11 @@ func (h *Handlers) setExerciseWithGit(
 			if h.loopState != nil {
 				h.loopState.SetPendingAction("Uncommitted changes blocking next exercise. Go to CLI to commit or stash.")
 			}
-			if !internal.ConfirmPromptDefaultYes("retry") {
+			retryChoice := h.promptRune(internal.Actions{
+				{Shortcut: '\n', Action: "retry", ShortcutAliases: []rune{'\r'}},
+				{Shortcut: 'q', Action: "quit"},
+			})
+			if retryChoice != '\n' {
 				if h.loopState != nil {
 					h.loopState.ClearPendingAction()
 				}
@@ -323,7 +375,7 @@ func (h *Handlers) setExerciseWithGit(
 		} else if internal.IsStdinTerminal() {
 			// Interactive conflict resolution loop
 			trainingName := h.config.TrainingConfig(fs).TrainingName
-			if err := resolveConflictsInteractive(gitOps, initBranch, mergeMsg, moduleExercisePath, exerciseDir, trainingName, h.loopState); err != nil {
+			if err := h.resolveConflictsInteractive(gitOps, initBranch, mergeMsg, moduleExercisePath, exerciseDir, trainingName); err != nil {
 				return err
 			}
 		} else {
@@ -518,7 +570,7 @@ func writeExerciseMd(allFiles []*genproto.File, fs afero.Fs, exerciseDir string)
 // IMPORTANT: The 'g' (replace) path is destructive — it overwrites user files.
 // We MUST save their code to a backup branch before replacing.
 // The user explicitly confirms this action.
-func resolveConflictsInteractive(gitOps *git.Ops, initBranch, mergeMsg, moduleExercisePath, exerciseDir, trainingName string, loopState *mcppkg.LoopState) error {
+func (h *Handlers) resolveConflictsInteractive(gitOps *git.Ops, initBranch, mergeMsg, moduleExercisePath, exerciseDir, trainingName string) error {
 	conflictFiles, _ := gitOps.UnmergedFiles()
 	fmt.Println(color.YellowString("\n  Merge conflict detected."))
 	fmt.Println(color.YellowString("  Files with conflicts:"))
@@ -534,19 +586,18 @@ func resolveConflictsInteractive(gitOps *git.Ops, initBranch, mergeMsg, moduleEx
 	fmt.Printf("  Your code will be saved to %s: you can restore it anytime.\n", color.MagentaString(backupBranch))
 
 	for {
-		if loopState != nil {
-			loopState.SetPendingAction("Merge conflicts need resolution. Go to CLI.")
+		if h.loopState != nil {
+			h.loopState.SetPendingAction("Merge conflicts need resolution. Go to CLI.")
 		}
-		choice := internal.Prompt(
+		choice := h.promptRune(
 			internal.Actions{
 				{Shortcut: '\n', Action: "confirm (conflicts resolved)", ShortcutAliases: []rune{'\r'}},
 				{Shortcut: 'g', Action: "replace exercise files with ours"},
 				{Shortcut: 'q', Action: "abort: cancel merge"},
 			},
-			os.Stdin, os.Stdout,
 		)
-		if loopState != nil {
-			loopState.ClearPendingAction()
+		if h.loopState != nil {
+			h.loopState.ClearPendingAction()
 		}
 
 		switch choice {
