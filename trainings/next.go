@@ -19,6 +19,7 @@ import (
 	"github.com/ThreeDotsLabs/cli/trainings/files"
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 	"github.com/ThreeDotsLabs/cli/trainings/git"
+	mcppkg "github.com/ThreeDotsLabs/cli/trainings/mcp"
 )
 
 // promptRune displays a prompt for the given actions and reads a single valid keypress.
@@ -296,6 +297,13 @@ func (h *Handlers) setExerciseWithGit(
 			if h.loopState != nil {
 				h.loopState.SetPendingAction("Merge conflict decision needed. Go to CLI.")
 			}
+			// Unblock MCP client immediately — the conflict prompt only accepts stdin input,
+			// so the MCP tool call would hang until the 5-minute timeout otherwise.
+			h.sendPendingMCPResult(mcppkg.MCPResult{
+				Error: "Advancing is paused: merge conflicts detected in files you modified. " +
+					"The user must resolve this in the CLI terminal. " +
+					"Call training_get_exercise_info to check when resolved.",
+			})
 			conflictPrompt = h.promptRune(
 				internal.Actions{
 					{Shortcut: '\n', Action: "merge (resolve in editor)", ShortcutAliases: []rune{'\r'}},
