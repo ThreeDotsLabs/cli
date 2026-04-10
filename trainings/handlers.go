@@ -65,6 +65,10 @@ func NewHandlers(cliVersion CliMetadata, mcpPort int) *Handlers {
 		mcpPort:       mcpPort,
 	}
 
+	if internal.DoNotTrack() {
+		logrus.Debug("DO_NOT_TRACK is set: some telemetry headers are disabled")
+	}
+
 	if mcpPort > 0 {
 		h.loopState = mcppkg.NewLoopState()
 		h.loopState.SetCLIVersion(cliVersion.Version)

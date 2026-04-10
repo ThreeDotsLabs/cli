@@ -8,6 +8,8 @@ import (
 	"github.com/spf13/afero"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
+
+	"github.com/ThreeDotsLabs/cli/internal"
 )
 
 type subActionKeyType struct{}
@@ -33,16 +35,19 @@ func (h *Handlers) debugHeaders() metadata.MD {
 		"cli-version":  h.cliMetadata.Version,
 		"cli-commit":   h.cliMetadata.Commit,
 		"os":           h.cliMetadata.OS,
-		"os-version":   h.cliMetadata.OSVersion,
 		"architecture": h.cliMetadata.Architecture,
 		"go-version":   h.cliMetadata.GoVersion,
-		"git-version":  h.cliMetadata.GitVersion,
 		"command":      h.cliMetadata.ExecutedCommand,
 		"interactive":  fmt.Sprint(h.cliMetadata.Interactive),
 	})
 
+	if !internal.DoNotTrack() {
+		md.Set("os-version", h.cliMetadata.OSVersion)
+		md.Set("git-version", h.cliMetadata.GitVersion)
+		h.appendMCPHeaders(md)
+	}
+
 	h.appendTrainingHeaders(md)
-	h.appendMCPHeaders(md)
 
 	return md
 }

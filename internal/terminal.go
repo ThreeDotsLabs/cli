@@ -41,6 +41,11 @@ func NewRawTerminalReader(stdin io.Reader) (*bufio.Reader, func(), error) {
 	}, err
 }
 
+func DoNotTrack() bool {
+	v, _ := strconv.ParseBool(os.Getenv("DO_NOT_TRACK"))
+	return v
+}
+
 // TerminalWidth returns the current terminal width, falling back to 60 if not a TTY.
 func TerminalWidth() int {
 	w, _, err := terminal.GetSize(stdoutFileDescriptor)
