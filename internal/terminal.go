@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"io"
 	"os"
+	"strconv"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -15,6 +16,9 @@ const stdoutFileDescriptor = 1
 
 // IsStdinTerminal returns true if stdin is connected to a terminal (not a pipe or file).
 func IsStdinTerminal() bool {
+	if v, _ := strconv.ParseBool(os.Getenv("TDL_FORCE_INTERACTIVE")); v {
+		return true
+	}
 	return terminal.IsTerminal(stdinFileDescriptor)
 }
 
