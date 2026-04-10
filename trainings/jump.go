@@ -305,7 +305,7 @@ func (h *Handlers) Jump(ctx context.Context, exerciseID string) error {
 			case '\n':
 				// Continue — no file ops, just update config pointer
 			case 'r':
-				if err := h.resetCleanFiles(gitOps, initBranch, moduleExercisePath, resp.Dir); err != nil {
+				if _, err := h.resetCleanFiles(gitOps, initBranch, moduleExercisePath, resp.Dir); err != nil {
 					return err
 				}
 			case 's':

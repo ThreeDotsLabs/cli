@@ -438,6 +438,25 @@ func (g *Ops) DiffStatPath(ref1, ref2, path string) (string, error) {
 	return g.run("diff", "--stat", "--color=always", ref1+".."+ref2, "--", path)
 }
 
+// DiffStatPathPlain returns a diff stat without ANSI color codes (suitable for machine consumption).
+func (g *Ops) DiffStatPathPlain(ref1, ref2, path string) (string, error) {
+	if !g.enabled {
+		return "", nil
+	}
+
+	return g.run("diff", "--stat", "--no-color", ref1+".."+ref2, "--", path)
+}
+
+// DiffPath returns a full diff between two refs, restricted to a specific path.
+// Output has no ANSI color codes (suitable for machine consumption).
+func (g *Ops) DiffPath(ref1, ref2, path string) (string, error) {
+	if !g.enabled {
+		return "", nil
+	}
+
+	return g.run("diff", "--no-color", ref1+".."+ref2, "--", path)
+}
+
 // DiffStatWorkingTree returns a diff stat of unstaged changes in the working tree for a path.
 func (g *Ops) DiffStatWorkingTree(path string) (string, error) {
 	if !g.enabled {

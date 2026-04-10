@@ -21,20 +21,21 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Trainings_Init_FullMethodName                = "/Trainings/Init"
-	Trainings_GetTrainings_FullMethodName        = "/Trainings/GetTrainings"
-	Trainings_StartTraining_FullMethodName       = "/Trainings/StartTraining"
-	Trainings_NextExercise_FullMethodName        = "/Trainings/NextExercise"
-	Trainings_VerifyExercise_FullMethodName      = "/Trainings/VerifyExercise"
-	Trainings_GetSolutions_FullMethodName        = "/Trainings/GetSolutions"
-	Trainings_GetSolutionFiles_FullMethodName    = "/Trainings/GetSolutionFiles"
-	Trainings_GetAllSolutionFiles_FullMethodName = "/Trainings/GetAllSolutionFiles"
-	Trainings_GetExercises_FullMethodName        = "/Trainings/GetExercises"
-	Trainings_GetExercise_FullMethodName         = "/Trainings/GetExercise"
-	Trainings_CanSkipExercise_FullMethodName     = "/Trainings/CanSkipExercise"
-	Trainings_SkipExercise_FullMethodName        = "/Trainings/SkipExercise"
-	Trainings_GetGoldenSolution_FullMethodName   = "/Trainings/GetGoldenSolution"
-	Trainings_Ping_FullMethodName                = "/Trainings/Ping"
+	Trainings_Init_FullMethodName                 = "/Trainings/Init"
+	Trainings_GetTrainings_FullMethodName         = "/Trainings/GetTrainings"
+	Trainings_StartTraining_FullMethodName        = "/Trainings/StartTraining"
+	Trainings_NextExercise_FullMethodName         = "/Trainings/NextExercise"
+	Trainings_VerifyExercise_FullMethodName       = "/Trainings/VerifyExercise"
+	Trainings_GetSolutions_FullMethodName         = "/Trainings/GetSolutions"
+	Trainings_GetSolutionFiles_FullMethodName     = "/Trainings/GetSolutionFiles"
+	Trainings_GetAllSolutionFiles_FullMethodName  = "/Trainings/GetAllSolutionFiles"
+	Trainings_GetExercises_FullMethodName         = "/Trainings/GetExercises"
+	Trainings_GetExercise_FullMethodName          = "/Trainings/GetExercise"
+	Trainings_CanSkipExercise_FullMethodName      = "/Trainings/CanSkipExercise"
+	Trainings_SkipExercise_FullMethodName         = "/Trainings/SkipExercise"
+	Trainings_GetGoldenSolution_FullMethodName    = "/Trainings/GetGoldenSolution"
+	Trainings_GetAgentInstructions_FullMethodName = "/Trainings/GetAgentInstructions"
+	Trainings_Ping_FullMethodName                 = "/Trainings/Ping"
 )
 
 // TrainingsClient is the client API for Trainings service.
@@ -54,6 +55,7 @@ type TrainingsClient interface {
 	CanSkipExercise(ctx context.Context, in *CanSkipExerciseRequest, opts ...grpc.CallOption) (*CanSkipExerciseResponse, error)
 	SkipExercise(ctx context.Context, in *SkipExerciseRequest, opts ...grpc.CallOption) (*SkipExerciseResponse, error)
 	GetGoldenSolution(ctx context.Context, in *GetGoldenSolutionRequest, opts ...grpc.CallOption) (*GetGoldenSolutionResponse, error)
+	GetAgentInstructions(ctx context.Context, in *GetAgentInstructionsRequest, opts ...grpc.CallOption) (*GetAgentInstructionsResponse, error)
 	Ping(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
@@ -204,6 +206,16 @@ func (c *trainingsClient) GetGoldenSolution(ctx context.Context, in *GetGoldenSo
 	return out, nil
 }
 
+func (c *trainingsClient) GetAgentInstructions(ctx context.Context, in *GetAgentInstructionsRequest, opts ...grpc.CallOption) (*GetAgentInstructionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAgentInstructionsResponse)
+	err := c.cc.Invoke(ctx, Trainings_GetAgentInstructions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *trainingsClient) Ping(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
@@ -231,6 +243,7 @@ type TrainingsServer interface {
 	CanSkipExercise(context.Context, *CanSkipExerciseRequest) (*CanSkipExerciseResponse, error)
 	SkipExercise(context.Context, *SkipExerciseRequest) (*SkipExerciseResponse, error)
 	GetGoldenSolution(context.Context, *GetGoldenSolutionRequest) (*GetGoldenSolutionResponse, error)
+	GetAgentInstructions(context.Context, *GetAgentInstructionsRequest) (*GetAgentInstructionsResponse, error)
 	Ping(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
 }
 
@@ -279,6 +292,9 @@ func (UnimplementedTrainingsServer) SkipExercise(context.Context, *SkipExerciseR
 }
 func (UnimplementedTrainingsServer) GetGoldenSolution(context.Context, *GetGoldenSolutionRequest) (*GetGoldenSolutionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetGoldenSolution not implemented")
+}
+func (UnimplementedTrainingsServer) GetAgentInstructions(context.Context, *GetAgentInstructionsRequest) (*GetAgentInstructionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAgentInstructions not implemented")
 }
 func (UnimplementedTrainingsServer) Ping(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
@@ -530,6 +546,24 @@ func _Trainings_GetGoldenSolution_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Trainings_GetAgentInstructions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAgentInstructionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TrainingsServer).GetAgentInstructions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Trainings_GetAgentInstructions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TrainingsServer).GetAgentInstructions(ctx, req.(*GetAgentInstructionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Trainings_Ping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
@@ -602,6 +636,10 @@ var Trainings_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetGoldenSolution",
 			Handler:    _Trainings_GetGoldenSolution_Handler,
+		},
+		{
+			MethodName: "GetAgentInstructions",
+			Handler:    _Trainings_GetAgentInstructions_Handler,
 		},
 		{
 			MethodName: "Ping",

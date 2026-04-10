@@ -1,7 +1,9 @@
 package trainings
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -14,6 +16,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
+	"golang.org/x/term"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -22,6 +25,7 @@ import (
 	"github.com/ThreeDotsLabs/cli/trainings/files"
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 	"github.com/ThreeDotsLabs/cli/trainings/git"
+	mcppkg "github.com/ThreeDotsLabs/cli/trainings/mcp"
 )
 
 func (h *Handlers) Run(ctx context.Context, detached bool) error {
@@ -34,11 +38,53 @@ func (h *Handlers) Run(ctx context.Context, detached bool) error {
 	trainingRootFs := newTrainingRootFs(trainingRoot)
 	printGitNotices(h.config.TrainingConfig(trainingRootFs))
 
+	agentInstructions, err := h.fetchAgentInstructions(ctx, trainingRootFs)
+	if err != nil {
+		return err
+	}
+
+	// MCP auto-detection: prompt to enable if AI coding tools are found.
+	// Skipped for detached mode and when --mcp-port 0 explicitly disables MCP.
+	// Gated on the server providing agent instructions for this training:
+	// if the training has no instructions, skip MCP setup entirely.
+	if !detached && h.mcpPort != 0 {
+		if len(agentInstructions) == 0 {
+			h.mcpPort = 0
+			h.loopState = nil
+		} else {
+			h.configureMCPIfNeeded(trainingRootFs, agentInstructions)
+		}
+	}
+
 	if detached {
 		return h.detachedRun(ctx, trainingRootFs)
 	} else {
 		return h.interactiveRun(ctx, trainingRootFs)
 	}
+}
+
+// fetchAgentInstructions asks the server for training-specific agent instructions
+// (content for CLAUDE.md / AGENTS.md). Returns nil when the training has none.
+// On codes.Unimplemented (old server) it logs a warning and returns nil.
+func (h *Handlers) fetchAgentInstructions(ctx context.Context, trainingRootFs *afero.BasePathFs) ([]byte, error) {
+	cfg := h.config.TrainingConfig(trainingRootFs)
+
+	resp, err := h.newGrpcClient().GetAgentInstructions(ctx, &genproto.GetAgentInstructionsRequest{
+		TrainingName: cfg.TrainingName,
+		Token:        h.config.GlobalConfig().Token,
+	})
+	if err != nil {
+		if status.Code(err) == codes.Unimplemented {
+			logrus.Warn("Server does not support agent instructions, skipping AI companion setup")
+			return nil, nil
+		}
+		return nil, errors.Wrap(err, "fetching agent instructions")
+	}
+
+	if resp.AgentInstructions == "" {
+		return nil, nil
+	}
+	return []byte(resp.AgentInstructions), nil
 }
 
 func (h *Handlers) detachedRun(ctx context.Context, trainingRootFs *afero.BasePathFs) error {
@@ -81,11 +127,49 @@ func (h *Handlers) detachedRun(ctx context.Context, trainingRootFs *afero.BasePa
 }
 
 func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.BasePathFs) error {
+	// Start MCP server if enabled
+	if h.loopState != nil && h.mcpPort > 0 {
+		h.setLoopExerciseInfo(trainingRootFs)
+
+		mcpCtx, mcpCancel := context.WithCancel(ctx)
+		defer mcpCancel()
+
+		srv := mcppkg.NewServer(h.loopState, h.mcpPort)
+		if err := srv.Start(mcpCtx); err != nil {
+			logrus.WithError(err).Warn("Failed to start MCP server")
+		} else {
+			fmt.Printf("%s\n", color.HiBlackString("MCP server listening on %s", srv.Addr()))
+		}
+	}
+
+	// Single stdin reader goroutine for the entire interactive session.
+	// Only needed when MCP is active (to select between stdin and MCP commands).
+	if h.loopState != nil {
+		ch := make(chan rune, 1)
+		go func() {
+			reader := bufio.NewReader(os.Stdin)
+			for {
+				r, _, err := reader.ReadRune()
+				if err != nil {
+					return
+				}
+				ch <- r
+			}
+		}()
+		h.stdinCh = ch
+		defer func() { h.stdinCh = nil }()
+	}
+
 	retries := 0
 	mergeAborted := false
 
 	for {
 		if !mergeAborted {
+			h.setLoopState(mcppkg.StateRunning)
+			if h.loopState != nil {
+				h.loopState.ClearLastError()
+			}
+
 			successful, err := h.run(ctx, trainingRootFs)
 			if err != nil && retries < 3 {
 				retries++
@@ -101,11 +185,38 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 				userErr := formatServerError(err)
 				fmt.Println(color.RedString("Failed to execute solution: %s", userErr))
 
-				if !internal.ConfirmPromptDefaultYes("run solution again") {
+				if h.loopState != nil {
+					errMsg := fmt.Sprintf("Training CLI error: %s", userErr)
+					h.loopState.SetLastError(errMsg)
+					fmt.Fprintln(h.loopState.OutputBuffer(), errMsg)
+				}
+
+				h.setLoopState(mcppkg.StateFailed)
+				action, fromMCP := h.waitForAction(
+					internal.Actions{
+						{Shortcut: '\n', Action: "run solution again", ShortcutAliases: []rune{'\r'}},
+						{Shortcut: 'q', Action: "quit"},
+					},
+					map[rune]loopAction{
+						'\n': loopActionRun,
+						'q':  loopActionQuit,
+					},
+					map[mcppkg.CommandType]loopAction{
+						mcppkg.CmdRunSolution:   loopActionRun,
+						mcppkg.CmdResetExercise: loopActionResetExercise,
+					},
+				)
+				ctx = withMCPTriggered(ctx, fromMCP)
+				if action == loopActionQuit {
 					return userErr
-				} else {
+				}
+				if action == loopActionResetExercise {
+					if err := h.resetExerciseFromLoop(ctx, trainingRootFs); err != nil {
+						h.sendPendingMCPResult(mcppkg.MCPResult{Error: fmt.Sprintf("Reset failed: %v", err)})
+					}
 					continue
 				}
+				continue
 			}
 
 			if !successful {
@@ -125,11 +236,32 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 					}
 				}
 
-				if !internal.ConfirmPromptDefaultYes("run solution again") {
+				h.setLoopState(mcppkg.StateFailed)
+				action, fromMCP := h.waitForAction(
+					internal.Actions{
+						{Shortcut: '\n', Action: "run solution again", ShortcutAliases: []rune{'\r'}},
+						{Shortcut: 'q', Action: "quit"},
+					},
+					map[rune]loopAction{
+						'\n': loopActionRun,
+						'q':  loopActionQuit,
+					},
+					map[mcppkg.CommandType]loopAction{
+						mcppkg.CmdRunSolution:   loopActionRun,
+						mcppkg.CmdResetExercise: loopActionResetExercise,
+					},
+				)
+				ctx = withMCPTriggered(ctx, fromMCP)
+				if action == loopActionQuit {
 					return nil
-				} else {
+				}
+				if action == loopActionResetExercise {
+					if err := h.resetExerciseFromLoop(ctx, trainingRootFs); err != nil {
+						h.sendPendingMCPResult(mcppkg.MCPResult{Error: fmt.Sprintf("Reset failed: %v", err)})
+					}
 					continue
 				}
+				continue
 			}
 		}
 		mergeAborted = false
@@ -137,6 +269,9 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 		// Build actions dynamically based on git config
 		actions := internal.Actions{
 			{Shortcut: '\n', Action: "go to the next exercise", ShortcutAliases: []rune{'\r'}},
+		}
+		actionMap := map[rune]loopAction{
+			'\n': loopActionNextExercise,
 		}
 
 		gitOps := h.newGitOps()
@@ -149,20 +284,50 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 
 		if gitOps.Enabled() && !exerciseCfg.IsTextOnly && !cfg.GitAutoGolden {
 			actions = append(actions, internal.Action{Shortcut: 's', Action: "sync with example solution"})
+			actionMap['s'] = loopActionSyncSolution
 		}
 		actions = append(actions,
 			internal.Action{Shortcut: 'r', Action: "re-run solution"},
 			internal.Action{Shortcut: 'q', Action: "quit"},
 		)
+		actionMap['r'] = loopActionRun
+		actionMap['q'] = loopActionQuit
 
-		promptResult := internal.Prompt(actions, os.Stdin, os.Stdout)
-		if promptResult == 'q' {
+		h.setLoopState(mcppkg.StateSucceeded)
+		chosenAction, fromMCP := h.waitForAction(
+			actions,
+			actionMap,
+			map[mcppkg.CommandType]loopAction{
+				mcppkg.CmdRunSolution:         loopActionRun,
+				mcppkg.CmdNextExercise:        loopActionNextExercise,
+				mcppkg.CmdSyncAndNextExercise: loopActionSyncSolution,
+				mcppkg.CmdResetExercise:       loopActionResetExercise,
+			},
+		)
+		ctx = withMCPTriggered(ctx, fromMCP)
+
+		if chosenAction == loopActionQuit {
 			os.Exit(0)
 		}
-		if promptResult == 'r' {
+		if chosenAction == loopActionRun {
 			continue
 		}
-		if promptResult == 's' {
+		if chosenAction == loopActionResetExercise {
+			if err := h.resetExerciseFromLoop(ctx, trainingRootFs); err != nil {
+				h.sendPendingMCPResult(mcppkg.MCPResult{Error: fmt.Sprintf("Reset failed: %v", err)})
+			}
+			continue
+		}
+
+		// Starting an advance cycle — clear any stale transition content so the
+		// sync/override step (below) and nextExercise both build on a clean slate.
+		// Must happen before overrideWithGolden; otherwise its captured sync diff
+		// would be wiped before nextExercise can append the scaffold diff.
+		if h.loopState != nil {
+			h.loopState.ClearTransitionContent()
+		}
+
+		if chosenAction == loopActionSyncSolution {
 			h.overrideWithGolden(withSubAction(ctx, "sync-golden-manual"), trainingRootFs, gitOps, exerciseCfg)
 			// Fall through to next exercise (example solution already committed, no staged changes)
 		}
@@ -184,29 +349,48 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 		}
 
 		// Auto-sync: override with example solution automatically after passing
-		if cfg.GitAutoGolden && gitOps.Enabled() && !exerciseCfg.IsTextOnly && promptResult != 's' {
+		if cfg.GitAutoGolden && gitOps.Enabled() && !exerciseCfg.IsTextOnly && chosenAction != loopActionSyncSolution {
 			h.overrideWithGolden(withSubAction(ctx, "sync-golden-auto"), trainingRootFs, gitOps, exerciseCfg)
 		}
 
-		// Create example solution branch for comparison (skip if user pressed 's' or auto-sync ran)
-		if gitOps.Enabled() && !exerciseCfg.IsTextOnly && !cfg.GitAutoGolden && promptResult != 's' {
+		// Create example solution branch for comparison (skip if user synced or auto-sync ran)
+		if gitOps.Enabled() && !exerciseCfg.IsTextOnly && !cfg.GitAutoGolden && chosenAction != loopActionSyncSolution {
 			goldenBranch := git.GoldenBranchName(exerciseCfg.ModuleExercisePath())
 			if !gitOps.BranchExists(goldenBranch) {
 				h.syncGoldenSolution(withSubAction(ctx, "sync-golden-auto"), trainingRootFs, gitOps, exerciseCfg, "compare", time.Now().Add(1*time.Second))
 			}
+
+			// Capture comparison diffstat for MCP when not syncing
+			if h.loopState != nil && gitOps.BranchExists(goldenBranch) {
+				if stat, err := gitOps.DiffStatPathPlain("HEAD", goldenBranch, exerciseCfg.Directory); err == nil && stat != "" {
+					var content strings.Builder
+					content.WriteString("## Files updated in your workspace\n")
+					content.WriteString(stat)
+					content.WriteString("\n")
+					h.loopState.SetTransitionContent(content.String())
+				}
+			}
 		}
+
+		h.setLoopState(mcppkg.StateAdvancing)
 
 		finished, err := h.nextExercise(withSubAction(ctx, "next"), exerciseCfg.ExerciseID, trainingRoot)
 		if errors.Is(err, errMergeAborted) {
+			h.sendPendingMCPResult(mcppkg.MCPResult{Error: "Merge aborted by user. Staying on current exercise."})
 			mergeAborted = true
 			continue // stay on current exercise, re-show prompt
 		}
 		if err != nil {
+			h.sendPendingMCPResult(mcppkg.MCPResult{Error: fmt.Sprintf("Failed to advance: %v", err)})
 			return err
 		}
 		if finished {
+			h.sendPendingMCPResult(mcppkg.MCPResult{Success: true, Message: "Training finished!"})
 			return nil
 		}
+
+		h.setLoopExerciseInfo(trainingRootFs)
+		h.sendPendingMCPResult(h.buildAdvanceResult())
 
 		// this is refreshed config after nextExercise execution
 		currentExerciseConfig := h.config.ExerciseConfig(trainingRootFs)
@@ -236,7 +420,12 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 
 		postActions = append(postActions, internal.Action{Shortcut: 'q', Action: "quit"})
 
-		promptResult = internal.Prompt(postActions, os.Stdin, os.Stdout)
+		if h.loopState != nil {
+			// MCP mode: auto-continue. The MCP client already triggered
+			// the advance — no reason to block before running the solution.
+			continue
+		}
+		promptResult := internal.Prompt(postActions, os.Stdin, os.Stdout)
 		if promptResult == 'q' {
 			os.Exit(0)
 		}
@@ -257,9 +446,12 @@ func (h *Handlers) run(ctx context.Context, trainingRootFs *afero.BasePathFs) (b
 	if isExerciseNoLongerAvailable(err) {
 		fmt.Println(color.YellowString("We did update of the exercise code. Your local workspace is out of sync."))
 
-		if !internal.ConfirmPromptDefaultYes("update your local workspace") {
-			os.Exit(0)
+		if h.loopState == nil {
+			if !internal.ConfirmPromptDefaultYes("update your local workspace") {
+				os.Exit(0)
+			}
 		}
+		// MCP mode: auto-accept update — exercise must be refreshed.
 
 		trainingRoot, err := h.config.FindTrainingRoot()
 		if err != nil {
@@ -317,6 +509,15 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 
 	terminalPath := h.generateRunTerminalPath(trainingRootFs)
 
+	// Set up output capture for MCP log buffer
+	stdoutW := io.Writer(os.Stdout)
+	stderrW := io.Writer(os.Stderr)
+	if h.loopState != nil {
+		h.loopState.OutputBuffer().Reset()
+		stdoutW = io.MultiWriter(os.Stdout, h.loopState.OutputBuffer())
+		stderrW = io.MultiWriter(os.Stderr, h.loopState.OutputBuffer())
+	}
+
 	successful := false
 	finished := false
 	verificationID := ""
@@ -339,15 +540,15 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 		}
 
 		if len(response.Command) > 0 {
-			printCommandWithPath(terminalPath, response.Command)
+			cmdStr := fmt.Sprintf("%s%s", color.CyanString(fmt.Sprintf("••• %s ➜ ", terminalPath)), response.Command)
+			fmt.Fprint(stdoutW, cmdStr)
 		}
 		if len(response.Stdout) > 0 {
-			fmt.Print(response.Stdout)
+			fmt.Fprint(stdoutW, response.Stdout)
 		}
 		if len(response.Stderr) > 0 {
-			_, _ = fmt.Fprint(os.Stderr, response.Stderr)
+			fmt.Fprint(stderrW, response.Stderr)
 		}
-		// todo - support stderr and commands
 
 		if response.Finished {
 			if len(response.GetSuiteResult().GetScenarios()) > 0 {
@@ -401,6 +602,236 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 	} else {
 		return successful, nil
 	}
+}
+
+// loopAction represents what the interactive loop should do next.
+type loopAction int
+
+const (
+	loopActionRun           loopAction = iota // Run (or re-run) the solution
+	loopActionNextExercise                    // Advance to next exercise
+	loopActionSyncSolution                    // Sync with example solution
+	loopActionQuit                            // Quit the loop
+	loopActionResetExercise                   // Reset exercise to clean files
+)
+
+// waitForAction prints a prompt and waits for input from either stdin or the MCP command channel.
+// When MCP is disabled (loopState == nil), it reads stdin synchronously (like internal.Prompt).
+// When MCP is enabled, stdinCh must be a long-lived channel fed by a single goroutine in interactiveRun.
+func (h *Handlers) waitForAction(
+	actions internal.Actions,
+	actionMap map[rune]loopAction,
+	validMCPCmds map[mcppkg.CommandType]loopAction,
+) (loopAction, bool) {
+	if h.loopState == nil {
+		// No MCP — delegate to promptRune for the actual reading.
+		key := h.promptRune(actions)
+		if action, ok := actionMap[key]; ok {
+			return action, false
+		}
+		return loopActionQuit, false
+	}
+
+	// MCP mode — need to select on both stdinCh and MCP commands.
+	defer fmt.Println()
+	printPrompt(actions)
+
+	termState, rawErr := term.MakeRaw(0)
+	if rawErr == nil {
+		defer term.Restore(0, termState)
+	}
+
+	drainChannel(h.stdinCh)
+
+	for {
+		select {
+		case ch := <-h.stdinCh:
+			if string(ch) == "\x03" {
+				if rawErr == nil {
+					term.Restore(0, termState)
+				}
+				os.Exit(0)
+			}
+			if key, ok := actions.ReadKeyFromInput(ch); ok {
+				if action, mapped := actionMap[key]; mapped {
+					return action, false
+				}
+			}
+		case cmd := <-h.loopState.CommandCh():
+			if mappedAction, ok := validMCPCmds[cmd.Type]; ok {
+				if cmd.Type == mcppkg.CmdNextExercise || cmd.Type == mcppkg.CmdSyncAndNextExercise || cmd.Type == mcppkg.CmdResetExercise {
+					// Defer result until the full operation completes (blocking for MCP client).
+					h.pendingMCPResultCh = cmd.ResultCh
+				} else {
+					cmd.ResultCh <- mcppkg.MCPResult{Success: true, Message: "command accepted"}
+				}
+				return mappedAction, true
+			}
+			cmd.ResultCh <- mcppkg.MCPResult{
+				Error: fmt.Sprintf("command '%s' not valid in current state (%s)", cmd.Type, h.loopState.GetState()),
+			}
+		}
+	}
+}
+
+// printPrompt formats and prints the action prompt line.
+func printPrompt(actions internal.Actions) {
+	var actionsStr []string
+	for _, action := range actions {
+		actionsStr = append(actionsStr, fmt.Sprintf(
+			"%s to %s",
+			color.New(color.Bold).Sprint(action.KeyString()),
+			action.Action,
+		))
+	}
+	fmt.Printf("%s", "Press "+formatActionsMessage(actionsStr)+" ")
+}
+
+// drainChannel discards any buffered values from a channel.
+func drainChannel(ch <-chan rune) {
+	for {
+		select {
+		case <-ch:
+		default:
+			return
+		}
+	}
+}
+
+func (h *Handlers) sendPendingMCPResult(result mcppkg.MCPResult) {
+	if h.pendingMCPResultCh != nil {
+		h.pendingMCPResultCh <- result
+		h.pendingMCPResultCh = nil
+	}
+}
+
+func (h *Handlers) buildAdvanceResult() mcppkg.MCPResult {
+	if h.loopState == nil {
+		return mcppkg.MCPResult{}
+	}
+	info := h.loopState.GetExerciseInfo()
+	content := h.loopState.GetTransitionContent()
+
+	resp := struct {
+		Status       string `json:"status"`
+		ExerciseID   string `json:"exercise_id"`
+		Directory    string `json:"directory"`
+		ModuleName   string `json:"module_name"`
+		ExerciseName string `json:"exercise_name"`
+		Content      string `json:"content,omitempty"`
+	}{
+		Status:       "advanced",
+		ExerciseID:   info.ExerciseID,
+		Directory:    info.Directory,
+		ModuleName:   info.ModuleName,
+		ExerciseName: info.ExerciseName,
+		Content:      content,
+	}
+
+	data, _ := json.MarshalIndent(resp, "", "  ")
+	return mcppkg.MCPResult{Success: true, Message: string(data)}
+}
+
+// resetExerciseFromLoop performs a clean-files reset of the current exercise,
+// then sends the deferred MCP result. Called from the interactive loop when
+// CmdResetExercise is received.
+func (h *Handlers) resetExerciseFromLoop(ctx context.Context, trainingRootFs *afero.BasePathFs) error {
+	exerciseCfg := h.config.ExerciseConfig(trainingRootFs)
+	gitOps := h.newGitOps()
+
+	if !gitOps.Enabled() || exerciseCfg.IsTextOnly || exerciseCfg.Directory == "" {
+		return fmt.Errorf("cannot reset: git is not enabled or exercise is text-only")
+	}
+
+	moduleExercisePath := exerciseCfg.ModuleExercisePath()
+	initBranch := git.InitBranchName(moduleExercisePath)
+
+	if !gitOps.BranchExists(initBranch) {
+		return fmt.Errorf("cannot reset: init branch %s does not exist", initBranch)
+	}
+
+	// Auto-commit uncommitted changes before reset
+	if gitOps.HasUncommittedChanges(exerciseCfg.Directory) {
+		saveProgress(gitOps, exerciseCfg.Directory, fmt.Sprintf("save progress on %s", moduleExercisePath))
+	}
+
+	// Perform the clean-files reset
+	backupBranch, err := h.resetCleanFiles(gitOps, initBranch, moduleExercisePath, exerciseCfg.Directory)
+	if err != nil {
+		return err
+	}
+
+	// Fetch exercise.md from server (it's gitignored)
+	cfg := h.config.TrainingConfig(trainingRootFs)
+	scaffoldResp, grpcErr := h.newGrpcClient().GetExercise(ctx, &genproto.GetExerciseRequest{
+		TrainingName: cfg.TrainingName,
+		Token:        h.config.GlobalConfig().Token,
+		ExerciseId:   exerciseCfg.ExerciseID,
+	})
+	if grpcErr != nil {
+		logrus.WithError(grpcErr).Warn("Could not fetch exercise scaffold for exercise.md")
+	} else {
+		writeExerciseMd(scaffoldResp.FilesToCreate, trainingRootFs, exerciseCfg.Directory)
+	}
+
+	// Send deferred MCP result with reset details
+	h.sendPendingMCPResult(h.buildResetResult(backupBranch, exerciseCfg))
+
+	return nil
+}
+
+func (h *Handlers) buildResetResult(backupBranch string, exerciseCfg config.ExerciseConfig) mcppkg.MCPResult {
+	resp := struct {
+		Status       string `json:"status"`
+		ExerciseID   string `json:"exercise_id"`
+		Directory    string `json:"directory"`
+		ModuleName   string `json:"module_name"`
+		ExerciseName string `json:"exercise_name"`
+		BackupBranch string `json:"backup_branch,omitempty"`
+	}{
+		Status:       "reset",
+		ExerciseID:   exerciseCfg.ExerciseID,
+		Directory:    exerciseCfg.Directory,
+		ModuleName:   exerciseCfg.ModuleName,
+		ExerciseName: exerciseCfg.ExerciseName,
+		BackupBranch: backupBranch,
+	}
+
+	data, _ := json.MarshalIndent(resp, "", "  ")
+	return mcppkg.MCPResult{Success: true, Message: string(data)}
+}
+
+func formatActionsMessage(actionsStr []string) string {
+	switch len(actionsStr) {
+	case 0:
+		return ""
+	case 1:
+		return actionsStr[0]
+	default:
+		return strings.Join(actionsStr[:len(actionsStr)-1], ", ") + " or " + actionsStr[len(actionsStr)-1]
+	}
+}
+
+func (h *Handlers) setLoopExerciseInfo(trainingRootFs *afero.BasePathFs) {
+	if h.loopState == nil {
+		return
+	}
+	cfg := h.config.ExerciseConfig(trainingRootFs)
+	h.loopState.SetExerciseInfo(mcppkg.ExerciseInfo{
+		ExerciseID:   cfg.ExerciseID,
+		Directory:    cfg.Directory,
+		IsTextOnly:   cfg.IsTextOnly,
+		IsOptional:   cfg.IsOptional,
+		ModuleName:   cfg.ModuleName,
+		ExerciseName: cfg.ExerciseName,
+	})
+}
+
+func (h *Handlers) setLoopState(state mcppkg.ExerciseState) {
+	if h.loopState == nil {
+		return
+	}
+	h.loopState.SetState(state)
 }
 
 // compareDir returns exerciseDir relative to the user's cwd, so that the
@@ -468,7 +899,7 @@ func (h *Handlers) overrideWithGolden(ctx context.Context, trainingRootFs *afero
 	exerciseDir := exerciseCfg.Directory
 	moduleExercisePath := exerciseCfg.ModuleExercisePath()
 
-	// Commit uncommitted changes before overriding
+	// Commit uncommitted changes before overriding so they end up in git history.
 	if gitOps.HasUncommittedChanges(exerciseDir) {
 		if err := gitOps.AddAll(exerciseDir); err != nil {
 			logrus.WithError(err).Warn("Could not stage solution files before override")
@@ -522,14 +953,34 @@ func (h *Handlers) overrideWithGolden(ctx context.Context, trainingRootFs *afero
 		logrus.WithError(err).Warn("Could not stage golden override")
 		return
 	}
+	goldenCommitted := false
 	if gitOps.HasStagedChanges() {
 		if err := gitOps.Commit(fmt.Sprintf("override with example solution for %s", moduleExercisePath)); err != nil {
 			logrus.WithError(err).Warn("Could not commit golden override")
 			return
 		}
+		goldenCommitted = true
 	}
 
 	fmt.Println(color.GreenString("  Your code replaced with example solution."))
+
+	// Capture the sync diffstat (student → golden) so the MCP client can surface it.
+	// Only the stat — the full diff is noise; the student can run `git diff` themselves
+	// if they want the full body.
+	if h.loopState != nil && goldenCommitted {
+		var content strings.Builder
+		if stat, err := gitOps.DiffStatPathPlain(backupBranch, "HEAD", exerciseDir); err == nil && stat != "" {
+			content.WriteString("## Sync: your code vs example solution\n")
+			content.WriteString(stat)
+			content.WriteString("\n")
+		}
+		if s := content.String(); s != "" {
+			h.loopState.SetTransitionContent(s)
+			logrus.WithField("bytes", len(s)).Debug("Sync diff captured")
+		} else {
+			logrus.Info("Sync diff was empty (no changes between student code and golden)")
+		}
+	}
 }
 
 // syncGoldenSolution creates a branch with the example solution for comparison.

@@ -9,8 +9,10 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/manifoldco/promptui"
+	"github.com/sirupsen/logrus"
 
 	"github.com/ThreeDotsLabs/cli/internal"
+	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 	"github.com/ThreeDotsLabs/cli/trainings/git"
 )
 
@@ -97,18 +99,35 @@ func (h *Handlers) Reset(ctx context.Context) error {
 
 	switch resetMode {
 	case 0:
-		return h.resetCleanFiles(gitOps, initBranch, moduleExercisePath, exerciseCfg.Directory)
+		if _, err := h.resetCleanFiles(gitOps, initBranch, moduleExercisePath, exerciseCfg.Directory); err != nil {
+			return err
+		}
 	case 1:
-		return h.resetMissingOnly(gitOps, initBranch, moduleExercisePath, exerciseCfg.Directory, trainingRoot)
+		if err := h.resetMissingOnly(gitOps, initBranch, moduleExercisePath, exerciseCfg.Directory, trainingRoot); err != nil {
+			return err
+		}
 	case 2:
 		fmt.Println("Cancelled")
 		return nil
 	}
 
+	// exercise.md is gitignored, so checkout from init branch won't restore it.
+	// Fetch from server and write directly.
+	scaffoldResp, err := h.newGrpcClient().GetExercise(ctx, &genproto.GetExerciseRequest{
+		TrainingName: trainingConfig.TrainingName,
+		Token:        h.config.GlobalConfig().Token,
+		ExerciseId:   exerciseCfg.ExerciseID,
+	})
+	if err != nil {
+		logrus.WithError(err).Warn("Could not fetch exercise scaffold for exercise.md")
+	} else {
+		writeExerciseMd(scaffoldResp.FilesToCreate, trainingRootFs, exerciseCfg.Directory)
+	}
+
 	return nil
 }
 
-func (h *Handlers) resetCleanFiles(gitOps *git.Ops, initBranch, moduleExercisePath, exerciseDir string) error {
+func (h *Handlers) resetCleanFiles(gitOps *git.Ops, initBranch, moduleExercisePath, exerciseDir string) (string, error) {
 	// Save user's work to backup branch
 	backupBranch := git.BackupBranchName(moduleExercisePath)
 	if err := gitOps.CreateBranchFromHead(backupBranch); err != nil {
@@ -121,7 +140,7 @@ func (h *Handlers) resetCleanFiles(gitOps *git.Ops, initBranch, moduleExercisePa
 
 	// Restore all exercise files from init branch
 	if err := gitOps.CheckoutFiles(initBranch, exerciseDir); err != nil {
-		return fmt.Errorf("could not restore exercise files: %w", err)
+		return "", fmt.Errorf("could not restore exercise files: %w", err)
 	}
 
 	_ = gitOps.ResetStaging()
@@ -146,7 +165,7 @@ func (h *Handlers) resetCleanFiles(gitOps *git.Ops, initBranch, moduleExercisePa
 	fmt.Println("  Restore anytime with: " + color.CyanString("git checkout %s -- %s", backupBranch, exerciseDir))
 	fmt.Println()
 
-	return nil
+	return backupBranch, nil
 }
 
 func (h *Handlers) resetMissingOnly(gitOps *git.Ops, initBranch, moduleExercisePath, exerciseDir, trainingRoot string) error {

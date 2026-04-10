@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"io"
 	"os"
+	"strconv"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -15,6 +16,9 @@ const stdoutFileDescriptor = 1
 
 // IsStdinTerminal returns true if stdin is connected to a terminal (not a pipe or file).
 func IsStdinTerminal() bool {
+	if v, _ := strconv.ParseBool(os.Getenv("TDL_FORCE_INTERACTIVE")); v {
+		return true
+	}
 	return terminal.IsTerminal(stdinFileDescriptor)
 }
 
@@ -35,6 +39,11 @@ func NewRawTerminalReader(stdin io.Reader) (*bufio.Reader, func(), error) {
 			logrus.WithError(err).Warn("Failed to restore terminal")
 		}
 	}, err
+}
+
+func DoNotTrack() bool {
+	v, _ := strconv.ParseBool(os.Getenv("DO_NOT_TRACK"))
+	return v
 }
 
 // TerminalWidth returns the current terminal width, falling back to 60 if not a TTY.

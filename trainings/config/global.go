@@ -13,10 +13,12 @@ import (
 )
 
 type GlobalConfig struct {
-	Token      string `toml:"token"`
-	ServerAddr string `toml:"server_addr"`
-	Region     string `toml:"region"`
-	Insecure   bool   `toml:"insecure"`
+	Token         string `toml:"token"`
+	ServerAddr    string `toml:"server_addr"`
+	Region        string `toml:"region"`
+	Insecure      bool   `toml:"insecure"`
+	MCPConfigured bool   `toml:"mcp_configured,omitempty"`
+	MCPEnabled    bool   `toml:"mcp_enabled,omitempty"`
 }
 
 func globalConfigPath() string {

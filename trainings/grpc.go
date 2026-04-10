@@ -8,6 +8,8 @@ import (
 	"github.com/spf13/afero"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
+
+	"github.com/ThreeDotsLabs/cli/internal"
 )
 
 type subActionKeyType struct{}
@@ -18,6 +20,14 @@ func withSubAction(ctx context.Context, name string) context.Context {
 	return context.WithValue(ctx, subActionKey, name)
 }
 
+type mcpTriggeredKeyType struct{}
+
+var mcpTriggeredKey mcpTriggeredKeyType
+
+func withMCPTriggered(ctx context.Context, triggered bool) context.Context {
+	return context.WithValue(ctx, mcpTriggeredKey, triggered)
+}
+
 // debugHeaders builds the metadata sent with every gRPC request.
 // Called per-RPC so training config changes mid-session are reflected.
 func (h *Handlers) debugHeaders() metadata.MD {
@@ -25,13 +35,17 @@ func (h *Handlers) debugHeaders() metadata.MD {
 		"cli-version":  h.cliMetadata.Version,
 		"cli-commit":   h.cliMetadata.Commit,
 		"os":           h.cliMetadata.OS,
-		"os-version":   h.cliMetadata.OSVersion,
 		"architecture": h.cliMetadata.Architecture,
 		"go-version":   h.cliMetadata.GoVersion,
-		"git-version":  h.cliMetadata.GitVersion,
 		"command":      h.cliMetadata.ExecutedCommand,
 		"interactive":  fmt.Sprint(h.cliMetadata.Interactive),
 	})
+
+	if !internal.DoNotTrack() {
+		md.Set("os-version", h.cliMetadata.OSVersion)
+		md.Set("git-version", h.cliMetadata.GitVersion)
+		h.appendMCPHeaders(md)
+	}
 
 	h.appendTrainingHeaders(md)
 
@@ -61,6 +75,19 @@ func (h *Handlers) appendTrainingHeaders(md metadata.MD) {
 	md.Set("git-sync-mode", cfg.GitGoldenMode)
 }
 
+func (h *Handlers) appendMCPHeaders(md metadata.MD) {
+	if h.loopState == nil {
+		return
+	}
+	name, version := h.loopState.GetMCPClientInfo()
+	if name != "" {
+		md.Set("mcp-client-name", name)
+	}
+	if version != "" {
+		md.Set("mcp-client-version", version)
+	}
+}
+
 func (h *Handlers) unaryInterceptor() grpc.UnaryClientInterceptor {
 	return func(
 		ctx context.Context,
@@ -73,6 +100,9 @@ func (h *Handlers) unaryInterceptor() grpc.UnaryClientInterceptor {
 		md := h.debugHeaders()
 		if sa, ok := ctx.Value(subActionKey).(string); ok && sa != "" {
 			md.Set("command", md.Get("command")[0]+" > "+sa)
+		}
+		if triggered, ok := ctx.Value(mcpTriggeredKey).(bool); ok && triggered {
+			md.Set("mcp-triggered", "true")
 		}
 		ctx = metadata.NewOutgoingContext(ctx, md)
 		return invoker(ctx, method, req, reply, cc, opts...)
@@ -91,6 +121,9 @@ func (h *Handlers) streamInterceptor() grpc.StreamClientInterceptor {
 		md := h.debugHeaders()
 		if sa, ok := ctx.Value(subActionKey).(string); ok && sa != "" {
 			md.Set("command", md.Get("command")[0]+" > "+sa)
+		}
+		if triggered, ok := ctx.Value(mcpTriggeredKey).(bool); ok && triggered {
+			md.Set("mcp-triggered", "true")
 		}
 		ctx = metadata.NewOutgoingContext(ctx, md)
 		return streamer(ctx, desc, cc, method, opts...)
