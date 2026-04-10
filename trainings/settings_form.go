@@ -3,9 +3,9 @@ package trainings
 import (
 	"fmt"
 
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/huh"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	"charm.land/huh/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
@@ -72,7 +72,7 @@ func (h *Handlers) runSettingsForm(cfg *config.TrainingConfig, globalCfg *config
 	form := huh.NewForm(
 		huh.NewGroup(fields...),
 	).
-		WithTheme(huh.ThemeBase()).
+		WithTheme(huh.ThemeFunc(huh.ThemeBase)).
 		WithKeyMap(settingsKeyMap())
 
 	if err := form.Run(); err != nil {
