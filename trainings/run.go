@@ -359,6 +359,17 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 			if !gitOps.BranchExists(goldenBranch) {
 				h.syncGoldenSolution(withSubAction(ctx, "sync-golden-auto"), trainingRootFs, gitOps, exerciseCfg, "compare", time.Now().Add(1*time.Second))
 			}
+
+			// Capture comparison diffstat for MCP when not syncing
+			if h.loopState != nil && gitOps.BranchExists(goldenBranch) {
+				if stat, err := gitOps.DiffStatPathPlain("HEAD", goldenBranch, exerciseCfg.Directory); err == nil && stat != "" {
+					var content strings.Builder
+					content.WriteString("## Files updated in your workspace\n")
+					content.WriteString(stat)
+					content.WriteString("\n")
+					h.loopState.SetTransitionContent(content.String())
+				}
+			}
 		}
 
 		h.setLoopState(mcppkg.StateAdvancing)
