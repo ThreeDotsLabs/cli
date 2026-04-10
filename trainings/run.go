@@ -684,6 +684,9 @@ func (h *Handlers) sendPendingMCPResult(result mcppkg.MCPResult) {
 }
 
 func (h *Handlers) buildAdvanceResult() mcppkg.MCPResult {
+	if h.loopState == nil {
+		return mcppkg.MCPResult{}
+	}
 	info := h.loopState.GetExerciseInfo()
 	content := h.loopState.GetTransitionContent()
 
