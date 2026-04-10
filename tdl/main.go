@@ -265,6 +265,12 @@ var app = &cli.App{
 							Aliases: []string{"d"},
 							Usage:   "running in non-interactive mode",
 						},
+						&cli.IntFlag{
+							Name:    "mcp-port",
+							Usage:   "port for MCP server on 127.0.0.1 (0 to disable)",
+							Value:   39131,
+							EnvVars: []string{"TDL_MCP_PORT"},
+						},
 					},
 					Action: func(c *cli.Context) error {
 						err := newHandlers(c).Run(c.Context, c.Bool("detached"))
@@ -366,9 +372,32 @@ Note: after completing this exercise, the next exercise will be the last one you
 				},
 				{
 					Name:  "settings",
-					Usage: "Change git integration settings (auto-commit, auto-sync)",
+					Usage: "View and change training settings",
+					Flags: []cli.Flag{
+						&cli.StringFlag{Name: "auto-commit", Usage: "auto-commit on exercise pass (on/off)"},
+						&cli.StringFlag{Name: "auto-sync", Usage: "auto-sync with example solution (on/off)"},
+						&cli.StringFlag{Name: "sync-mode", Usage: "sync mode: compare, merge, or override"},
+						&cli.StringFlag{Name: "mcp", Usage: "MCP server for AI coding tools (on/off)"},
+					},
 					Action: func(c *cli.Context) error {
-						return newHandlers(c).ConfigureGit()
+						var opts trainings.SettingsOptions
+						if c.IsSet("auto-commit") {
+							v := parseBoolFlag(c.String("auto-commit"))
+							opts.AutoCommit = &v
+						}
+						if c.IsSet("auto-sync") {
+							v := parseBoolFlag(c.String("auto-sync"))
+							opts.AutoSync = &v
+						}
+						if c.IsSet("sync-mode") {
+							v := c.String("sync-mode")
+							opts.SyncMode = &v
+						}
+						if c.IsSet("mcp") {
+							v := parseBoolFlag(c.String("mcp"))
+							opts.MCP = &v
+						}
+						return newHandlers(c).Settings(opts)
 					},
 				},
 			},
@@ -416,6 +445,8 @@ func newHandlers(c *cli.Context) *trainings.Handlers {
 		cmd = c.Command.FullName()
 	}
 
+	mcpPort := c.Int("mcp-port")
+
 	return trainings.NewHandlers(trainings.CliMetadata{
 		Version:         version,
 		Commit:          commit,
@@ -426,7 +457,7 @@ func newHandlers(c *cli.Context) *trainings.Handlers {
 		GitVersion:      gitVersionString(),
 		ExecutedCommand: cmd,
 		Interactive:     internal.IsStdinTerminal(),
-	})
+	}, mcpPort)
 }
 
 func osVersion() string {
@@ -435,6 +466,15 @@ func osVersion() string {
 		return ""
 	}
 	return strings.TrimSpace(string(out))
+}
+
+func parseBoolFlag(s string) bool {
+	switch strings.ToLower(s) {
+	case "on", "true", "1", "yes":
+		return true
+	default:
+		return false
+	}
 }
 
 func gitVersionString() string {

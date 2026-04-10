@@ -9,8 +9,10 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/manifoldco/promptui"
+	"github.com/sirupsen/logrus"
 
 	"github.com/ThreeDotsLabs/cli/internal"
+	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 	"github.com/ThreeDotsLabs/cli/trainings/git"
 )
 
@@ -97,12 +99,29 @@ func (h *Handlers) Reset(ctx context.Context) error {
 
 	switch resetMode {
 	case 0:
-		return h.resetCleanFiles(gitOps, initBranch, moduleExercisePath, exerciseCfg.Directory)
+		if err := h.resetCleanFiles(gitOps, initBranch, moduleExercisePath, exerciseCfg.Directory); err != nil {
+			return err
+		}
 	case 1:
-		return h.resetMissingOnly(gitOps, initBranch, moduleExercisePath, exerciseCfg.Directory, trainingRoot)
+		if err := h.resetMissingOnly(gitOps, initBranch, moduleExercisePath, exerciseCfg.Directory, trainingRoot); err != nil {
+			return err
+		}
 	case 2:
 		fmt.Println("Cancelled")
 		return nil
+	}
+
+	// exercise.md is gitignored, so checkout from init branch won't restore it.
+	// Fetch from server and write directly.
+	scaffoldResp, err := h.newGrpcClient().GetExercise(ctx, &genproto.GetExerciseRequest{
+		TrainingName: trainingConfig.TrainingName,
+		Token:        h.config.GlobalConfig().Token,
+		ExerciseId:   exerciseCfg.ExerciseID,
+	})
+	if err != nil {
+		logrus.WithError(err).Warn("Could not fetch exercise scaffold for exercise.md")
+	} else {
+		writeExerciseMd(scaffoldResp.FilesToCreate, trainingRootFs, exerciseCfg.Directory)
 	}
 
 	return nil

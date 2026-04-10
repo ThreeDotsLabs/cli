@@ -18,6 +18,14 @@ func withSubAction(ctx context.Context, name string) context.Context {
 	return context.WithValue(ctx, subActionKey, name)
 }
 
+type mcpTriggeredKeyType struct{}
+
+var mcpTriggeredKey mcpTriggeredKeyType
+
+func withMCPTriggered(ctx context.Context, triggered bool) context.Context {
+	return context.WithValue(ctx, mcpTriggeredKey, triggered)
+}
+
 // debugHeaders builds the metadata sent with every gRPC request.
 // Called per-RPC so training config changes mid-session are reflected.
 func (h *Handlers) debugHeaders() metadata.MD {
@@ -34,6 +42,7 @@ func (h *Handlers) debugHeaders() metadata.MD {
 	})
 
 	h.appendTrainingHeaders(md)
+	h.appendMCPHeaders(md)
 
 	return md
 }
@@ -61,6 +70,19 @@ func (h *Handlers) appendTrainingHeaders(md metadata.MD) {
 	md.Set("git-sync-mode", cfg.GitGoldenMode)
 }
 
+func (h *Handlers) appendMCPHeaders(md metadata.MD) {
+	if h.loopState == nil {
+		return
+	}
+	name, version := h.loopState.GetMCPClientInfo()
+	if name != "" {
+		md.Set("mcp-client-name", name)
+	}
+	if version != "" {
+		md.Set("mcp-client-version", version)
+	}
+}
+
 func (h *Handlers) unaryInterceptor() grpc.UnaryClientInterceptor {
 	return func(
 		ctx context.Context,
@@ -73,6 +95,9 @@ func (h *Handlers) unaryInterceptor() grpc.UnaryClientInterceptor {
 		md := h.debugHeaders()
 		if sa, ok := ctx.Value(subActionKey).(string); ok && sa != "" {
 			md.Set("command", md.Get("command")[0]+" > "+sa)
+		}
+		if triggered, ok := ctx.Value(mcpTriggeredKey).(bool); ok && triggered {
+			md.Set("mcp-triggered", "true")
 		}
 		ctx = metadata.NewOutgoingContext(ctx, md)
 		return invoker(ctx, method, req, reply, cc, opts...)
@@ -91,6 +116,9 @@ func (h *Handlers) streamInterceptor() grpc.StreamClientInterceptor {
 		md := h.debugHeaders()
 		if sa, ok := ctx.Value(subActionKey).(string); ok && sa != "" {
 			md.Set("command", md.Get("command")[0]+" > "+sa)
+		}
+		if triggered, ok := ctx.Value(mcpTriggeredKey).(bool); ok && triggered {
+			md.Set("mcp-triggered", "true")
 		}
 		ctx = metadata.NewOutgoingContext(ctx, md)
 		return streamer(ctx, desc, cc, method, opts...)

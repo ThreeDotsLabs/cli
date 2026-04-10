@@ -280,7 +280,7 @@ func (f Files) shouldWriteAllFiles(fs afero.Fs, exerciseDir string, filesToCreat
 
 			edits := myers.ComputeEdits(span.URIFromPath("local "+filePath), string(localContent), externalContent)
 			diff := fmt.Sprint(gotextdiff.ToUnified("local "+relPath, "remote "+relPath, string(localContent), edits))
-			_, _ = fmt.Fprintln(f.stdout, colorDiff(diff))
+			_, _ = fmt.Fprintln(f.stdout, ColorDiff(diff))
 		}
 	}
 
@@ -339,7 +339,7 @@ func (f Files) shouldWriteFile(fs afero.Fs, filePath string, file *genproto.File
 
 	edits := myers.ComputeEdits(span.URIFromPath("local "+filepath.Base(file.Path)), string(actualContent), file.Content)
 	diff := fmt.Sprint(gotextdiff.ToUnified("local "+filepath.Base(file.Path), "remote "+filepath.Base(file.Path), string(actualContent), edits))
-	_, _ = fmt.Fprintln(f.stdout, colorDiff(diff))
+	_, _ = fmt.Fprintln(f.stdout, ColorDiff(diff))
 
 	if !internal.FConfirmPrompt("Should it be overridden?", f.stdin, f.stdout) {
 		_, _ = fmt.Fprintln(f.stdout, "Skipping file")
@@ -366,7 +366,7 @@ func DirOrFileExists(fs afero.Fs, path string) bool {
 	panic(err)
 }
 
-func colorDiff(diffText string) string {
+func ColorDiff(diffText string) string {
 	red := color.New(color.FgRed)
 	green := color.New(color.FgGreen)
 	yellow := color.New(color.FgYellow)
