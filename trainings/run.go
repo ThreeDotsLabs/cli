@@ -212,7 +212,11 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 				}
 				if action == loopActionResetExercise {
 					if err := h.resetExerciseFromLoop(ctx, trainingRootFs); err != nil {
-						h.sendPendingMCPResult(mcppkg.MCPResult{Error: fmt.Sprintf("Reset failed: %v", err)})
+						if errors.Is(err, errBackupAborted) {
+							h.sendPendingMCPResult(mcppkg.MCPResult{Error: "Reset aborted: backup branch creation failed and user declined to continue"})
+						} else {
+							h.sendPendingMCPResult(mcppkg.MCPResult{Error: fmt.Sprintf("Reset failed: %v", err)})
+						}
 					}
 					continue
 				}
@@ -257,7 +261,11 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 				}
 				if action == loopActionResetExercise {
 					if err := h.resetExerciseFromLoop(ctx, trainingRootFs); err != nil {
-						h.sendPendingMCPResult(mcppkg.MCPResult{Error: fmt.Sprintf("Reset failed: %v", err)})
+						if errors.Is(err, errBackupAborted) {
+							h.sendPendingMCPResult(mcppkg.MCPResult{Error: "Reset aborted: backup branch creation failed and user declined to continue"})
+						} else {
+							h.sendPendingMCPResult(mcppkg.MCPResult{Error: fmt.Sprintf("Reset failed: %v", err)})
+						}
 					}
 					continue
 				}
@@ -314,7 +322,11 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 		}
 		if chosenAction == loopActionResetExercise {
 			if err := h.resetExerciseFromLoop(ctx, trainingRootFs); err != nil {
-				h.sendPendingMCPResult(mcppkg.MCPResult{Error: fmt.Sprintf("Reset failed: %v", err)})
+				if errors.Is(err, errBackupAborted) {
+					h.sendPendingMCPResult(mcppkg.MCPResult{Error: "Reset aborted: backup branch creation failed and user declined to continue"})
+				} else {
+					h.sendPendingMCPResult(mcppkg.MCPResult{Error: fmt.Sprintf("Reset failed: %v", err)})
+				}
 			}
 			continue
 		}
@@ -761,7 +773,9 @@ func (h *Handlers) resetExerciseFromLoop(ctx context.Context, trainingRootFs *af
 		return err
 	}
 
-	// Fetch exercise.md from server (it's gitignored)
+	// Fetch exercise files from server and write them all.
+	// This ensures the latest scaffold is applied (the init branch may be stale),
+	// and for EASY mode includes golden (example solution) files.
 	cfg := h.config.TrainingConfig(trainingRootFs)
 	scaffoldResp, grpcErr := h.newGrpcClient().GetExercise(ctx, &genproto.GetExerciseRequest{
 		TrainingName: cfg.TrainingName,
@@ -769,9 +783,9 @@ func (h *Handlers) resetExerciseFromLoop(ctx context.Context, trainingRootFs *af
 		ExerciseId:   exerciseCfg.ExerciseID,
 	})
 	if grpcErr != nil {
-		logrus.WithError(grpcErr).Warn("Could not fetch exercise scaffold for exercise.md")
+		logrus.WithError(grpcErr).Warn("Could not fetch exercise files from server")
 	} else {
-		writeExerciseMd(scaffoldResp.FilesToCreate, trainingRootFs, exerciseCfg.Directory)
+		writeServerFiles(scaffoldResp.FilesToCreate, trainingRootFs, exerciseCfg.Directory, gitOps, moduleExercisePath)
 	}
 
 	// Send deferred MCP result with reset details
@@ -928,15 +942,11 @@ func (h *Handlers) overrideWithGolden(ctx context.Context, trainingRootFs *afero
 
 	// Save user's solution to a timestamped backup branch.
 	// If this fails, abort — we must not overwrite files without a backup.
-	trainingName := h.config.TrainingConfig(trainingRootFs).TrainingName
 	backupBranch := git.BackupBranchName(moduleExercisePath)
-	if err := gitOps.CreateBranchFromHead(backupBranch); err != nil {
-		logrus.WithError(err).Warn("Could not save solution to backup branch")
-		fmt.Println(formatGitError("Could not save your solution to a backup branch", err, trainingName))
+	if err := saveToBackupBranch(gitOps, backupBranch); err != nil {
 		fmt.Println(color.YellowString("  Aborting example solution override to protect your code."))
 		return
 	}
-	gitOps.PrintInfo(fmt.Sprintf("git branch %s", backupBranch))
 	fmt.Printf("  Your code saved to branch %s\n", color.MagentaString(backupBranch))
 	fmt.Println("  Restore anytime with: " + color.CyanString("git checkout %s -- %s", backupBranch, exerciseDir))
 

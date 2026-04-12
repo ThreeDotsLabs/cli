@@ -23,13 +23,19 @@ const claudeMdFile = "CLAUDE.md"
 const agentsMdFile = "AGENTS.md"
 
 // ensureMCPFiles creates or updates .mcp.json, CLAUDE.md, AGENTS.md, and .gitignore in the training root.
-// port is the MCP server port to write into .mcp.json (passed explicitly because h.mcpPort
-// may already be zeroed when MCP is disabled, but we still want .mcp.json to have the right port).
 // agentInstructions is the server-provided content written to both CLAUDE.md and AGENTS.md.
-func (h *Handlers) ensureMCPFiles(trainingRootFs *afero.BasePathFs, port int, agentInstructions []byte) {
+//
+// Discovery behavior: this function is called whenever an AI coding tool is
+// detected on the system, even when the user declined to enable the MCP server
+// (MCPEnabled == false). Keeping CLAUDE.md/AGENTS.md around serves as a hint
+// that the feature exists and can be turned on later via `tdl training settings`.
+// The caller (configureMCPIfNeeded in mcp_detect.go) gates the server lifecycle
+// separately on MCPEnabled. Callers must NOT invoke this function when no AI
+// tool is detected — the files would have no reader and serve only to clutter.
+func (h *Handlers) ensureMCPFiles(trainingRootFs *afero.BasePathFs, agentInstructions []byte) {
 	cfg := h.config.TrainingConfig(trainingRootFs)
 
-	ensureMCPJson(trainingRootFs, port)
+	ensureMCPJson(trainingRootFs, h.mcpPort)
 
 	changed := ensureManagedFile(trainingRootFs, claudeMdFile, agentInstructions, cfg.FileHashes)
 	changed = ensureManagedFile(trainingRootFs, agentsMdFile, agentInstructions, cfg.FileHashes) || changed

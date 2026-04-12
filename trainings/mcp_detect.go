@@ -58,6 +58,15 @@ func detectAICodingTools() []string {
 		}
 	}
 
+	if runtime.GOOS == "windows" {
+		// Windows PATH detection misses many real installs (stale IDE
+		// environments, GUI installers that skip PATH, WSL split-brain,
+		// PowerShell function shims). Treat Windows as "tool present" so
+		// the MCP prompt always runs; users without a tool can decline it.
+		logrus.Debug("Windows: assuming AI coding tool is present")
+		found = append(found, "windows-assumed")
+	}
+
 	// Deduplicate: if "cursor" CLI is found AND "Cursor.app" exists, keep just "cursor"
 	seen := make(map[string]bool)
 	var deduped []string
@@ -100,30 +109,39 @@ func promptMCPSetup() bool {
 	return choice == '\n'
 }
 
-// configureMCPIfNeeded checks the global config for MCP preference.
-// If not yet configured, it detects AI coding tools and prompts the user.
+// configureMCPIfNeeded reconciles MCP runtime state (h.mcpPort, h.loopState)
+// and on-disk files (.mcp.json, CLAUDE.md, AGENTS.md) with the user's saved
+// preference.
 //
-// Key invariant: when no AI tools are detected, nothing is written to config.
-// This ensures that if the user installs an AI tool later, MCPConfigured will
-// still be false and the prompt will appear on the next run.
+// Once MCP is configured — whether the user enabled or declined it — the files
+// are always written on every run. When enabled, the server runs as well; when
+// declined, the files remain as a discovery hint so users can learn the feature
+// exists and flip it on later via `tdl training settings`. See ensureMCPFiles
+// for the rationale behind the unconditional file writes.
+//
+// AI tool detection is used ONLY to decide whether to prompt on the first run.
+// We skip the prompt entirely when no tool is installed, leaving config
+// unconfigured so it re-arms next time a tool is present. Once the user has
+// answered the prompt, detection is no longer consulted: their saved preference
+// drives everything, so uninstalling/reinstalling the tool doesn't force them
+// to re-opt-in.
 func (h *Handlers) configureMCPIfNeeded(trainingRootFs *afero.BasePathFs, agentInstructions []byte) {
 	globalCfg := h.config.GlobalConfig()
-	filePort := h.mcpPort // preserve for .mcp.json before we might zero h.mcpPort
 
 	if globalCfg.MCPConfigured {
+		// Write files first (while h.mcpPort is still valid), then zero
+		// runtime state if disabled. This is both the normal-enabled path
+		// and the discovery-dump path, unified.
+		h.ensureMCPFiles(trainingRootFs, agentInstructions)
 		if !globalCfg.MCPEnabled {
 			h.mcpPort = 0
 			h.loopState = nil
 		}
-		// Always ensure files exist when MCP has been configured
-		// (user may enable later via settings, files should already be there)
-		h.ensureMCPFiles(trainingRootFs, filePort, agentInstructions)
 		return
 	}
 
-	// Not yet configured — detect AI tools
+	// First run — detect AI tools to decide whether to prompt.
 	tools := detectAICodingTools()
-
 	if len(tools) == 0 {
 		// No AI tools found. Do NOT write config — when the user installs
 		// a tool later, MCPConfigured will still be false and this check
@@ -135,7 +153,8 @@ func (h *Handlers) configureMCPIfNeeded(trainingRootFs *afero.BasePathFs, agentI
 	}
 
 	if !internal.IsStdinTerminal() {
-		// Non-interactive — can't prompt, skip for now
+		// Non-interactive — can't prompt, skip for now. Leave config
+		// unconfigured so the prompt re-arms on the next interactive run.
 		h.mcpPort = 0
 		h.loopState = nil
 		return
@@ -149,22 +168,20 @@ func (h *Handlers) configureMCPIfNeeded(trainingRootFs *afero.BasePathFs, agentI
 		logrus.WithError(errors.WithStack(err)).Warn("Could not save MCP preference")
 	}
 
+	h.ensureMCPFiles(trainingRootFs, agentInstructions)
+
 	if !enabled {
 		h.mcpPort = 0
 		h.loopState = nil
-	} else {
-		if h.loopState == nil {
-			h.loopState = mcppkg.NewLoopState()
-			h.loopState.SetCLIVersion(h.cliMetadata.Version)
-		}
+		return
 	}
 
-	// Always create files when AI tools are present
-	h.ensureMCPFiles(trainingRootFs, filePort, agentInstructions)
-
-	if enabled {
-		fmt.Println(color.GreenString("  MCP enabled.") + " Created " + color.CyanString(".mcp.json") + " in your training directory.")
-		fmt.Println("  Restart your AI coding tools to pick up the new MCP server config.")
-		fmt.Println()
+	if h.loopState == nil {
+		h.loopState = mcppkg.NewLoopState()
+		h.loopState.SetCLIVersion(h.cliMetadata.Version)
 	}
+
+	fmt.Println(color.GreenString("  MCP enabled.") + " Created " + color.CyanString(".mcp.json") + " in your training directory.")
+	fmt.Println("  Restart your AI coding tools to pick up the new MCP server config.")
+	fmt.Println()
 }

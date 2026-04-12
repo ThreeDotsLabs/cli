@@ -359,13 +359,15 @@ func (h *Handlers) setExerciseWithGit(
 		if conflictPrompt == 'g' && len(previewedConflictFiles) > 0 {
 			// User chose "replace all exercise files" — save their work, then overwrite entire exercise dir
 			trainingName := h.config.TrainingConfig(fs).TrainingName
-			if err := gitOps.CreateBranchFromHead(previewBackupBranch); err != nil {
-				fmt.Println(formatGitWarning("Could not save your solution to a backup branch", err))
-			} else {
-				gitOps.PrintInfo(fmt.Sprintf("git branch %s", previewBackupBranch))
-				fmt.Printf("  Your code saved to branch %s\n", color.MagentaString(previewBackupBranch))
-				fmt.Println("  Restore anytime with: " + color.CyanString("git checkout %s -- %s", previewBackupBranch, exerciseDir))
+			if err := saveToBackupBranch(gitOps, previewBackupBranch); err != nil {
+				// Backup failed and user (or non-interactive) aborted.
+				// We're mid-conflict — abort the merge to leave a clean state.
+				_ = gitOps.MergeAbort()
+				fmt.Println(color.YellowString("  Merge aborted, staying on current exercise."))
+				return errMergeAborted
 			}
+			fmt.Printf("  Your code saved to branch %s\n", color.MagentaString(previewBackupBranch))
+			fmt.Println("  Restore anytime with: " + color.CyanString("git checkout %s -- %s", previewBackupBranch, exerciseDir))
 			if err := gitOps.CheckoutFiles(initBranch, exerciseDir); err != nil {
 				fmt.Println(formatGitError("Could not replace exercise files", err, trainingName))
 				return err
@@ -572,6 +574,37 @@ func writeExerciseMd(allFiles []*genproto.File, fs afero.Fs, exerciseDir string)
 	}
 }
 
+// writeServerFiles writes all files from the server response to the exercise directory,
+// then stages and commits any changes. Used after git-based reset to ensure the latest
+// scaffold (and golden files for EASY mode) is applied on top of the init branch checkout.
+func writeServerFiles(
+	allFiles []*genproto.File,
+	trainingRootFs *afero.BasePathFs,
+	exerciseDir string,
+	gitOps *git.Ops,
+	moduleExercisePath string,
+) {
+	if len(allFiles) == 0 {
+		return
+	}
+
+	fw := files.NewFilesSilent()
+	if err := fw.WriteExerciseFiles(allFiles, trainingRootFs, exerciseDir); err != nil {
+		logrus.WithError(err).Warn("Could not write exercise files from server")
+		return
+	}
+
+	if err := gitOps.AddAll(exerciseDir); err != nil {
+		logrus.WithError(err).Warn("Could not stage exercise files")
+		return
+	}
+	if gitOps.HasStagedChanges() {
+		if err := gitOps.Commit(fmt.Sprintf("update exercise files for %s", moduleExercisePath)); err != nil {
+			logrus.WithError(err).Warn("Could not commit exercise files")
+		}
+	}
+}
+
 // resolveConflictsInteractive runs a loop where the user can fix conflicts in their editor,
 // replace all exercise files with init branch versions (saving to a backup branch), or quit.
 //
@@ -630,13 +663,15 @@ func (h *Handlers) resolveConflictsInteractive(gitOps *git.Ops, initBranch, merg
 
 		case 'g':
 			// Save user's work, then replace all exercise files from init branch
-			if err := gitOps.CreateBranchFromHead(backupBranch); err != nil {
-				fmt.Println(formatGitWarning("Could not save your solution to a backup branch", err))
-			} else {
-				gitOps.PrintInfo(fmt.Sprintf("git branch %s", backupBranch))
-				fmt.Printf("  Your code saved to branch %s\n", color.MagentaString(backupBranch))
-				fmt.Println("  Restore anytime with: " + color.CyanString("git checkout %s -- %s", backupBranch, exerciseDir))
+			if err := saveToBackupBranch(gitOps, backupBranch); err != nil {
+				// Backup failed and user (or non-interactive) aborted.
+				// We're mid-conflict — abort the merge to leave a clean state.
+				_ = gitOps.MergeAbort()
+				fmt.Println(color.YellowString("  Merge aborted, staying on current exercise."))
+				return errMergeAborted
 			}
+			fmt.Printf("  Your code saved to branch %s\n", color.MagentaString(backupBranch))
+			fmt.Println("  Restore anytime with: " + color.CyanString("git checkout %s -- %s", backupBranch, exerciseDir))
 			if err := gitOps.CheckoutFiles(initBranch, exerciseDir); err != nil {
 				fmt.Println(formatGitError("Could not replace exercise files", err, trainingName))
 				return err

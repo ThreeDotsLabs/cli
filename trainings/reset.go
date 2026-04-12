@@ -2,6 +2,7 @@ package trainings
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/ThreeDotsLabs/cli/internal"
+	"github.com/ThreeDotsLabs/cli/trainings/files"
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 	"github.com/ThreeDotsLabs/cli/trainings/git"
 )
@@ -100,6 +102,9 @@ func (h *Handlers) Reset(ctx context.Context) error {
 	switch resetMode {
 	case 0:
 		if _, err := h.resetCleanFiles(gitOps, initBranch, moduleExercisePath, exerciseCfg.Directory); err != nil {
+			if errors.Is(err, errBackupAborted) {
+				return nil // user chose to abort — already explained above
+			}
 			return err
 		}
 	case 1:
@@ -111,29 +116,29 @@ func (h *Handlers) Reset(ctx context.Context) error {
 		return nil
 	}
 
-	// exercise.md is gitignored, so checkout from init branch won't restore it.
-	// Fetch from server and write directly.
+	// Fetch exercise files from server and write them all.
+	// This ensures the latest scaffold is applied (the init branch may be stale),
+	// and for EASY mode includes golden (example solution) files.
 	scaffoldResp, err := h.newGrpcClient().GetExercise(ctx, &genproto.GetExerciseRequest{
 		TrainingName: trainingConfig.TrainingName,
 		Token:        h.config.GlobalConfig().Token,
 		ExerciseId:   exerciseCfg.ExerciseID,
 	})
 	if err != nil {
-		logrus.WithError(err).Warn("Could not fetch exercise scaffold for exercise.md")
+		logrus.WithError(err).Warn("Could not fetch exercise files from server")
 	} else {
-		writeExerciseMd(scaffoldResp.FilesToCreate, trainingRootFs, exerciseCfg.Directory)
+		writeServerFiles(scaffoldResp.FilesToCreate, trainingRootFs, exerciseCfg.Directory, gitOps, moduleExercisePath)
 	}
 
 	return nil
 }
 
 func (h *Handlers) resetCleanFiles(gitOps *git.Ops, initBranch, moduleExercisePath, exerciseDir string) (string, error) {
-	// Save user's work to backup branch
+	// Save user's work to backup branch before any destructive operation.
+	// If backup fails and the user aborts (or non-interactive), don't touch files.
 	backupBranch := git.BackupBranchName(moduleExercisePath)
-	if err := gitOps.CreateBranchFromHead(backupBranch); err != nil {
-		fmt.Println(formatGitWarning("Could not save your code to a backup branch", err))
-	} else {
-		gitOps.PrintInfo(fmt.Sprintf("git branch %s", backupBranch))
+	if err := saveToBackupBranch(gitOps, backupBranch); err != nil {
+		return "", err
 	}
 
 	oldHead, _ := gitOps.RevParse("HEAD")
@@ -141,6 +146,42 @@ func (h *Handlers) resetCleanFiles(gitOps *git.Ops, initBranch, moduleExercisePa
 	// Restore all exercise files from init branch
 	if err := gitOps.CheckoutFiles(initBranch, exerciseDir); err != nil {
 		return "", fmt.Errorf("could not restore exercise files: %w", err)
+	}
+
+	// git checkout only overwrites files — it doesn't delete files that are tracked in
+	// HEAD but absent from the init branch (e.g. files added by later exercises). Those
+	// extras would remain and break compilation. Use the init branch as the source of
+	// truth and remove any working-tree file not present on it. exercise.md (gitignored
+	// copyright) and go.sum (auto-regenerated) are preserved.
+	if initFiles, listErr := gitOps.ListFiles(initBranch, exerciseDir); listErr == nil {
+		initFileSet := make(map[string]struct{}, len(initFiles))
+		for _, f := range initFiles {
+			initFileSet[f] = struct{}{}
+		}
+
+		trainingRoot := gitOps.RootDir()
+		absExerciseDir := filepath.Join(trainingRoot, exerciseDir)
+		_ = filepath.Walk(absExerciseDir, func(path string, info os.FileInfo, err error) error {
+			if err != nil || info.IsDir() {
+				return nil
+			}
+			base := filepath.Base(path)
+			if base == files.ExerciseFile || base == "go.sum" {
+				return nil
+			}
+			relPath, relErr := filepath.Rel(trainingRoot, path)
+			if relErr != nil {
+				return nil
+			}
+			if _, onInit := initFileSet[relPath]; !onInit {
+				if rmErr := os.Remove(path); rmErr != nil {
+					logrus.WithError(rmErr).WithField("path", relPath).Warn("Could not remove extra file")
+				}
+			}
+			return nil
+		})
+	} else {
+		logrus.WithError(listErr).Warn("Could not list init branch files for cleanup; extras not removed")
 	}
 
 	_ = gitOps.ResetStaging()
