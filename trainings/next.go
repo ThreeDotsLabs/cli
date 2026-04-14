@@ -166,6 +166,9 @@ func (h *Handlers) setExercise(fs *afero.BasePathFs, exercise *genproto.NextExer
 		// Existing behavior (no git or text-only)
 		isEasy := exercise.TrainingDifficulty == genproto.TrainingDifficulty_EASY
 		f := files.NewFilesWithConfig(isEasy, isEasy)
+		if h.stdinCh != nil {
+			f = f.WithStdinCh(h.stdinCh)
+		}
 		if err := h.writeExerciseFiles(f, nextExerciseResponseToExerciseSolution(exercise), fs); err != nil {
 			return false, err
 		}
