@@ -93,6 +93,8 @@ func promptMCPSetup() bool {
 	fmt.Println("  It listens on 127.0.0.1 (localhost only) while " + color.CyanString("tdl tr run") + " is active.")
 	fmt.Println()
 	fmt.Println("  The training works perfectly fine without it.")
+	fmt.Println("  It will integrate your coding agent with this CLI.")
+	fmt.Println(color.New(color.Bold).Sprint("  Writing by hand is still the default, and may help the ideas stick."))
 	fmt.Println("  You can change this later with: " + color.CyanString("tdl training settings"))
 	fmt.Println()
 
@@ -183,5 +185,8 @@ func (h *Handlers) configureMCPIfNeeded(trainingRootFs *afero.BasePathFs, agentI
 
 	fmt.Println(color.GreenString("  MCP enabled.") + " Created " + color.CyanString(".mcp.json") + " in your training directory.")
 	fmt.Println("  Restart your AI coding tools to pick up the new MCP server config.")
+	fmt.Println()
+	fmt.Println("  We did our best to avoid hallucinations, but AI tools can still make")
+	fmt.Println("  things up. If the agent contradicts the training, trust the training.")
 	fmt.Println()
 }
