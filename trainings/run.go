@@ -66,6 +66,7 @@ func (h *Handlers) Run(ctx context.Context, detached bool) error {
 // fetchAgentInstructions asks the server for training-specific agent instructions
 // (content for CLAUDE.md / AGENTS.md). Returns nil when the training has none.
 // On codes.Unimplemented (old server) it logs a warning and returns nil.
+// On codes.NotFound (training has no instructions registered) it silently returns nil.
 func (h *Handlers) fetchAgentInstructions(ctx context.Context, trainingRootFs *afero.BasePathFs) ([]byte, error) {
 	cfg := h.config.TrainingConfig(trainingRootFs)
 
@@ -74,8 +75,12 @@ func (h *Handlers) fetchAgentInstructions(ctx context.Context, trainingRootFs *a
 		Token:        h.config.GlobalConfig().Token,
 	})
 	if err != nil {
-		if status.Code(err) == codes.Unimplemented {
+		switch status.Code(err) {
+		case codes.Unimplemented:
 			logrus.Warn("Server does not support agent instructions, skipping AI companion setup")
+			return nil, nil
+		case codes.NotFound:
+			// Training has no agent instructions registered — that's fine, they're optional.
 			return nil, nil
 		}
 		return nil, errors.Wrap(err, "fetching agent instructions")
