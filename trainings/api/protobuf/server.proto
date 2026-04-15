@@ -26,6 +26,8 @@ service Trainings {
 
   rpc GetGoldenSolution(GetGoldenSolutionRequest) returns (GetGoldenSolutionResponse) {};
 
+  rpc GetAgentInstructions(GetAgentInstructionsRequest) returns (GetAgentInstructionsResponse) {};
+
   rpc Ping(google.protobuf.Empty) returns (google.protobuf.Empty) {};
 }
 
@@ -263,4 +265,13 @@ message GetGoldenSolutionRequest {
 message GetGoldenSolutionResponse {
   string dir = 1;
   repeated File files = 2;
+}
+
+message GetAgentInstructionsRequest {
+  string training_name = 1;
+  string token = 2;
+}
+
+message GetAgentInstructionsResponse {
+  string agent_instructions = 1;
 }

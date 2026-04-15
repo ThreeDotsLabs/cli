@@ -13,13 +13,27 @@ import (
 const trainingConfigFile = ".tdl-training"
 
 type TrainingConfig struct {
-	TrainingName   string `toml:"training_name"`
-	GitConfigured  bool   `toml:"git_configured,omitempty"`
-	GitEnabled     bool   `toml:"git_enabled,omitempty"`
-	GitAutoCommit  bool   `toml:"git_auto_commit,omitempty"`
-	GitAutoGolden  bool   `toml:"git_auto_sync,omitempty"`
-	GitGoldenMode  string `toml:"git_sync_mode,omitempty"`   // "compare" | "merge" | "override"
-	GitUnavailable bool   `toml:"git_unavailable,omitempty"` // git was missing/too old at init
+	TrainingName   string            `toml:"training_name"`
+	GitConfigured  bool              `toml:"git_configured,omitempty"`
+	GitEnabled     bool              `toml:"git_enabled,omitempty"`
+	GitAutoCommit  bool              `toml:"git_auto_commit,omitempty"`
+	GitAutoGolden  bool              `toml:"git_auto_sync,omitempty"`
+	GitGoldenMode  string            `toml:"git_sync_mode,omitempty"`   // "compare" | "merge" | "override"
+	GitUnavailable bool              `toml:"git_unavailable,omitempty"` // git was missing/too old at init
+	ClaudeMdHash   string            `toml:"claude_md_hash,omitempty"`  // deprecated: migrated to FileHashes
+	FileHashes     map[string]string `toml:"file_hashes,omitempty"`
+}
+
+// MigrateHashes moves the deprecated ClaudeMdHash into the FileHashes map
+// and ensures the map is initialized.
+func (c *TrainingConfig) MigrateHashes() {
+	if c.FileHashes == nil {
+		c.FileHashes = make(map[string]string)
+	}
+	if c.ClaudeMdHash != "" && c.FileHashes["CLAUDE.md"] == "" {
+		c.FileHashes["CLAUDE.md"] = c.ClaudeMdHash
+		c.ClaudeMdHash = ""
+	}
 }
 
 func (c Config) WriteTrainingConfig(config TrainingConfig, trainingRootFs afero.Fs) error {
@@ -38,6 +52,8 @@ func (c Config) TrainingConfig(trainingRootFs afero.Fs) TrainingConfig {
 	if _, err := toml.Decode(string(b), &config); err != nil {
 		panic(errors.Wrapf(err, "can't decode training config: %s", string(b)))
 	}
+
+	config.MigrateHashes()
 
 	logrus.WithField("training_config", config).Debug("Training config")
 

@@ -21,6 +21,7 @@ import (
 	"github.com/ThreeDotsLabs/cli/trainings/config"
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 	"github.com/ThreeDotsLabs/cli/trainings/git"
+	mcppkg "github.com/ThreeDotsLabs/cli/trainings/mcp"
 )
 
 type Handlers struct {
@@ -33,6 +34,12 @@ type Handlers struct {
 	solutionAvailable     bool
 	stuckRunCount         int
 	notifications         map[string]struct{}
+
+	loopState *mcppkg.LoopState // nil if MCP disabled
+	mcpPort   int               // 0 = MCP disabled
+	stdinCh   <-chan rune       // centralized stdin channel; non-nil only during interactiveRun with MCP
+
+	pendingMCPResultCh chan<- mcppkg.MCPResult // deferred result for blocking MCP commands (e.g. next exercise)
 }
 
 type CliMetadata struct {
@@ -49,14 +56,26 @@ type CliMetadata struct {
 	Interactive     bool
 }
 
-func NewHandlers(cliVersion CliMetadata) *Handlers {
+func NewHandlers(cliVersion CliMetadata, mcpPort int) *Handlers {
 	conf := config.NewConfig()
 
-	return &Handlers{
+	h := &Handlers{
 		config:        conf,
 		cliMetadata:   cliVersion,
 		notifications: map[string]struct{}{},
+		mcpPort:       mcpPort,
 	}
+
+	if internal.DoNotTrack() {
+		logrus.Debug("DO_NOT_TRACK is set: some telemetry headers are disabled")
+	}
+
+	if mcpPort > 0 {
+		h.loopState = mcppkg.NewLoopState()
+		h.loopState.SetCLIVersion(cliVersion.Version)
+	}
+
+	return h
 }
 
 func (h *Handlers) newGrpcClient() genproto.TrainingsClient {

@@ -305,11 +305,18 @@ func (h *Handlers) Jump(ctx context.Context, exerciseID string) error {
 			case '\n':
 				// Continue — no file ops, just update config pointer
 			case 'r':
-				if err := h.resetCleanFiles(gitOps, initBranch, moduleExercisePath, resp.Dir); err != nil {
+				if _, err := h.resetCleanFiles(gitOps, initBranch, moduleExercisePath, resp.Dir); err != nil {
+					if errors.Is(err, errBackupAborted) {
+						return nil // user aborted — clean exit
+					}
 					return err
 				}
+				writeServerFiles(resp.FilesToCreate, trainingRootFs, resp.Dir, gitOps, moduleExercisePath)
 			case 's':
 				if err := h.checkoutSolution(ctx, gitOps, successfulVerificationId, moduleExercisePath, trainingRootFs); err != nil {
+					if errors.Is(err, errBackupAborted) {
+						return nil // user aborted — clean exit
+					}
 					return err
 				}
 			}
@@ -335,12 +342,10 @@ func (h *Handlers) checkoutSolution(
 		return fmt.Errorf("failed to get solution files: %w", err)
 	}
 
-	// 2. Create backup branch
+	// 2. Save user's work to backup branch before overwriting files.
 	backupBranch := git.BackupBranchName(moduleExercisePath)
-	if err := gitOps.CreateBranchFromHead(backupBranch); err != nil {
-		fmt.Println(formatGitWarning("Could not save your code to a backup branch", err))
-	} else {
-		gitOps.PrintInfo(fmt.Sprintf("git branch %s", backupBranch))
+	if err := saveToBackupBranch(gitOps, backupBranch); err != nil {
+		return err
 	}
 
 	oldHead, _ := gitOps.RevParse("HEAD")

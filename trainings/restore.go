@@ -210,6 +210,11 @@ func (h *Handlers) restoreExerciseWithGit(
 		return fmt.Errorf("failed to write solution files: %w", err)
 	}
 
+	// exercise.md is gitignored, so the merge didn't deliver it. Write directly.
+	if scaffoldResp != nil {
+		writeExerciseMd(scaffoldResp.FilesToCreate, trainingRootFs, solution.Dir)
+	}
+
 	// 5. Commit completed — with original date if available
 	if err := quietOps.AddAll(solution.Dir); err != nil {
 		return fmt.Errorf("failed to stage solution: %w", err)

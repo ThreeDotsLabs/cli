@@ -411,6 +411,11 @@ var gitignore = strings.Join(
 		"# TDL exercise state (managed by CLI)",
 		".tdl-exercise",
 		"",
+		"# AI coding tool configs (managed by CLI)",
+		"CLAUDE.md",
+		"AGENTS.md",
+		".mcp.json",
+		"",
 	},
 	"\n",
 )

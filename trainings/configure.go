@@ -29,10 +29,15 @@ func (h *Handlers) ConfigureGlobally(ctx context.Context, token, serverAddr, reg
 		region = resp.Region
 	}
 
-	return h.config.WriteGlobalConfig(config.GlobalConfig{
-		Token:      token,
-		ServerAddr: serverAddr,
-		Region:     region,
-		Insecure:   insecure,
-	})
+	// Read existing config to preserve MCP settings (and any future fields).
+	// ConfiguredGlobally() check: on first-ever configure, there's no file yet.
+	var globalCfg config.GlobalConfig
+	if h.config.ConfiguredGlobally() {
+		globalCfg = h.config.GlobalConfig()
+	}
+	globalCfg.Token = token
+	globalCfg.ServerAddr = serverAddr
+	globalCfg.Region = region
+	globalCfg.Insecure = insecure
+	return h.config.WriteGlobalConfig(globalCfg)
 }
