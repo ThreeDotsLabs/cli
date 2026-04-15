@@ -47,20 +47,24 @@ func TestShouldShowBlockingPrompt(t *testing.T) {
 
 func TestUpdateCommandHint(t *testing.T) {
 	tests := []struct {
-		method   InstallMethod
-		expected string
+		name             string
+		method           InstallMethod
+		availableVersion string
+		expected         string
 	}{
-		{InstallMethodHomebrew, "brew upgrade tdl"},
-		{InstallMethodGoInstall, "go install github.com/ThreeDotsLabs/cli/tdl@latest"},
-		{InstallMethodNix, "nix profile upgrade --flake github:ThreeDotsLabs/cli"},
-		{InstallMethodScoop, "scoop update tdl"},
-		{InstallMethodDirectBinary, ""},
-		{InstallMethodUnknown, ""},
+		{"homebrew", InstallMethodHomebrew, "1.2.0", "brew upgrade tdl"},
+		{"go install with version", InstallMethodGoInstall, "1.2.0", "go install github.com/ThreeDotsLabs/cli/tdl@v1.2.0"},
+		{"go install with v-prefixed version", InstallMethodGoInstall, "v1.2.0", "go install github.com/ThreeDotsLabs/cli/tdl@v1.2.0"},
+		{"go install without version falls back to latest", InstallMethodGoInstall, "", "go install github.com/ThreeDotsLabs/cli/tdl@latest"},
+		{"nix", InstallMethodNix, "1.2.0", "nix profile upgrade --flake github:ThreeDotsLabs/cli"},
+		{"scoop", InstallMethodScoop, "1.2.0", "scoop update tdl"},
+		{"direct binary", InstallMethodDirectBinary, "1.2.0", ""},
+		{"unknown", InstallMethodUnknown, "1.2.0", ""},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.method.String(), func(t *testing.T) {
-			assert.Equal(t, tt.expected, updateCommandHint(tt.method))
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, updateCommandHint(tt.method, tt.availableVersion))
 		})
 	}
 }

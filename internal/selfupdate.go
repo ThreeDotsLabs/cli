@@ -240,10 +240,12 @@ func RunUpdate(ctx context.Context, currentVersion string, opts UpdateOptions) e
 			[]string{"upgrade", "tdl"})
 
 	case InstallMethodGoInstall:
-		ref := "latest"
-		if opts.TargetVersion != "" {
-			ref = "v" + strings.TrimPrefix(opts.TargetVersion, "v")
-		}
+		// Pin to the explicit version we just resolved via the GitHub API
+		// rather than letting `go install` resolve "@latest" itself. The Go
+		// module proxy caches "@latest" and can serve a stale version right
+		// after a release, which would silently re-install the current
+		// version and cause the update prompt to loop.
+		ref := "v" + strings.TrimPrefix(targetVersion, "v")
 		return updateViaCommand(ctx, "go", opts, currentVersion, targetVersion,
 			[]string{"install", "github.com/ThreeDotsLabs/cli/tdl@" + ref})
 

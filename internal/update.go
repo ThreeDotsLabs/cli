@@ -184,7 +184,7 @@ func showBlockingUpdatePrompt(updateInfo UpdateInfo, currentVersion string) {
 		}
 	}
 
-	hint := updateCommandHint(method)
+	hint := updateCommandHint(method, updateInfo.AvailableVersion)
 	action := "update now"
 	if hint != "" {
 		action = fmt.Sprintf("run %s", SprintCommand(hint))
@@ -225,12 +225,18 @@ func showBlockingUpdatePrompt(updateInfo UpdateInfo, currentVersion string) {
 	os.Exit(0)
 }
 
-func updateCommandHint(method InstallMethod) string {
+func updateCommandHint(method InstallMethod, availableVersion string) string {
 	switch method {
 	case InstallMethodHomebrew:
 		return "brew upgrade tdl"
 	case InstallMethodGoInstall:
-		return "go install github.com/ThreeDotsLabs/cli/tdl@latest"
+		// Pin to the explicit version when we know it so copy-pasting the
+		// hint does not hit a stale "@latest" resolution in the Go proxy.
+		ref := "latest"
+		if availableVersion != "" {
+			ref = "v" + strings.TrimPrefix(availableVersion, "v")
+		}
+		return "go install github.com/ThreeDotsLabs/cli/tdl@" + ref
 	case InstallMethodNix:
 		return "nix profile upgrade --flake github:ThreeDotsLabs/cli"
 	case InstallMethodScoop:
