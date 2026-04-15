@@ -144,7 +144,7 @@ func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, trainingRootFs
 		var deletedFiles []string
 		for path := range filesToDelete {
 			if !f.showFullDiff && !f.forceOverwrite {
-				shouldDelete := internal.FConfirmPrompt(fmt.Sprintf("File %s is not used anymore, should it be deleted?", path), f.stdin, f.stdout)
+				shouldDelete := f.confirmPrompt(fmt.Sprintf("File %s is not used anymore, should it be deleted?", path))
 				if !shouldDelete {
 					continue
 				}
@@ -306,7 +306,7 @@ func (f Files) shouldWriteAllFiles(fs afero.Fs, exerciseDir string, filesToCreat
 		fmt.Println()
 	}
 
-	proceed := internal.FConfirmPrompt("Should all files be overridden?", f.stdin, f.stdout)
+	proceed := f.confirmPrompt("Should all files be overridden?")
 	if !proceed {
 		fmt.Println("Skipping all files.")
 		return false, nil
@@ -341,12 +341,22 @@ func (f Files) shouldWriteFile(fs afero.Fs, filePath string, file *genproto.File
 	diff := fmt.Sprint(gotextdiff.ToUnified("local "+filepath.Base(file.Path), "remote "+filepath.Base(file.Path), string(actualContent), edits))
 	_, _ = fmt.Fprintln(f.stdout, ColorDiff(diff))
 
-	if !internal.FConfirmPrompt("Should it be overridden?", f.stdin, f.stdout) {
+	if !f.confirmPrompt("Should it be overridden?") {
 		_, _ = fmt.Fprintln(f.stdout, "Skipping file")
 		return false, nil
 	} else {
 		return true, nil
 	}
+}
+
+// confirmPrompt routes to the MCP-safe channel reader when stdinCh is set,
+// otherwise falls back to the plain stdin reader. This avoids races with
+// the interactiveRun stdin goroutine that owns os.Stdin while MCP is active.
+func (f Files) confirmPrompt(msg string) bool {
+	if f.stdinCh != nil {
+		return internal.FConfirmPromptFromCh(msg, f.stdinCh, f.stdout)
+	}
+	return internal.FConfirmPrompt(msg, f.stdin, f.stdout)
 }
 
 func (f Files) dirOrFileExists(fs afero.Fs, path string) bool {
