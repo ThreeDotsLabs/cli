@@ -495,6 +495,26 @@ func hasGo() bool {
 }
 
 func (h *Handlers) showTrainingStartPrompt(trainingDir string) error {
+	homeDir, _ := os.UserHomeDir()
+	if homeDir != "" {
+		absTrainingDir, err := filepath.Abs(trainingDir)
+		if err == nil && absTrainingDir == homeDir {
+			if !internal.IsStdinTerminal() {
+				return fmt.Errorf("refusing to init in home directory %s — create a subdirectory first", homeDir)
+			}
+
+			fmt.Println()
+			fmt.Println(color.YellowString("  ⚠ Warning: you are about to clone training files directly into your home directory (%s).", homeDir))
+			fmt.Println(color.YellowString("  This is almost never what you want. We recommend creating a subdirectory instead."))
+			fmt.Println()
+
+			if !internal.FConfirmPrompt(color.YellowString("Are you sure you want to continue?"), os.Stdin, os.Stdout) {
+				return ErrInterrupted
+			}
+			return nil
+		}
+	}
+
 	fmt.Printf(
 		"This command will clone training source code to %s directory.\n",
 		trainingDir,
