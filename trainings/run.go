@@ -772,25 +772,10 @@ func (h *Handlers) resetExerciseFromLoop(ctx context.Context, trainingRootFs *af
 		saveProgress(gitOps, exerciseCfg.Directory, fmt.Sprintf("save progress on %s", moduleExercisePath))
 	}
 
-	// Perform the clean-files reset
-	backupBranch, err := h.resetCleanFiles(gitOps, initBranch, moduleExercisePath, exerciseCfg.Directory)
+	// Perform the clean-files reset — fetches fresh scaffold+golden and writes the start state.
+	backupBranch, err := h.resetCleanFiles(ctx, gitOps, trainingRootFs, exerciseCfg.ExerciseID, moduleExercisePath, exerciseCfg.Directory)
 	if err != nil {
 		return err
-	}
-
-	// Fetch exercise files from server and write them all.
-	// This ensures the latest scaffold is applied (the init branch may be stale),
-	// and for EASY mode includes golden (example solution) files.
-	cfg := h.config.TrainingConfig(trainingRootFs)
-	scaffoldResp, grpcErr := h.newGrpcClient().GetExercise(ctx, &genproto.GetExerciseRequest{
-		TrainingName: cfg.TrainingName,
-		Token:        h.config.GlobalConfig().Token,
-		ExerciseId:   exerciseCfg.ExerciseID,
-	})
-	if grpcErr != nil {
-		logrus.WithError(grpcErr).Warn("Could not fetch exercise files from server")
-	} else {
-		writeServerFiles(scaffoldResp.FilesToCreate, trainingRootFs, exerciseCfg.Directory, gitOps, moduleExercisePath)
 	}
 
 	// Send deferred MCP result with reset details
@@ -914,6 +899,11 @@ func (h *Handlers) generateRunTerminalPath(trainingRootFs *afero.BasePathFs) str
 // IMPORTANT: This is a destructive operation — user's code is overwritten.
 // We MUST save their work to a backup branch before replacing files.
 // The user explicitly chose this action ('s' key).
+//
+// INVARIANT: after this returns, exerciseDir is 1:1 with the example solution —
+// any stale user files not in the golden are deleted. Enforced via
+// replaceExerciseFilesAndCommit → replaceExerciseFiles. Do not replace this
+// with a direct WriteExerciseFiles call; see exercise_replace.go for why.
 func (h *Handlers) overrideWithGolden(ctx context.Context, trainingRootFs *afero.BasePathFs, gitOps *git.Ops, exerciseCfg config.ExerciseConfig) {
 	exerciseDir := exerciseCfg.Directory
 	moduleExercisePath := exerciseCfg.ModuleExercisePath()
@@ -931,13 +921,11 @@ func (h *Handlers) overrideWithGolden(ctx context.Context, trainingRootFs *afero
 	}
 
 	// Fetch example solution via gRPC
-	resp, err := h.newGrpcClient().GetGoldenSolution(
+	goldenFiles, err := h.fetchGoldenFiles(
 		ctx,
-		&genproto.GetGoldenSolutionRequest{
-			TrainingName: h.config.TrainingConfig(trainingRootFs).TrainingName,
-			ExerciseId:   exerciseCfg.ExerciseID,
-			Token:        h.config.GlobalConfig().Token,
-		},
+		h.config.TrainingConfig(trainingRootFs).TrainingName,
+		exerciseCfg.ExerciseID,
+		h.config.GlobalConfig().Token,
 	)
 	if err != nil {
 		logrus.WithError(err).Warn("Could not fetch golden solution")
@@ -945,37 +933,22 @@ func (h *Handlers) overrideWithGolden(ctx context.Context, trainingRootFs *afero
 		return
 	}
 
-	// Save user's solution to a timestamped backup branch.
-	// If this fails, abort — we must not overwrite files without a backup.
 	backupBranch := git.BackupBranchName(moduleExercisePath)
-	if err := saveToBackupBranch(gitOps, backupBranch); err != nil {
-		fmt.Println(color.YellowString("  Aborting example solution override to protect your code."))
+	goldenCommitted, err := replaceExerciseFilesAndCommit(
+		gitOps, trainingRootFs, goldenFiles, exerciseDir, backupBranch,
+		fmt.Sprintf("override with example solution for %s", moduleExercisePath),
+	)
+	if err != nil {
+		if errors.Is(err, errBackupAborted) {
+			fmt.Println(color.YellowString("  Aborting example solution override to protect your code."))
+			return
+		}
+		logrus.WithError(err).Warn("Could not override with example solution")
+		fmt.Println(color.YellowString("  Could not write example solution files"))
 		return
 	}
 	fmt.Printf("  Your code saved to branch %s\n", color.MagentaString(backupBranch))
 	fmt.Println("  Restore anytime with: " + color.CyanString("git checkout %s -- %s", backupBranch, exerciseDir))
-
-	// Write example solution files directly to exercise directory
-	f := files.NewFilesSilentDeleteUnused()
-	if err := f.WriteExerciseFiles(resp.Files, trainingRootFs, exerciseDir); err != nil {
-		logrus.WithError(err).Warn("Could not write golden files")
-		fmt.Println(color.YellowString("  Could not write example solution files"))
-		return
-	}
-
-	// Stage and commit
-	if err := gitOps.AddAll(exerciseDir); err != nil {
-		logrus.WithError(err).Warn("Could not stage golden override")
-		return
-	}
-	goldenCommitted := false
-	if gitOps.HasStagedChanges() {
-		if err := gitOps.Commit(fmt.Sprintf("override with example solution for %s", moduleExercisePath)); err != nil {
-			logrus.WithError(err).Warn("Could not commit golden override")
-			return
-		}
-		goldenCommitted = true
-	}
 
 	fmt.Println(color.GreenString("  Your code replaced with example solution."))
 

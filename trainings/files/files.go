@@ -65,6 +65,13 @@ func NewFilesSilent() Files {
 // NewFilesSilentDeleteUnused creates a Files that writes silently and deletes
 // files not present in the server response. Use for override operations where
 // the exercise directory should exactly match the example solution.
+//
+// Used by trainings.replaceExerciseFiles to enforce the "1:1 with the replacement
+// file list" invariant on "sync with example" and "replace on merge conflict"
+// flows. Do NOT switch the replace primitive to NewFilesSilent (additive) — that
+// path allowed stale empty placeholders from earlier scaffolds to overwrite
+// filled-in user code in project-style trainings (the 0001_init_orders.up.sql
+// regression).
 func NewFilesSilentDeleteUnused() Files {
 	return Files{
 		forceOverwrite:    true,
