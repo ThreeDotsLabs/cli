@@ -103,10 +103,10 @@ func (h *Handlers) nextExerciseWithSkipped(ctx context.Context, currentExerciseI
 		}
 	}
 
-	return h.setExercise(trainingRootFs, resp, trainingRoot, writeFiles)
+	return h.setExercise(ctx, trainingRootFs, resp, trainingRoot, writeFiles)
 }
 
-func (h *Handlers) setExercise(fs *afero.BasePathFs, exercise *genproto.NextExerciseResponse, trainingRoot string, writeFiles bool) (finished bool, err error) {
+func (h *Handlers) setExercise(ctx context.Context, fs *afero.BasePathFs, exercise *genproto.NextExerciseResponse, trainingRoot string, writeFiles bool) (finished bool, err error) {
 	if exercise.TrainingStatus == genproto.NextExerciseResponse_FINISHED {
 		printFinished()
 		return true, nil
@@ -137,13 +137,15 @@ func (h *Handlers) setExercise(fs *afero.BasePathFs, exercise *genproto.NextExer
 		gitOps := h.newGitOps()
 		if gitOps.Enabled() && !exercise.IsTextOnly {
 			// Read current (soon-to-be-previous) exercise config for init chain
-			var prevModuleExercisePath string
+			// and for fetching "golden of prev" if 'g' is chosen on conflict.
+			var prevModuleExercisePath, prevExerciseID string
 			if files.DirOrFileExists(fs, ".tdl-exercise") {
 				prevCfg := h.config.ExerciseConfig(fs)
 				prevModuleExercisePath = prevCfg.ModuleExercisePath()
+				prevExerciseID = prevCfg.ExerciseID
 			}
 
-			if err := h.setExerciseWithGit(gitOps, fs, exercise, trainingRoot, prevModuleExercisePath); err != nil {
+			if err := h.setExerciseWithGit(ctx, gitOps, fs, exercise, trainingRoot, prevModuleExercisePath, prevExerciseID); err != nil {
 				return false, fmt.Errorf("git flow failed: %w", err)
 			}
 			// Git handled file writing; just write the exercise config
@@ -259,11 +261,13 @@ func (h *Handlers) writeExerciseFiles(files files.Files, resp *genproto.Exercise
 }
 
 func (h *Handlers) setExerciseWithGit(
+	ctx context.Context,
 	gitOps *git.Ops,
 	fs *afero.BasePathFs,
 	exercise *genproto.NextExerciseResponse,
 	trainingRoot string,
 	prevModuleExercisePath string,
+	prevExerciseID string,
 ) error {
 	exerciseDir := exercise.Dir
 	moduleExercisePath := moduleExercisePathFromResponse(exercise)
@@ -359,36 +363,26 @@ func (h *Handlers) setExerciseWithGit(
 		}
 
 		// Merge conflict — working tree has conflict markers
+		trainingName := h.config.TrainingConfig(fs).TrainingName
 		if conflictPrompt == 'g' && len(previewedConflictFiles) > 0 {
-			// User chose "replace all exercise files" — save their work, then overwrite entire exercise dir
-			trainingName := h.config.TrainingConfig(fs).TrainingName
-			if err := saveToBackupBranch(gitOps, previewBackupBranch); err != nil {
-				// Backup failed and user (or non-interactive) aborted.
-				// We're mid-conflict — abort the merge to leave a clean state.
-				_ = gitOps.MergeAbort()
-				fmt.Println(color.YellowString("  Merge aborted, staying on current exercise."))
-				return errMergeAborted
-			}
-			fmt.Printf("  Your code saved to branch %s\n", color.MagentaString(previewBackupBranch))
-			fmt.Println("  Restore anytime with: " + color.CyanString("git checkout %s -- %s", previewBackupBranch, exerciseDir))
-			if err := gitOps.CheckoutFiles(initBranch, exerciseDir); err != nil {
-				fmt.Println(formatGitError("Could not replace exercise files", err, trainingName))
+			// User chose "replace all exercise files". INVARIANT: after replace,
+			// exerciseDir must be 1:1 with the exercise's start state
+			// (golden(prev) + scaffold(current)) — no stale user files. Enforced
+			// by replaceExerciseFilesAndCommit → replaceExerciseFiles.
+			if err := h.replaceExerciseFilesOnMergeConflict(
+				ctx, gitOps, fs,
+				prevExerciseID, exercise.FilesToCreate,
+				exerciseDir, previewBackupBranch, mergeMsg, trainingName,
+			); err != nil {
 				return err
 			}
-			if err := gitOps.AddAll(exerciseDir); err != nil {
-				fmt.Println(formatGitWarning("Could not stage replaced files", err))
-			}
-			if err := gitOps.Commit(mergeMsg); err != nil {
-				fmt.Println(formatGitWarning("Could not commit replaced files", err))
-				fmt.Println()
-				fmt.Println(recoveryHint(trainingName))
-			}
-			fmt.Println(color.GreenString("  All exercise files replaced with our versions."))
-			fmt.Println()
 		} else if internal.IsStdinTerminal() {
 			// Interactive conflict resolution loop
-			trainingName := h.config.TrainingConfig(fs).TrainingName
-			if err := h.resolveConflictsInteractive(gitOps, initBranch, mergeMsg, moduleExercisePath, exerciseDir, trainingName); err != nil {
+			if err := h.resolveConflictsInteractive(
+				ctx, gitOps, fs,
+				initBranch, mergeMsg, moduleExercisePath, exerciseDir, trainingName,
+				prevExerciseID, exercise.FilesToCreate,
+			); err != nil {
 				return err
 			}
 		} else {
@@ -609,12 +603,22 @@ func writeServerFiles(
 }
 
 // resolveConflictsInteractive runs a loop where the user can fix conflicts in their editor,
-// replace all exercise files with init branch versions (saving to a backup branch), or quit.
+// replace all exercise files with the start state (saving to a backup branch), or quit.
 //
 // IMPORTANT: The 'g' (replace) path is destructive — it overwrites user files.
-// We MUST save their code to a backup branch before replacing.
-// The user explicitly confirms this action.
-func (h *Handlers) resolveConflictsInteractive(gitOps *git.Ops, initBranch, mergeMsg, moduleExercisePath, exerciseDir, trainingName string) error {
+// We MUST save their code to a backup branch before replacing. The user explicitly
+// confirms this action.
+//
+// INVARIANT on 'g': exerciseDir ends 1:1 with golden(prev)+scaffold(current) —
+// routed through replaceExerciseFilesOnMergeConflict → replaceExerciseFilesAndCommit.
+func (h *Handlers) resolveConflictsInteractive(
+	ctx context.Context,
+	gitOps *git.Ops,
+	fs *afero.BasePathFs,
+	initBranch, mergeMsg, moduleExercisePath, exerciseDir, trainingName string,
+	prevExerciseID string,
+	scaffoldFiles []*genproto.File,
+) error {
 	conflictFiles, _ := gitOps.UnmergedFiles()
 	fmt.Println(color.YellowString("\n  Merge conflict detected."))
 	fmt.Println(color.YellowString("  Files with conflicts:"))
@@ -665,31 +669,11 @@ func (h *Handlers) resolveConflictsInteractive(gitOps *git.Ops, initBranch, merg
 			return nil
 
 		case 'g':
-			// Save user's work, then replace all exercise files from init branch
-			if err := saveToBackupBranch(gitOps, backupBranch); err != nil {
-				// Backup failed and user (or non-interactive) aborted.
-				// We're mid-conflict — abort the merge to leave a clean state.
-				_ = gitOps.MergeAbort()
-				fmt.Println(color.YellowString("  Merge aborted, staying on current exercise."))
-				return errMergeAborted
-			}
-			fmt.Printf("  Your code saved to branch %s\n", color.MagentaString(backupBranch))
-			fmt.Println("  Restore anytime with: " + color.CyanString("git checkout %s -- %s", backupBranch, exerciseDir))
-			if err := gitOps.CheckoutFiles(initBranch, exerciseDir); err != nil {
-				fmt.Println(formatGitError("Could not replace exercise files", err, trainingName))
-				return err
-			}
-			if err := gitOps.AddAll("."); err != nil {
-				fmt.Println(formatGitWarning("Could not stage replaced files", err))
-			}
-			if err := gitOps.Commit(mergeMsg); err != nil {
-				fmt.Println(formatGitWarning("Could not commit replaced files", err))
-				fmt.Println()
-				fmt.Println(recoveryHint(trainingName))
-			}
-			fmt.Println(color.GreenString("  All exercise files replaced with our versions."))
-			fmt.Println()
-			return nil
+			return h.replaceExerciseFilesOnMergeConflict(
+				ctx, gitOps, fs,
+				prevExerciseID, scaffoldFiles,
+				exerciseDir, backupBranch, mergeMsg, trainingName,
+			)
 
 		case 'q':
 			// Abort merge, restore pre-merge state
@@ -698,4 +682,59 @@ func (h *Handlers) resolveConflictsInteractive(gitOps *git.Ops, initBranch, merg
 			return errMergeAborted
 		}
 	}
+}
+
+// replaceExerciseFilesOnMergeConflict completes an in-progress merge by replacing
+// exerciseDir with the start state (golden(prev) + scaffold(current)).
+// User's pre-merge state is saved to backupBranch.
+//
+// INVARIANT: on success, exerciseDir is 1:1 with the start state — no stale user
+// files. Routes through replaceExerciseFilesAndCommit → replaceExerciseFiles;
+// see exercise_replace.go for why this invariant is load-bearing.
+//
+// If backup creation fails and the user aborts, the merge is aborted and
+// errMergeAborted is returned so callers can treat it as a clean cancellation.
+func (h *Handlers) replaceExerciseFilesOnMergeConflict(
+	ctx context.Context,
+	gitOps *git.Ops,
+	fs *afero.BasePathFs,
+	prevExerciseID string,
+	scaffoldFiles []*genproto.File,
+	exerciseDir, backupBranch, mergeMsg, trainingName string,
+) error {
+	var goldenFiles []*genproto.File
+	if prevExerciseID != "" {
+		gf, err := h.fetchGoldenFiles(
+			ctx,
+			h.config.TrainingConfig(fs).TrainingName,
+			prevExerciseID,
+			h.config.GlobalConfig().Token,
+		)
+		if err != nil {
+			// Abort the in-progress merge to leave a clean state.
+			_ = gitOps.MergeAbort()
+			fmt.Println(formatGitError("Could not fetch example solution for previous exercise", err, trainingName))
+			return err
+		}
+		goldenFiles = gf
+	}
+
+	startState := mergeStartStateFiles(goldenFiles, scaffoldFiles)
+
+	_, err := replaceExerciseFilesAndCommit(gitOps, fs, startState, exerciseDir, backupBranch, mergeMsg)
+	if err != nil {
+		if errors.Is(err, errBackupAborted) {
+			_ = gitOps.MergeAbort()
+			fmt.Println(color.YellowString("  Merge aborted, staying on current exercise."))
+			return errMergeAborted
+		}
+		fmt.Println(formatGitError("Could not replace exercise files", err, trainingName))
+		fmt.Println(recoveryHint(trainingName))
+		return err
+	}
+	fmt.Printf("  Your code saved to branch %s\n", color.MagentaString(backupBranch))
+	fmt.Println("  Restore anytime with: " + color.CyanString("git checkout %s -- %s", backupBranch, exerciseDir))
+	fmt.Println(color.GreenString("  All exercise files replaced with our versions."))
+	fmt.Println()
+	return nil
 }

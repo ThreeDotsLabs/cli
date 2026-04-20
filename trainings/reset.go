@@ -10,7 +10,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/manifoldco/promptui"
-	"github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
 
 	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings/files"
@@ -101,14 +101,14 @@ func (h *Handlers) Reset(ctx context.Context) error {
 
 	switch resetMode {
 	case 0:
-		if _, err := h.resetCleanFiles(gitOps, initBranch, moduleExercisePath, exerciseCfg.Directory); err != nil {
+		if _, err := h.resetCleanFiles(ctx, gitOps, trainingRootFs, exerciseCfg.ExerciseID, moduleExercisePath, exerciseCfg.Directory); err != nil {
 			if errors.Is(err, errBackupAborted) {
 				return nil // user chose to abort — already explained above
 			}
 			return err
 		}
 	case 1:
-		if err := h.resetMissingOnly(gitOps, initBranch, moduleExercisePath, exerciseCfg.Directory, trainingRoot); err != nil {
+		if err := h.resetMissingOnly(ctx, gitOps, trainingRootFs, exerciseCfg.ExerciseID, moduleExercisePath, exerciseCfg.Directory, trainingRoot); err != nil {
 			return err
 		}
 	case 2:
@@ -116,82 +116,40 @@ func (h *Handlers) Reset(ctx context.Context) error {
 		return nil
 	}
 
-	// Fetch exercise files from server and write them all.
-	// This ensures the latest scaffold is applied (the init branch may be stale),
-	// and for EASY mode includes golden (example solution) files.
-	scaffoldResp, err := h.newGrpcClient().GetExercise(ctx, &genproto.GetExerciseRequest{
-		TrainingName: trainingConfig.TrainingName,
-		Token:        h.config.GlobalConfig().Token,
-		ExerciseId:   exerciseCfg.ExerciseID,
-	})
-	if err != nil {
-		logrus.WithError(err).Warn("Could not fetch exercise files from server")
-	} else {
-		writeServerFiles(scaffoldResp.FilesToCreate, trainingRootFs, exerciseCfg.Directory, gitOps, moduleExercisePath)
-	}
+	// Note: resetCleanFiles/resetMissingOnly already fetch fresh scaffold+golden from
+	// the server and write the start state — no additional overlay step is needed.
 
 	return nil
 }
 
-func (h *Handlers) resetCleanFiles(gitOps *git.Ops, initBranch, moduleExercisePath, exerciseDir string) (string, error) {
-	// Save user's work to backup branch before any destructive operation.
-	// If backup fails and the user aborts (or non-interactive), don't touch files.
-	backupBranch := git.BackupBranchName(moduleExercisePath)
-	if err := saveToBackupBranch(gitOps, backupBranch); err != nil {
+// resetCleanFiles replaces exerciseDir with its starting state
+// (golden(prev) + scaffold(current)) — 1:1, deletes extras. Saves user's work
+// to a timestamped backup branch first.
+//
+// INVARIANT: on success exerciseDir is 1:1 with the start state — no stale user
+// files. Enforced by replaceExerciseFilesAndCommit → replaceExerciseFiles.
+// Do not replace this with a CheckoutFiles(initBranch, ...) call: init branches
+// in project-style trainings accumulate empty placeholder files from earlier
+// scaffolds (see exercise_replace.go for the full story).
+func (h *Handlers) resetCleanFiles(
+	ctx context.Context,
+	gitOps *git.Ops,
+	fs *afero.BasePathFs,
+	exerciseID, moduleExercisePath, exerciseDir string,
+) (string, error) {
+	startState, err := h.fetchStartStateFiles(ctx, fs, exerciseID)
+	if err != nil {
 		return "", err
 	}
 
+	backupBranch := git.BackupBranchName(moduleExercisePath)
 	oldHead, _ := gitOps.RevParse("HEAD")
 
-	// Restore all exercise files from init branch
-	if err := gitOps.CheckoutFiles(initBranch, exerciseDir); err != nil {
-		return "", fmt.Errorf("could not restore exercise files: %w", err)
-	}
-
-	// git checkout only overwrites files — it doesn't delete files that are tracked in
-	// HEAD but absent from the init branch (e.g. files added by later exercises). Those
-	// extras would remain and break compilation. Use the init branch as the source of
-	// truth and remove any working-tree file not present on it. exercise.md (gitignored
-	// copyright) and go.sum (auto-regenerated) are preserved.
-	if initFiles, listErr := gitOps.ListFiles(initBranch, exerciseDir); listErr == nil {
-		initFileSet := make(map[string]struct{}, len(initFiles))
-		for _, f := range initFiles {
-			initFileSet[f] = struct{}{}
-		}
-
-		trainingRoot := gitOps.RootDir()
-		absExerciseDir := filepath.Join(trainingRoot, exerciseDir)
-		_ = filepath.Walk(absExerciseDir, func(path string, info os.FileInfo, err error) error {
-			if err != nil || info.IsDir() {
-				return nil
-			}
-			base := filepath.Base(path)
-			if base == files.ExerciseFile || base == "go.sum" {
-				return nil
-			}
-			relPath, relErr := filepath.Rel(trainingRoot, path)
-			if relErr != nil {
-				return nil
-			}
-			if _, onInit := initFileSet[relPath]; !onInit {
-				if rmErr := os.Remove(path); rmErr != nil {
-					logrus.WithError(rmErr).WithField("path", relPath).Warn("Could not remove extra file")
-				}
-			}
-			return nil
-		})
-	} else {
-		logrus.WithError(listErr).Warn("Could not list init branch files for cleanup; extras not removed")
-	}
-
-	_ = gitOps.ResetStaging()
-	if err := gitOps.AddAll(exerciseDir); err != nil {
-		fmt.Println(formatGitWarning("Could not stage restored files", err))
-	}
-	if gitOps.HasStagedChanges() {
-		if err := gitOps.Commit(fmt.Sprintf("reset exercise %s", moduleExercisePath)); err != nil {
-			fmt.Println(formatGitWarning("Could not commit reset", err))
-		}
+	if _, err := replaceExerciseFilesAndCommit(
+		gitOps, fs, startState, exerciseDir, backupBranch,
+		fmt.Sprintf("reset exercise %s", moduleExercisePath),
+	); err != nil {
+		return "", err
 	}
 
 	if oldHead != "" {
@@ -209,17 +167,64 @@ func (h *Handlers) resetCleanFiles(gitOps *git.Ops, initBranch, moduleExercisePa
 	return backupBranch, nil
 }
 
-func (h *Handlers) resetMissingOnly(gitOps *git.Ops, initBranch, moduleExercisePath, exerciseDir, trainingRoot string) error {
-	// List files on init branch
-	initFiles, err := gitOps.ListFiles(initBranch, exerciseDir)
+// fetchStartStateFiles returns the starting state of the given exercise:
+// golden(prev) with scaffold(current) overlaid on top. Makes up to 3
+// gRPC calls (GetExercises for prev resolution, GetGoldenSolution for prev golden,
+// GetExercise for current scaffold). Pass "" for exerciseID only in edge cases
+// where the caller knows the current exercise has no meaningful prev.
+func (h *Handlers) fetchStartStateFiles(
+	ctx context.Context,
+	fs *afero.BasePathFs,
+	exerciseID string,
+) ([]*genproto.File, error) {
+	trainingName := h.config.TrainingConfig(fs).TrainingName
+	token := h.config.GlobalConfig().Token
+
+	prevExerciseID, _, err := h.resolvePreviousExercise(ctx, trainingName, token, exerciseID)
 	if err != nil {
-		return fmt.Errorf("could not list init branch files: %w", err)
+		return nil, fmt.Errorf("could not resolve previous exercise: %w", err)
 	}
 
-	// Find missing files
-	var missingFiles []string
-	for _, f := range initFiles {
-		fullPath := filepath.Join(trainingRoot, f)
+	scaffoldResp, err := h.newGrpcClient().GetExercise(ctx, &genproto.GetExerciseRequest{
+		TrainingName: trainingName,
+		Token:        token,
+		ExerciseId:   exerciseID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not fetch exercise scaffold: %w", err)
+	}
+
+	var goldenFiles []*genproto.File
+	if prevExerciseID != "" {
+		gf, err := h.fetchGoldenFiles(ctx, trainingName, prevExerciseID, token)
+		if err != nil {
+			return nil, err
+		}
+		goldenFiles = gf
+	}
+
+	return mergeStartStateFiles(goldenFiles, scaffoldResp.FilesToCreate), nil
+}
+
+// resetMissingOnly restores files from the exercise's start state
+// (golden(prev) + scaffold(current)) that are missing on disk. Unlike
+// resetCleanFiles, this keeps the user's modifications to existing files —
+// it only fills gaps.
+func (h *Handlers) resetMissingOnly(
+	ctx context.Context,
+	gitOps *git.Ops,
+	fs *afero.BasePathFs,
+	exerciseID, moduleExercisePath, exerciseDir, trainingRoot string,
+) error {
+	startState, err := h.fetchStartStateFiles(ctx, fs, exerciseID)
+	if err != nil {
+		return err
+	}
+
+	// Find files that exist in the start state but are missing on disk.
+	var missingFiles []*genproto.File
+	for _, f := range startState {
+		fullPath := filepath.Join(trainingRoot, exerciseDir, f.Path)
 		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
 			missingFiles = append(missingFiles, f)
 		}
@@ -232,13 +237,15 @@ func (h *Handlers) resetMissingOnly(gitOps *git.Ops, initBranch, moduleExerciseP
 
 	oldHead, _ := gitOps.RevParse("HEAD")
 
-	// Restore each missing file from init branch
+	// Additive write — do NOT use NewFilesSilentDeleteUnused here: resetMissingOnly
+	// must preserve the user's modifications. This is a gap-fill, not a full reset.
+	fw := files.NewFilesSilent()
+	if err := fw.WriteExerciseFiles(missingFiles, fs, exerciseDir); err != nil {
+		return fmt.Errorf("could not write missing files: %w", err)
+	}
+
 	for _, f := range missingFiles {
-		if err := gitOps.CheckoutPathFrom(initBranch, f); err != nil {
-			fmt.Println(formatGitWarning(fmt.Sprintf("Could not restore %s", f), err))
-			continue
-		}
-		fmt.Printf("  %s %s\n", color.GreenString("+"), f)
+		fmt.Printf("  %s %s\n", color.GreenString("+"), filepath.Join(exerciseDir, f.Path))
 	}
 
 	_ = gitOps.ResetStaging()

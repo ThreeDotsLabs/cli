@@ -305,13 +305,13 @@ func (h *Handlers) Jump(ctx context.Context, exerciseID string) error {
 			case '\n':
 				// Continue — no file ops, just update config pointer
 			case 'r':
-				if _, err := h.resetCleanFiles(gitOps, initBranch, moduleExercisePath, resp.Dir); err != nil {
+				if _, err := h.resetCleanFiles(ctx, gitOps, trainingRootFs, resp.ExerciseId, moduleExercisePath, resp.Dir); err != nil {
 					if errors.Is(err, errBackupAborted) {
 						return nil // user aborted — clean exit
 					}
 					return err
 				}
-				writeServerFiles(resp.FilesToCreate, trainingRootFs, resp.Dir, gitOps, moduleExercisePath)
+				// resetCleanFiles already fetched fresh scaffold+golden and wrote the start state.
 			case 's':
 				if err := h.checkoutSolution(ctx, gitOps, successfulVerificationId, moduleExercisePath, trainingRootFs); err != nil {
 					if errors.Is(err, errBackupAborted) {
@@ -323,7 +323,7 @@ func (h *Handlers) Jump(ctx context.Context, exerciseID string) error {
 		}
 	}
 
-	_, err = h.setExercise(trainingRootFs, resp, trainingRoot, false)
+	_, err = h.setExercise(ctx, trainingRootFs, resp, trainingRoot, false)
 	return err
 }
 
