@@ -29,10 +29,15 @@ func gitDefaultConfig(cfg *config.TrainingConfig) {
 }
 
 // stageInitialFiles stages the base set of files for an initial commit:
-// .tdl-training, .gitignore, and optionally go.work if a Go workspace exists.
+// .gitignore, and optionally go.work if a Go workspace exists.
 // Extra files (e.g. a cloned exercise directory) can be appended.
+//
+// .tdl-training is intentionally omitted — it's gitignored as local state
+// (see the gitignore template in init.go), so force-adding it here would
+// fail silently. User progress is tracked via per-exercise commits, not
+// via .tdl-training.
 func stageInitialFiles(gitOps *git.Ops, trainingRootDir string, extraFiles ...string) {
-	files := []string{".tdl-training", ".gitignore"}
+	files := []string{".gitignore"}
 	if hasGoWorkspace(trainingRootDir) {
 		files = append(files, "go.work")
 	}

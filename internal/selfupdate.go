@@ -221,7 +221,7 @@ func RunUpdate(ctx context.Context, currentVersion string, opts UpdateOptions) e
 		fmt.Printf("\nUpdate available: %s → %s\n", currentVersion, targetVersion)
 
 		if notes := release.ReleaseNotes; notes != "" {
-			formatted := formatReleaseNotes(notes, 15)
+			formatted := FormatReleaseNotes(notes, 15)
 			if formatted != "" {
 				fmt.Println()
 				fmt.Println("Release notes:")
@@ -362,8 +362,8 @@ func handleBranchInstall(ctx context.Context, branch string, method InstallMetho
 	}
 }
 
-// formatReleaseNotes prepares release notes for terminal display.
-func formatReleaseNotes(body string, maxLines int) string {
+// FormatReleaseNotes prepares release notes for terminal display.
+func FormatReleaseNotes(body string, maxLines int) string {
 	if strings.TrimSpace(body) == "" {
 		return ""
 	}

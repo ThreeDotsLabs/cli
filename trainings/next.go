@@ -298,7 +298,7 @@ func (h *Handlers) setExerciseWithGit(
 			}
 			fmt.Println()
 			fmt.Println("  You can merge the changes yourself, or we'll replace all exercise files")
-			fmt.Println("  with our versions (only this exercise is affected).")
+			fmt.Println("  with our example solution (only this exercise is affected).")
 			fmt.Printf("  Your code will be saved to %s: you can restore it anytime.\n", color.MagentaString(previewBackupBranch))
 			fmt.Println()
 			if h.loopState != nil {
@@ -314,7 +314,7 @@ func (h *Handlers) setExerciseWithGit(
 			conflictPrompt = h.promptRune(
 				internal.Actions{
 					{Shortcut: '\n', Action: "merge (resolve in editor)", ShortcutAliases: []rune{'\r'}},
-					{Shortcut: 'g', Action: "replace exercise files with ours"},
+					{Shortcut: 'g', Action: "replace exercise files with our example solution"},
 					{Shortcut: 'q', Action: "abort: stay on current exercise"},
 				},
 			)
@@ -630,7 +630,7 @@ func (h *Handlers) resolveConflictsInteractive(
 
 	fmt.Println()
 	fmt.Println("  Resolve the conflicts in your editor, or press 'g' to replace all exercise")
-	fmt.Println("  files with our versions (only this exercise is affected).")
+	fmt.Println("  files with our example solution (only this exercise is affected).")
 	fmt.Printf("  Your code will be saved to %s: you can restore it anytime.\n", color.MagentaString(backupBranch))
 
 	for {
@@ -640,7 +640,7 @@ func (h *Handlers) resolveConflictsInteractive(
 		choice := h.promptRune(
 			internal.Actions{
 				{Shortcut: '\n', Action: "confirm (conflicts resolved)", ShortcutAliases: []rune{'\r'}},
-				{Shortcut: 'g', Action: "replace exercise files with ours"},
+				{Shortcut: 'g', Action: "replace exercise files with our example solution"},
 				{Shortcut: 'q', Action: "abort: cancel merge"},
 			},
 		)
@@ -660,7 +660,7 @@ func (h *Handlers) resolveConflictsInteractive(
 				continue
 			}
 			// All resolved — complete the merge
-			_ = gitOps.AddAll(".")
+			_ = gitOps.AddAll(exerciseDir)
 			if err := gitOps.Commit(mergeMsg); err != nil {
 				return fmt.Errorf("can't complete merge commit: %w", err)
 			}
@@ -734,7 +734,7 @@ func (h *Handlers) replaceExerciseFilesOnMergeConflict(
 	}
 	fmt.Printf("  Your code saved to branch %s\n", color.MagentaString(backupBranch))
 	fmt.Println("  Restore anytime with: " + color.CyanString("git checkout %s -- %s", backupBranch, exerciseDir))
-	fmt.Println(color.GreenString("  All exercise files replaced with our versions."))
+	fmt.Println(color.GreenString("  All exercise files replaced with our example solution."))
 	fmt.Println()
 	return nil
 }

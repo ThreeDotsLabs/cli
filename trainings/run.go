@@ -165,6 +165,14 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 		defer func() { h.stdinCh = nil }()
 	}
 
+	// Background poller: long `tr run` sessions (days/weeks) can outlive the
+	// one-shot update check that runs at CLI startup. This goroutine keeps
+	// checking periodically so a newer release is still surfaced mid-session.
+	// Dev builds skip this unless --force-update-prompt is set for testing.
+	if h.cliMetadata.Version != "" && (h.cliMetadata.Version != "dev" || h.cliMetadata.ForceUpdatePrompt) {
+		go h.backgroundUpdateCheck(ctx)
+	}
+
 	retries := 0
 	mergeAborted := false
 
@@ -197,7 +205,7 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 				}
 
 				h.setLoopState(mcppkg.StateFailed)
-				action, fromMCP := h.waitForAction(
+				failActions, failActionMap := h.augmentActionsWithUpdate(
 					internal.Actions{
 						{Shortcut: '\n', Action: "run solution again", ShortcutAliases: []rune{'\r'}},
 						{Shortcut: 'q', Action: "quit"},
@@ -206,6 +214,10 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 						'\n': loopActionRun,
 						'q':  loopActionQuit,
 					},
+				)
+				action, fromMCP := h.waitForAction(
+					failActions,
+					failActionMap,
 					map[mcppkg.CommandType]loopAction{
 						mcppkg.CmdRunSolution:   loopActionRun,
 						mcppkg.CmdResetExercise: loopActionResetExercise,
@@ -214,6 +226,10 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 				ctx = withMCPTriggered(ctx, fromMCP)
 				if action == loopActionQuit {
 					return userErr
+				}
+				if action == loopActionUpdate {
+					h.handleUpdateAction(ctx)
+					continue
 				}
 				if action == loopActionResetExercise {
 					if err := h.resetExerciseFromLoop(ctx, trainingRootFs); err != nil {
@@ -246,7 +262,7 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 				}
 
 				h.setLoopState(mcppkg.StateFailed)
-				action, fromMCP := h.waitForAction(
+				failActions, failActionMap := h.augmentActionsWithUpdate(
 					internal.Actions{
 						{Shortcut: '\n', Action: "run solution again", ShortcutAliases: []rune{'\r'}},
 						{Shortcut: 'q', Action: "quit"},
@@ -255,6 +271,10 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 						'\n': loopActionRun,
 						'q':  loopActionQuit,
 					},
+				)
+				action, fromMCP := h.waitForAction(
+					failActions,
+					failActionMap,
 					map[mcppkg.CommandType]loopAction{
 						mcppkg.CmdRunSolution:   loopActionRun,
 						mcppkg.CmdResetExercise: loopActionResetExercise,
@@ -263,6 +283,10 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 				ctx = withMCPTriggered(ctx, fromMCP)
 				if action == loopActionQuit {
 					return nil
+				}
+				if action == loopActionUpdate {
+					h.handleUpdateAction(ctx)
+					continue
 				}
 				if action == loopActionResetExercise {
 					if err := h.resetExerciseFromLoop(ctx, trainingRootFs); err != nil {
@@ -307,6 +331,7 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 		actionMap['q'] = loopActionQuit
 
 		h.setLoopState(mcppkg.StateSucceeded)
+		actions, actionMap = h.augmentActionsWithUpdate(actions, actionMap)
 		chosenAction, fromMCP := h.waitForAction(
 			actions,
 			actionMap,
@@ -321,6 +346,10 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 
 		if chosenAction == loopActionQuit {
 			os.Exit(0)
+		}
+		if chosenAction == loopActionUpdate {
+			h.handleUpdateAction(ctx)
+			continue
 		}
 		if chosenAction == loopActionRun {
 			continue
@@ -630,7 +659,92 @@ const (
 	loopActionSyncSolution                    // Sync with example solution
 	loopActionQuit                            // Quit the loop
 	loopActionResetExercise                   // Reset exercise to clean files
+	loopActionUpdate                          // Update the CLI binary and exit
 )
+
+// backgroundUpdateCheck polls for a newer CLI release while the interactive
+// loop is alive. Runs until ctx is cancelled (e.g. user quits the loop).
+func (h *Handlers) backgroundUpdateCheck(ctx context.Context) {
+	check := func() {
+		available, version, notes := internal.CheckUpdateAvailable(h.cliMetadata.Version, h.cliMetadata.ForceUpdatePrompt)
+		if available {
+			h.setUpdateAvailable(version, notes)
+			logrus.WithField("version", version).Debug("Background update check: update available")
+		}
+	}
+
+	check() // immediate check so a user who launched right after a release sees it quickly
+
+	ticker := time.NewTicker(30 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			check()
+		}
+	}
+}
+
+// augmentActionsWithUpdate appends a 'u' action to the given prompt when a
+// background update check has flagged a newer release. The yellow notice
+// line is printed above the prompt only on the first prompt after detection
+// (per ShouldShowUpdateNoticeCLI); the 'u' action stays in the list on
+// every subsequent prompt so the user can trigger the update anytime.
+//
+// Returns fresh action/map copies; the caller's originals are not mutated.
+func (h *Handlers) augmentActionsWithUpdate(actions internal.Actions, actionMap map[rune]loopAction) (internal.Actions, map[rune]loopAction) {
+	available, version, releaseNotes := h.getUpdateAvailable()
+	if !available {
+		return actions, actionMap
+	}
+
+	if h.shouldShowUpdateNoticeCLI() {
+		fmt.Println()
+		_, _ = color.New(color.FgHiYellow).Printf(
+			"A new CLI version is available: %s → %s. Press 'u' to update.\n",
+			h.cliMetadata.Version, version,
+		)
+		if formatted := internal.FormatReleaseNotes(releaseNotes, 15); formatted != "" {
+			fmt.Println()
+			fmt.Println("Release notes:")
+			fmt.Println(formatted)
+		}
+		h.markUpdateNoticeShownCLI()
+	}
+
+	newActions := make(internal.Actions, 0, len(actions)+1)
+	newActions = append(newActions, actions...)
+	newActions = append(newActions, internal.Action{Shortcut: 'u', Action: "update CLI (will exit)"})
+
+	newMap := make(map[rune]loopAction, len(actionMap)+1)
+	for k, v := range actionMap {
+		newMap[k] = v
+	}
+	newMap['u'] = loopActionUpdate
+
+	return newActions, newMap
+}
+
+// handleUpdateAction runs the self-update flow and exits on success.
+// On failure it prints the error and returns, letting the caller continue
+// the interactive loop with the current CLI version.
+func (h *Handlers) handleUpdateAction(ctx context.Context) {
+	fmt.Println()
+	if err := internal.RunUpdate(ctx, h.cliMetadata.Version, internal.UpdateOptions{
+		SkipConfirm: true,
+		ForceUpdate: true,
+	}); err != nil {
+		fmt.Println(color.RedString("Update failed: %v", err))
+		fmt.Println(color.HiBlackString("Continuing with current version..."))
+		return
+	}
+	fmt.Println()
+	fmt.Println("Please re-run your command.")
+	os.Exit(0)
+}
 
 // waitForAction prints a prompt and waits for input from either stdin or the MCP command channel.
 // When MCP is disabled (loopState == nil), it reads stdin synchronously (like internal.Prompt).

@@ -155,13 +155,13 @@ func TestCanWriteBinary(t *testing.T) {
 
 func TestFormatReleaseNotes(t *testing.T) {
 	t.Run("empty body", func(t *testing.T) {
-		assert.Equal(t, "", formatReleaseNotes("", 15))
-		assert.Equal(t, "", formatReleaseNotes("   \n\n  ", 15))
+		assert.Equal(t, "", FormatReleaseNotes("", 15))
+		assert.Equal(t, "", FormatReleaseNotes("   \n\n  ", 15))
 	})
 
 	t.Run("short body under limit", func(t *testing.T) {
 		body := "- Fixed bug in exercise reset\n- Added module skipping"
-		result := formatReleaseNotes(body, 15)
+		result := FormatReleaseNotes(body, 15)
 		assert.Contains(t, result, "Fixed bug in exercise reset")
 		assert.Contains(t, result, "Added module skipping")
 		assert.NotContains(t, result, "see full release notes")
@@ -173,7 +173,7 @@ func TestFormatReleaseNotes(t *testing.T) {
 			lines = append(lines, "- Change number "+string(rune('A'+i)))
 		}
 		body := strings.Join(lines, "\n")
-		result := formatReleaseNotes(body, 5)
+		result := FormatReleaseNotes(body, 5)
 		assert.Contains(t, result, "Change number A")
 		assert.Contains(t, result, "see full release notes")
 		assert.NotContains(t, result, "Change number F")
@@ -181,21 +181,21 @@ func TestFormatReleaseNotes(t *testing.T) {
 
 	t.Run("strips markdown headers", func(t *testing.T) {
 		body := "## What's Changed\n- Bug fix"
-		result := formatReleaseNotes(body, 15)
+		result := FormatReleaseNotes(body, 15)
 		assert.Contains(t, result, "What's Changed")
 		assert.NotContains(t, result, "##")
 	})
 
 	t.Run("strips bold markers", func(t *testing.T) {
 		body := "**Important**: This is a breaking change"
-		result := formatReleaseNotes(body, 15)
+		result := FormatReleaseNotes(body, 15)
 		assert.Contains(t, result, "Important")
 		assert.NotContains(t, result, "**")
 	})
 
 	t.Run("strips markdown links", func(t *testing.T) {
 		body := "See [the docs](https://example.com) for details"
-		result := formatReleaseNotes(body, 15)
+		result := FormatReleaseNotes(body, 15)
 		assert.Contains(t, result, "the docs")
 		assert.NotContains(t, result, "https://example.com")
 		assert.NotContains(t, result, "[")
@@ -203,7 +203,7 @@ func TestFormatReleaseNotes(t *testing.T) {
 
 	t.Run("trims leading and trailing blank lines", func(t *testing.T) {
 		body := "\n\n- First line\n- Second line\n\n"
-		result := formatReleaseNotes(body, 15)
+		result := FormatReleaseNotes(body, 15)
 		assert.Contains(t, result, "First line")
 		assert.Contains(t, result, "Second line")
 	})

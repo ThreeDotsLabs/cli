@@ -89,6 +89,74 @@ func CheckForUpdate(currentVersion string, commandName string, forcePrompt bool)
 	}
 }
 
+// CheckUpdateAvailable performs a silent update check suitable for background
+// goroutines that poll on a long timer. It never prints and never prompts.
+// Returns whether a newer release is known for currentVersion, along with the
+// new version string and its release notes (if any).
+//
+// Honors TDL_NO_UPDATE_CHECK, skips when currentVersion is empty or "dev",
+// fast-paths the cached state file, and only hits the GitHub API once the
+// updateCheckInterval has elapsed. Respects the on-disk dismissal window so
+// a user who already declined the same version at startup isn't re-notified
+// mid-session.
+//
+// forcePrompt mirrors the semantics of CheckForUpdate's forcePrompt: bypass
+// the interval gate, accept any release that differs from currentVersion
+// (not just newer), and bypass the dismissal window. Intended for the hidden
+// --force-update-prompt testing flag.
+func CheckUpdateAvailable(currentVersion string, forcePrompt bool) (available bool, newVersion string, releaseNotes string) {
+	if os.Getenv("TDL_NO_UPDATE_CHECK") != "" {
+		return false, "", ""
+	}
+	if currentVersion == "" {
+		return false, "", ""
+	}
+	if !forcePrompt && currentVersion == "dev" {
+		return false, "", ""
+	}
+
+	updateInfo, _ := getUpdateInfo()
+
+	if forcePrompt || time.Since(updateInfo.LastChecked) >= updateCheckInterval {
+		if release := getLatestRelease(); release != nil {
+			isNewer := release.Version != "" && isNewerVersion(release.Version, currentVersion)
+			isDifferent := release.Version != "" && release.Version != currentVersion
+			if isNewer || (forcePrompt && isDifferent) {
+				updateInfo.CurrentVersion = currentVersion
+				updateInfo.AvailableVersion = release.Version
+				updateInfo.UpdateAvailable = true
+				updateInfo.ReleaseNotes = release.ReleaseNotes
+			} else {
+				updateInfo.CurrentVersion = currentVersion
+				updateInfo.AvailableVersion = ""
+				updateInfo.UpdateAvailable = false
+				updateInfo.ReleaseNotes = ""
+				updateInfo.DismissedVersion = ""
+				updateInfo.DismissedAt = time.Time{}
+			}
+			updateInfo.LastChecked = time.Now()
+			_ = storeUpdateInfo(updateInfo)
+		}
+	}
+
+	if !updateInfo.UpdateAvailable {
+		return false, "", ""
+	}
+
+	if !forcePrompt {
+		if !isNewerVersion(updateInfo.AvailableVersion, currentVersion) {
+			return false, "", ""
+		}
+		// Respect the existing dismissal window — don't nag a user who already
+		// declined the same version at startup.
+		if !shouldShowBlockingPrompt(updateInfo) {
+			return false, "", ""
+		}
+	}
+
+	return true, updateInfo.AvailableVersion, updateInfo.ReleaseNotes
+}
+
 func showUpdatePromptOrNotice(updateInfo UpdateInfo, currentVersion string, isUpdateCommand bool, forcePrompt bool) {
 	// If user is running "tdl update", skip — they're already updating
 	if isUpdateCommand {
@@ -129,7 +197,7 @@ func showBlockingUpdatePrompt(updateInfo UpdateInfo, currentVersion string) {
 	_, _ = c.Printf("Some features may be missing or not work correctly.\n")
 
 	if updateInfo.ReleaseNotes != "" {
-		formatted := formatReleaseNotes(updateInfo.ReleaseNotes, 15)
+		formatted := FormatReleaseNotes(updateInfo.ReleaseNotes, 15)
 		if formatted != "" {
 			fmt.Println()
 			fmt.Println("Release notes:")

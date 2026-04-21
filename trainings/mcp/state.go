@@ -99,6 +99,15 @@ type LoopState struct {
 	lastError     string
 
 	transitionContent string // human-readable context from last exercise transition (e.g. diff)
+
+	// Background CLI-update signals. The terminal ("CLI") and MCP surfaces
+	// each render the one-shot notice independently, so their "shown" flags
+	// are tracked separately.
+	updateAvailable      bool
+	updateVersion        string
+	updateReleaseNotes   string
+	updateNoticeShownCLI bool
+	updateNoticeShownMCP bool
 }
 
 func NewLoopState() *LoopState {
@@ -227,4 +236,56 @@ func (s *LoopState) ClearTransitionContent() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.transitionContent = ""
+}
+
+// SetUpdateAvailable records that a newer CLI release is available.
+// Called from the background update-check goroutine.
+func (s *LoopState) SetUpdateAvailable(version, releaseNotes string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.updateVersion != version {
+		// A different (newer) version than what was previously signaled —
+		// reset the "shown" flags so both surfaces re-notify.
+		s.updateNoticeShownCLI = false
+		s.updateNoticeShownMCP = false
+	}
+	s.updateAvailable = true
+	s.updateVersion = version
+	s.updateReleaseNotes = releaseNotes
+}
+
+// GetUpdateAvailable returns the current background-check result.
+func (s *LoopState) GetUpdateAvailable() (available bool, version, releaseNotes string) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.updateAvailable, s.updateVersion, s.updateReleaseNotes
+}
+
+// ShouldShowUpdateNoticeCLI reports whether the terminal should still print
+// its one-shot "update available" line. Returns false once
+// MarkUpdateNoticeShownCLI has been called for the current version.
+func (s *LoopState) ShouldShowUpdateNoticeCLI() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.updateAvailable && !s.updateNoticeShownCLI
+}
+
+func (s *LoopState) MarkUpdateNoticeShownCLI() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.updateNoticeShownCLI = true
+}
+
+// ShouldShowUpdateNoticeMCP is the MCP-side counterpart — gates the one-shot
+// note appended to tool-result messages.
+func (s *LoopState) ShouldShowUpdateNoticeMCP() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.updateAvailable && !s.updateNoticeShownMCP
+}
+
+func (s *LoopState) MarkUpdateNoticeShownMCP() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.updateNoticeShownMCP = true
 }

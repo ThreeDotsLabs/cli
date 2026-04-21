@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/retry"
@@ -40,6 +41,15 @@ type Handlers struct {
 	stdinCh   <-chan rune       // centralized stdin channel; non-nil only during interactiveRun with MCP
 
 	pendingMCPResultCh chan<- mcppkg.MCPResult // deferred result for blocking MCP commands (e.g. next exercise)
+
+	// Fallback update-state for when MCP is disabled (loopState == nil).
+	// When loopState is non-nil all update accessors route through it so
+	// MCP tool handlers see the same values as the terminal prompt.
+	updateMu             sync.Mutex
+	updateAvailable      bool
+	updateVersion        string
+	updateReleaseNotes   string
+	updateNoticeShownCLI bool
 }
 
 type CliMetadata struct {
@@ -54,6 +64,11 @@ type CliMetadata struct {
 
 	ExecutedCommand string
 	Interactive     bool
+
+	// ForceUpdatePrompt mirrors the top-level hidden --force-update-prompt
+	// flag so the in-loop background update check can also bypass the
+	// interval/dismissal gates for testing.
+	ForceUpdatePrompt bool
 }
 
 func NewHandlers(cliVersion CliMetadata, mcpPort int) *Handlers {
