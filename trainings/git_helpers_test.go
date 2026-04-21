@@ -95,13 +95,14 @@ func TestStageInitialFiles_BaseCase(t *testing.T) {
 
 	stageInitialFiles(gitOps, dir)
 
-	// Check that files are staged
 	cmd := exec.Command("git", "diff", "--cached", "--name-only")
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err)
-	assert.Contains(t, string(out), ".tdl-training")
 	assert.Contains(t, string(out), ".gitignore")
+	// .tdl-training is local state; it must not land in the initial commit
+	// even when present on disk.
+	assert.NotContains(t, string(out), ".tdl-training")
 }
 
 func TestStageInitialFiles_WithGoWork(t *testing.T) {

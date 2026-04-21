@@ -86,16 +86,20 @@ func registerTools(srv *server.MCPServer, state *LoopState) {
 }
 
 type exerciseInfoResponse struct {
-	ExerciseID    string `json:"exercise_id"`
-	Directory     string `json:"directory"`
-	IsTextOnly    bool   `json:"is_text_only"`
-	IsOptional    bool   `json:"is_optional"`
-	ModuleName    string `json:"module_name"`
-	ExerciseName  string `json:"exercise_name"`
-	State         string `json:"state"`
-	PendingAction string `json:"pending_action,omitempty"`
-	Error         string `json:"error,omitempty"`
-	Logs          string `json:"logs,omitempty"`
+	ExerciseID         string `json:"exercise_id"`
+	Directory          string `json:"directory"`
+	IsTextOnly         bool   `json:"is_text_only"`
+	IsOptional         bool   `json:"is_optional"`
+	ModuleName         string `json:"module_name"`
+	ExerciseName       string `json:"exercise_name"`
+	State              string `json:"state"`
+	PendingAction      string `json:"pending_action,omitempty"`
+	Error              string `json:"error,omitempty"`
+	Logs               string `json:"logs,omitempty"`
+	UpdateAvailable    bool   `json:"update_available,omitempty"`
+	UpdateVersion      string `json:"update_version,omitempty"`
+	UpdateCommand      string `json:"update_command,omitempty"`
+	UpdateReleaseNotes string `json:"update_release_notes,omitempty"`
 }
 
 func handleGetExerciseInfo(state *LoopState) server.ToolHandlerFunc {
@@ -113,6 +117,13 @@ func handleGetExerciseInfo(state *LoopState) server.ToolHandlerFunc {
 			State:         currentState.String(),
 			PendingAction: state.GetPendingAction(),
 			Error:         state.GetLastError(),
+		}
+
+		if updateAvailable, updateVersion, updateNotes := state.GetUpdateAvailable(); updateAvailable {
+			resp.UpdateAvailable = true
+			resp.UpdateVersion = updateVersion
+			resp.UpdateCommand = "tdl update"
+			resp.UpdateReleaseNotes = updateNotes
 		}
 
 		includeLogs, _ := request.GetArguments()["include_logs"].(bool)
@@ -315,6 +326,18 @@ func sendCommand(state *LoopState, cmdType CommandType, successMsg string, respo
 		msg := successMsg
 		if result.Message != "" {
 			msg = result.Message
+		}
+		// Piggyback the one-shot update notice on the first successful tool
+		// call after detection. Gives agent clients a chance to relay it to
+		// the user since mcp-go has no server-push channel.
+		if state.ShouldShowUpdateNoticeMCP() {
+			if updateAvailable, updateVersion, _ := state.GetUpdateAvailable(); updateAvailable {
+				msg += fmt.Sprintf(
+					"\n\nNote: a new CLI version (%s) is available. Run `tdl update` in your terminal.",
+					updateVersion,
+				)
+				state.MarkUpdateNoticeShownMCP()
+			}
 		}
 		return mcp.NewToolResultText(msg), nil
 	case <-time.After(responseTimeout):

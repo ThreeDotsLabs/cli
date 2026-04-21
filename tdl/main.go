@@ -448,15 +448,16 @@ func newHandlers(c *cli.Context) *trainings.Handlers {
 	mcpPort := c.Int("mcp-port")
 
 	return trainings.NewHandlers(trainings.CliMetadata{
-		Version:         version,
-		Commit:          commit,
-		Architecture:    runtime.GOARCH,
-		OS:              runtime.GOOS,
-		OSVersion:       osVersion(),
-		GoVersion:       runtime.Version(),
-		GitVersion:      gitVersionString(),
-		ExecutedCommand: cmd,
-		Interactive:     internal.IsStdinTerminal(),
+		Version:           version,
+		Commit:            commit,
+		Architecture:      runtime.GOARCH,
+		OS:                runtime.GOOS,
+		OSVersion:         osVersion(),
+		GoVersion:         runtime.Version(),
+		GitVersion:        gitVersionString(),
+		ExecutedCommand:   cmd,
+		Interactive:       internal.IsStdinTerminal(),
+		ForceUpdatePrompt: c.Bool("force-update-prompt"),
 	}, mcpPort)
 }
 
