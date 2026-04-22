@@ -31,35 +31,13 @@ func replaceExerciseFiles(
 	return files.NewFilesSilentDeleteUnused().WriteExerciseFiles(replacementFiles, trainingRootFs, exerciseDir)
 }
 
-// mergeStartStateFiles returns the starting state of an exercise:
-// golden(prev) with scaffold(current) overlaid on top. Scaffold wins on path
-// collisions because it represents the delta from end-of-prev to start-of-current.
-// Pass nil goldenFiles for the first exercise.
-func mergeStartStateFiles(
-	goldenFiles []*genproto.File,
-	scaffoldFiles []*genproto.File,
-) []*genproto.File {
-	byPath := make(map[string]*genproto.File, len(goldenFiles)+len(scaffoldFiles))
-	for _, f := range goldenFiles {
-		byPath[f.Path] = f
-	}
-	for _, f := range scaffoldFiles {
-		byPath[f.Path] = f // scaffold wins on collisions
-	}
-	merged := make([]*genproto.File, 0, len(byPath))
-	for _, f := range byPath {
-		merged = append(merged, f)
-	}
-	return merged
-}
-
 // replaceExerciseFilesAndCommit is the complete orchestration for replacing
 // the user's exercise files with a given file list: save backup → write files
 // (1:1, deletes extras) → stage → commit. ALL callers that replace the user's
 // solution with example / start-state content MUST go through this function:
-//   - overrideWithGolden ('s' action):       files = golden(current)
-//   - g during next/merge-conflict:          files = golden(prev) + scaffold(current)
-//   - resetCleanFiles:                       files = golden(prev) + scaffold(current)
+//   - overrideWithGolden ('s' action):       files = golden(current) via GetGoldenSolution
+//   - g during next/merge-conflict:          files = start state via GetExerciseStartState
+//   - resetCleanFiles:                       files = start state via GetExerciseStartState
 //
 // The backup branch is REQUIRED — destructive ops must always be recoverable.
 // If saveToBackupBranch returns errBackupAborted, that error is returned directly
