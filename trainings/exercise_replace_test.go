@@ -11,58 +11,6 @@ import (
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )
 
-func TestMergeStartStateFiles(t *testing.T) {
-	t.Run("first exercise (nil golden) returns scaffold as-is", func(t *testing.T) {
-		scaffold := []*genproto.File{
-			{Path: "a.txt", Content: "A"},
-			{Path: "b.txt", Content: "B"},
-		}
-		merged := mergeStartStateFiles(nil, scaffold)
-		assertFilesByPath(t, merged, map[string]string{
-			"a.txt": "A",
-			"b.txt": "B",
-		})
-	})
-
-	t.Run("scaffold wins on path collision", func(t *testing.T) {
-		golden := []*genproto.File{
-			{Path: "shared.txt", Content: "from golden"},
-			{Path: "golden-only.txt", Content: "G"},
-		}
-		scaffold := []*genproto.File{
-			{Path: "shared.txt", Content: "from scaffold"}, // overrides golden
-			{Path: "scaffold-only.txt", Content: "S"},
-		}
-		merged := mergeStartStateFiles(golden, scaffold)
-		assertFilesByPath(t, merged, map[string]string{
-			"shared.txt":        "from scaffold",
-			"golden-only.txt":   "G",
-			"scaffold-only.txt": "S",
-		})
-	})
-
-	t.Run("regression: golden with filled-in placeholder is preserved when scaffold does not redeliver it", func(t *testing.T) {
-		// This is the 0001_init_orders.up.sql scenario.
-		// Earlier exercises scaffolded the file as empty; the user filled it in.
-		// By a later exercise, the scaffold no longer includes that file — only
-		// the prev-exercise golden does. The start state must preserve the
-		// filled-in content.
-		golden := []*genproto.File{
-			{Path: "migrations/0001_init.sql", Content: "CREATE TABLE ..."},
-			{Path: "common.go", Content: "package common"},
-		}
-		scaffold := []*genproto.File{
-			{Path: "new_for_this_exercise.go", Content: "package new"},
-		}
-		merged := mergeStartStateFiles(golden, scaffold)
-		assertFilesByPath(t, merged, map[string]string{
-			"migrations/0001_init.sql": "CREATE TABLE ...", // survives from golden
-			"common.go":                "package common",
-			"new_for_this_exercise.go": "package new",
-		})
-	})
-}
-
 func TestReplaceExerciseFiles_is1to1(t *testing.T) {
 	// The invariant: after replaceExerciseFiles, exerciseDir contains exactly
 	// the replacement files — any extras are deleted. This is load-bearing

@@ -168,42 +168,32 @@ func (h *Handlers) resetCleanFiles(
 }
 
 // fetchStartStateFiles returns the starting state of the given exercise:
-// golden(prev) with scaffold(current) overlaid on top. Makes up to 3
-// gRPC calls (GetExercises for prev resolution, GetGoldenSolution for prev golden,
-// GetExercise for current scaffold). Pass "" for exerciseID only in edge cases
-// where the caller knows the current exercise has no meaningful prev.
+// golden(prev) merged with scaffold(current). One gRPC call — the server
+// owns the composition via GetExerciseStartState, which uses
+// TrainingConfig.PreviousExercises (same-dir filter) to pick the right
+// predecessor.
+//
+// The empty-files guard is load-bearing: callers pipe the result into
+// replaceExerciseFiles which enforces a 1:1 "delete unused" invariant.
+// Zero files would mean "wipe everything" — always an anomaly, never a
+// legitimate input.
 func (h *Handlers) fetchStartStateFiles(
 	ctx context.Context,
 	fs *afero.BasePathFs,
 	exerciseID string,
 ) ([]*genproto.File, error) {
-	trainingName := h.config.TrainingConfig(fs).TrainingName
-	token := h.config.GlobalConfig().Token
-
-	prevExerciseID, _, err := h.resolvePreviousExercise(ctx, trainingName, token, exerciseID)
-	if err != nil {
-		return nil, fmt.Errorf("could not resolve previous exercise: %w", err)
-	}
-
-	scaffoldResp, err := h.newGrpcClient().GetExercise(ctx, &genproto.GetExerciseRequest{
-		TrainingName: trainingName,
-		Token:        token,
+	resp, err := h.newGrpcClient().GetExerciseStartState(ctx, &genproto.GetExerciseStartStateRequest{
+		TrainingName: h.config.TrainingConfig(fs).TrainingName,
+		Token:        h.config.GlobalConfig().Token,
 		ExerciseId:   exerciseID,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("could not fetch exercise scaffold: %w", err)
+		return nil, fmt.Errorf("could not fetch exercise start state: %w", err)
 	}
-
-	var goldenFiles []*genproto.File
-	if prevExerciseID != "" {
-		gf, err := h.fetchGoldenFiles(ctx, trainingName, prevExerciseID, token)
-		if err != nil {
-			return nil, err
-		}
-		goldenFiles = gf
+	if len(resp.Files) == 0 {
+		return nil, fmt.Errorf("server returned no files for exercise start state — aborting to protect your workspace (please update your CLI or contact support)")
 	}
-
-	return mergeStartStateFiles(goldenFiles, scaffoldResp.FilesToCreate), nil
+	return resp.Files, nil
 }
 
 // resetMissingOnly restores files from the exercise's start state
