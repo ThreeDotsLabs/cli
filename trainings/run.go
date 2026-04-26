@@ -36,7 +36,11 @@ func (h *Handlers) Run(ctx context.Context, detached bool) error {
 	}
 
 	trainingRootFs := newTrainingRootFs(trainingRoot)
-	printGitNotices(h.config.TrainingConfig(trainingRootFs))
+	cfg := h.config.TrainingConfig(trainingRootFs)
+	printGitNotices(cfg)
+	if !showGitInstallNoticeIfDue(cfg) {
+		return nil
+	}
 
 	agentInstructions, err := h.fetchAgentInstructions(ctx, trainingRootFs)
 	if err != nil {

@@ -66,6 +66,7 @@ func (h *Handlers) Init(ctx context.Context, trainingName string, dir string, no
 			if errors.As(err, &notInstalled) {
 				if internal.IsStdinTerminal() {
 					printGitUnavailableNotice("Git is not installed.", git.InstallHint(runtime.GOOS))
+					_ = internal.RecordGitInstallNoticeShown()
 					if !promptContinueWithoutGit() {
 						return nil
 					}
@@ -76,6 +77,7 @@ func (h *Handlers) Init(ctx context.Context, trainingName string, dir string, no
 				if internal.IsStdinTerminal() {
 					reason := fmt.Sprintf("Your git version (%s) is too old: %s or newer is required.", tooOld.Detected, tooOld.Required)
 					printGitUnavailableNotice(reason, git.InstallHint(runtime.GOOS))
+					_ = internal.RecordGitInstallNoticeShown()
 					if !promptContinueWithoutGit() {
 						return nil
 					}

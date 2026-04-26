@@ -9,7 +9,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 )
 
 const stdinFileDescriptor = 0
@@ -19,14 +19,21 @@ func stdinTerminalReason() (bool, string) {
 	if v, _ := strconv.ParseBool(os.Getenv("TDL_FORCE_INTERACTIVE")); v {
 		return true, "true (TDL_FORCE_INTERACTIVE)"
 	}
-	if terminal.IsTerminal(stdinFileDescriptor) {
+	if term.IsTerminal(stdinFileDescriptor) {
 		return true, "true (native console)"
 	}
-	// On Windows, mintty (Git Bash) and MSYS2 terminals use pipes instead of
-	// native console handles, so IsTerminal returns false even though they fully
-	// support ANSI/VT sequences. The TERM env var is a reliable signal for these.
-	if term := os.Getenv("TERM"); term != "" {
-		return true, fmt.Sprintf("true (TERM=%s)", term)
+	// mintty (Git Bash) and MSYS2 use pipes instead of native console handles;
+	// TERM env var is their reliable signal.
+	if t := os.Getenv("TERM"); t != "" {
+		return true, fmt.Sprintf("true (TERM=%s)", t)
+	}
+	// Windows Terminal sets WT_SESSION in every child process.
+	if wt := os.Getenv("WT_SESSION"); wt != "" {
+		return true, "true (WT_SESSION)"
+	}
+	// VS Code integrated terminal and other modern emulators set TERM_PROGRAM.
+	if tp := os.Getenv("TERM_PROGRAM"); tp != "" {
+		return true, fmt.Sprintf("true (TERM_PROGRAM=%s)", tp)
 	}
 	return false, "false"
 }
@@ -42,13 +49,13 @@ func NewRawTerminalReader(stdin io.Reader) (*bufio.Reader, func(), error) {
 		return bufio.NewReader(stdin), func() {}, nil
 	}
 
-	state, err := terminal.MakeRaw(stdinFileDescriptor)
+	state, err := term.MakeRaw(stdinFileDescriptor)
 	if err != nil {
 		return nil, func() {}, errors.Wrap(err, "can't set stdin to raw")
 	}
 
 	return bufio.NewReader(stdin), func() {
-		if err := terminal.Restore(stdinFileDescriptor, state); err != nil {
+		if err := term.Restore(stdinFileDescriptor, state); err != nil {
 			logrus.WithError(err).Warn("Failed to restore terminal")
 		}
 	}, err
@@ -61,7 +68,7 @@ func DoNotTrack() bool {
 
 // TerminalWidth returns the current terminal width, falling back to 60 if not a TTY.
 func TerminalWidth() int {
-	w, _, err := terminal.GetSize(stdoutFileDescriptor)
+	w, _, err := term.GetSize(stdoutFileDescriptor)
 	if err != nil || w <= 0 {
 		return 60
 	}

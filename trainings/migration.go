@@ -2,6 +2,7 @@ package trainings
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 
 	"github.com/fatih/color"
@@ -79,4 +80,25 @@ func printGitNowAvailableNotice(cfg config.TrainingConfig) {
 func printGitNotices(cfg config.TrainingConfig) {
 	printGitMigrationNotice(cfg)
 	printGitNowAvailableNotice(cfg)
+}
+
+// showGitInstallNoticeIfDue shows the "git not installed" notice at most once per 24 h.
+// Only fires when the workspace was created without git (GitUnavailable=true) and git
+// is still missing. Returns false if the user chose to quit.
+func showGitInstallNoticeIfDue(cfg config.TrainingConfig) bool {
+	if !cfg.GitConfigured || cfg.GitEnabled || !cfg.GitUnavailable {
+		return true
+	}
+	if _, err := git.CheckVersion(); err == nil {
+		return true // git became available — printGitNowAvailableNotice handles this
+	}
+	if !internal.ShouldShowGitInstallNotice() {
+		return true // shown recently, skip
+	}
+	_ = internal.RecordGitInstallNoticeShown()
+	printGitUnavailableNotice("Git is not installed.", git.InstallHint(runtime.GOOS))
+	if !internal.IsStdinTerminal() {
+		return true
+	}
+	return promptContinueWithoutGit()
 }
