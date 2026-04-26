@@ -57,7 +57,16 @@ func (h *Handlers) promptRune(actions internal.Actions) rune {
 	drainChannel(h.stdinCh)
 
 	for {
-		ch := <-h.stdinCh
+		ch, ok := <-h.stdinCh
+		if !ok {
+			if rawErr == nil {
+				// Reset terminal to cooked mode so the shell works normally after exit.
+				term.Restore(0, termState)
+			}
+			logrus.Debug("stdin closed, exiting")
+			fmt.Println(color.HiBlackString("Input closed — exiting."))
+			os.Exit(0)
+		}
 		if string(ch) == "\x03" {
 			if rawErr == nil {
 				term.Restore(0, termState)

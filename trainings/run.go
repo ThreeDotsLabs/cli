@@ -152,10 +152,18 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 	if h.loopState != nil {
 		ch := make(chan rune, 1)
 		go func() {
+			defer close(ch)
 			reader := bufio.NewReader(os.Stdin)
 			for {
 				r, _, err := reader.ReadRune()
 				if err != nil {
+					if err == io.EOF && internal.IsStdinTerminal() {
+						// Spurious EOF: switching between raw/cooked terminal mode
+						// can flush the canonical buffer mid-read, returning 0 bytes.
+						// Stdin is still open — recreate the reader and continue.
+						reader = bufio.NewReader(os.Stdin)
+						continue
+					}
 					return
 				}
 				ch <- r
@@ -776,7 +784,15 @@ func (h *Handlers) waitForAction(
 
 	for {
 		select {
-		case ch := <-h.stdinCh:
+		case ch, ok := <-h.stdinCh:
+			if !ok {
+				if rawErr == nil {
+					// Reset terminal to cooked mode so the shell works normally after exit.
+					term.Restore(0, termState)
+				}
+				fmt.Println(color.HiBlackString("Input closed — exiting."))
+				os.Exit(0)
+			}
 			if string(ch) == "\x03" {
 				if rawErr == nil {
 					term.Restore(0, termState)
