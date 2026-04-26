@@ -2,6 +2,7 @@ package internal
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"os"
 	"strconv"
@@ -14,13 +15,25 @@ import (
 const stdinFileDescriptor = 0
 const stdoutFileDescriptor = 1
 
-// IsStdinTerminal returns true if stdin is connected to a terminal (not a pipe or file).
-func IsStdinTerminal() bool {
+func stdinTerminalReason() (bool, string) {
 	if v, _ := strconv.ParseBool(os.Getenv("TDL_FORCE_INTERACTIVE")); v {
-		return true
+		return true, "true (TDL_FORCE_INTERACTIVE)"
 	}
-	return terminal.IsTerminal(stdinFileDescriptor)
+	if terminal.IsTerminal(stdinFileDescriptor) {
+		return true, "true (native console)"
+	}
+	// On Windows, mintty (Git Bash) and MSYS2 terminals use pipes instead of
+	// native console handles, so IsTerminal returns false even though they fully
+	// support ANSI/VT sequences. The TERM env var is a reliable signal for these.
+	if term := os.Getenv("TERM"); term != "" {
+		return true, fmt.Sprintf("true (TERM=%s)", term)
+	}
+	return false, "false"
 }
+
+// IsStdinTerminal returns true if stdin is connected to a terminal (not a pipe or file).
+func IsStdinTerminal() bool         { v, _ := stdinTerminalReason(); return v }
+func IsStdinTerminalReason() string { _, s := stdinTerminalReason(); return s }
 
 // NewRawTerminalReader returns raw terminal reader which allows reading stdin without hitting enter.
 func NewRawTerminalReader(stdin io.Reader) (*bufio.Reader, func(), error) {

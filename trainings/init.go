@@ -53,10 +53,9 @@ func (h *Handlers) Init(ctx context.Context, trainingName string, dir string, no
 		// Partial init: exercise not yet set up, fall through to nextExercise.
 	}
 
-	// Git integration: init repo, configure preferences, initial commit
-	// Skip git entirely in non-interactive mode (pipes, CI, E2E) — we can't prompt for preferences.
-	// forceGit overrides the non-interactive check (used by E2E tests and scripted restore).
-	gitOps := git.NewOps(trainingRootDir, noGit || (!forceGit && !internal.IsStdinTerminal()))
+	// Git integration: init repo, configure preferences, initial commit.
+	// Always attempt git detection; terminal is only needed for the "git missing" prompt.
+	gitOps := git.NewOps(trainingRootDir, noGit)
 	gitWasUnavailable := false
 
 	if gitOps.Enabled() {
@@ -65,17 +64,21 @@ func (h *Handlers) Init(ctx context.Context, trainingName string, dir string, no
 			var notInstalled *git.GitNotInstalledError
 			var tooOld *git.GitTooOldError
 			if errors.As(err, &notInstalled) {
-				printGitUnavailableNotice("Git is not installed.", git.InstallHint(runtime.GOOS))
-				if !promptContinueWithoutGit() {
-					return nil
+				if internal.IsStdinTerminal() {
+					printGitUnavailableNotice("Git is not installed.", git.InstallHint(runtime.GOOS))
+					if !promptContinueWithoutGit() {
+						return nil
+					}
 				}
 				gitOps = git.NewOps(trainingRootDir, true)
 				gitWasUnavailable = true
 			} else if errors.As(err, &tooOld) {
-				reason := fmt.Sprintf("Your git version (%s) is too old: %s or newer is required.", tooOld.Detected, tooOld.Required)
-				printGitUnavailableNotice(reason, git.InstallHint(runtime.GOOS))
-				if !promptContinueWithoutGit() {
-					return nil
+				if internal.IsStdinTerminal() {
+					reason := fmt.Sprintf("Your git version (%s) is too old: %s or newer is required.", tooOld.Detected, tooOld.Required)
+					printGitUnavailableNotice(reason, git.InstallHint(runtime.GOOS))
+					if !promptContinueWithoutGit() {
+						return nil
+					}
 				}
 				gitOps = git.NewOps(trainingRootDir, true)
 				gitWasUnavailable = true
