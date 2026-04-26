@@ -44,11 +44,11 @@ func printGitMigrationNotice(cfg config.TrainingConfig) {
 	fmt.Println()
 }
 
-// printGitNowAvailableNotice shows a banner when git has become available
-// since the workspace was created without it (git was missing/too old).
-// Does not trigger for users who chose --no-git (GitUnavailable = false).
+// printGitNowAvailableNotice shows a banner when git is available but the workspace
+// has git disabled. Covers both workspaces where git was missing at init (GitUnavailable=true)
+// and older workspaces that were silently disabled before the terminal-detection fix.
 func printGitNowAvailableNotice(cfg config.TrainingConfig) {
-	if !cfg.GitConfigured || cfg.GitEnabled || !cfg.GitUnavailable {
+	if !cfg.GitConfigured || cfg.GitEnabled {
 		return
 	}
 
@@ -64,7 +64,7 @@ func printGitNowAvailableNotice(cfg config.TrainingConfig) {
 	fmt.Println(sep)
 	fmt.Println(title)
 	fmt.Println()
-	fmt.Println("  Git was not available when this workspace was created.")
+	fmt.Println("  Git was not enabled for this workspace.")
 	fmt.Println("  You can enable git integration by reinitializing:")
 	fmt.Println()
 	fmt.Printf("    cd ..\n")
