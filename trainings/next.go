@@ -30,9 +30,10 @@ func (h *Handlers) promptRune(actions internal.Actions) rune {
 
 	printPrompt(actions)
 
-	termState, rawErr := term.MakeRaw(0)
+	stdinFd := int(os.Stdin.Fd())
+	termState, rawErr := term.MakeRaw(stdinFd)
 	if rawErr == nil {
-		defer term.Restore(0, termState)
+		defer term.Restore(stdinFd, termState)
 	}
 
 	if h.stdinCh == nil {
@@ -44,7 +45,7 @@ func (h *Handlers) promptRune(actions internal.Actions) rune {
 			}
 			if string(ch) == "\x03" {
 				if rawErr == nil {
-					term.Restore(0, termState)
+					term.Restore(stdinFd, termState)
 				}
 				os.Exit(0)
 			}
