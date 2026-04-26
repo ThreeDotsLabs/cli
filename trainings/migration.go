@@ -44,8 +44,8 @@ func printGitMigrationNotice(cfg config.TrainingConfig) {
 	fmt.Println()
 }
 
-// printGitNowAvailableNotice shows a banner when git is available but the workspace
-// has git disabled. Covers both workspaces where git was missing at init (GitUnavailable=true)
+// printGitNowAvailableNotice shows a banner (at most once per 24 h) when git is available
+// but the workspace has git disabled. Covers both workspaces where git was missing at init
 // and older workspaces that were silently disabled before the terminal-detection fix.
 func printGitNowAvailableNotice(cfg config.TrainingConfig) {
 	if !cfg.GitConfigured || cfg.GitEnabled {
@@ -56,6 +56,11 @@ func printGitNowAvailableNotice(cfg config.TrainingConfig) {
 		// git still not usable
 		return
 	}
+
+	if !internal.ShouldShowGitInstallNotice() {
+		return
+	}
+	_ = internal.RecordGitInstallNoticeShown()
 
 	sep := color.HiBlackString(strings.Repeat("─", internal.TerminalWidth()))
 	title := color.New(color.Bold, color.FgHiGreen).Sprint("  *** Git is now available! ***")
