@@ -370,6 +370,7 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 		ctx = withMCPTriggered(ctx, fromMCP)
 
 		if chosenAction == loopActionQuit {
+			h.restoreTerminal()
 			os.Exit(0)
 		}
 		if chosenAction == loopActionUpdate {
@@ -768,6 +769,7 @@ func (h *Handlers) handleUpdateAction(ctx context.Context) {
 	}
 	fmt.Println()
 	fmt.Println("Please re-run your command.")
+	h.restoreTerminal()
 	os.Exit(0)
 }
 
