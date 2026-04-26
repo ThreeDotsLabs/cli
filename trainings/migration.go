@@ -2,6 +2,7 @@ package trainings
 
 import (
 	"fmt"
+	"os"
 	"runtime"
 	"strings"
 
@@ -79,6 +80,21 @@ func printGitNowAvailableNotice(cfg config.TrainingConfig) {
 	fmt.Println("  Your progress will be restored automatically.")
 	fmt.Println(sep)
 	fmt.Println()
+
+	if internal.IsStdinTerminal() {
+		choice := internal.Prompt(
+			internal.Actions{
+				{Shortcut: '\n', Action: "continue for now", ShortcutAliases: []rune{'\r'}},
+				{Shortcut: 'q', Action: "quit to reinitialize"},
+			},
+			os.Stdin,
+			os.Stdout,
+		)
+		fmt.Println()
+		if choice == 'q' {
+			os.Exit(0)
+		}
+	}
 }
 
 // printGitNotices shows all relevant git migration/availability notices.
