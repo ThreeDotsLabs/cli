@@ -83,14 +83,15 @@ func printGitNotices(cfg config.TrainingConfig) {
 }
 
 // showGitInstallNoticeIfDue shows the "git not installed" notice at most once per 24 h.
-// Only fires when the workspace was created without git (GitUnavailable=true) and git
-// is still missing. Returns false if the user chose to quit.
+// Fires whenever git is disabled and still not installed — covers both workspaces where
+// git was missing at init (GitUnavailable=true) and older workspaces that were silently
+// disabled before the terminal-detection fix. Returns false if the user chose to quit.
 func showGitInstallNoticeIfDue(cfg config.TrainingConfig) bool {
-	if !cfg.GitConfigured || cfg.GitEnabled || !cfg.GitUnavailable {
+	if !cfg.GitConfigured || cfg.GitEnabled {
 		return true
 	}
 	if _, err := git.CheckVersion(); err == nil {
-		return true // git became available — printGitNowAvailableNotice handles this
+		return true // git is available — printGitNowAvailableNotice handles the reinitialize prompt
 	}
 	if !internal.ShouldShowGitInstallNotice() {
 		return true // shown recently, skip

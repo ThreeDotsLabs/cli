@@ -12,8 +12,12 @@ import (
 	"golang.org/x/term"
 )
 
-const stdinFileDescriptor = 0
-const stdoutFileDescriptor = 1
+// On Windows, golang.org/x/term uses fd directly as a Win32 HANDLE.
+// os.Stdin.Fd() returns the real Win32 handle (not 0); hardcoding 0
+// would pass NULL to GetConsoleMode and always return "not a terminal".
+// On Unix, os.Stdin.Fd() returns 0 as usual — no behaviour change.
+var stdinFileDescriptor = int(os.Stdin.Fd())
+var stdoutFileDescriptor = int(os.Stdout.Fd())
 
 func stdinTerminalReason() (bool, string) {
 	if v, _ := strconv.ParseBool(os.Getenv("TDL_FORCE_INTERACTIVE")); v {
