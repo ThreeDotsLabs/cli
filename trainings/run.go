@@ -150,13 +150,38 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 	// Single stdin reader goroutine for the entire interactive session.
 	// Only needed when MCP is active (to select between stdin and MCP commands).
 	if h.loopState != nil {
+		// Set terminal to raw mode once for the entire session so the goroutine
+		// always reads in raw mode (ICANON off). Without this, the goroutine
+		// can block in a cooked-mode read between prompts, and term.MakeRaw
+		// called later in waitForAction may not interrupt that blocked syscall.
+		// Re-enable output processing (OPOST) so test output is not garbled.
+		if sessState, err := term.MakeRaw(0); err == nil {
+			_ = internal.EnableOutputProcessing(0)
+			h.sessionTermState = sessState
+			defer func() {
+				_ = term.Restore(0, sessState)
+				h.sessionTermState = nil
+			}()
+		}
+
 		ch := make(chan rune, 1)
 		go func() {
+			defer close(ch)
 			reader := bufio.NewReader(os.Stdin)
 			for {
 				r, _, err := reader.ReadRune()
 				if err != nil {
+					if err == io.EOF && internal.IsStdinTerminal() {
+						reader = bufio.NewReader(os.Stdin)
+						continue
+					}
 					return
+				}
+				if r == '\x03' {
+					// Ctrl+C: restore terminal before exiting so the shell is
+					// not left in raw mode (os.Exit bypasses deferred restores).
+					h.restoreTerminal()
+					os.Exit(0)
 				}
 				ch <- r
 			}
@@ -345,6 +370,7 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 		ctx = withMCPTriggered(ctx, fromMCP)
 
 		if chosenAction == loopActionQuit {
+			h.restoreTerminal()
 			os.Exit(0)
 		}
 		if chosenAction == loopActionUpdate {
@@ -743,6 +769,7 @@ func (h *Handlers) handleUpdateAction(ctx context.Context) {
 	}
 	fmt.Println()
 	fmt.Println("Please re-run your command.")
+	h.restoreTerminal()
 	os.Exit(0)
 }
 
@@ -776,11 +803,11 @@ func (h *Handlers) waitForAction(
 
 	for {
 		select {
-		case ch := <-h.stdinCh:
-			if string(ch) == "\x03" {
-				if rawErr == nil {
-					term.Restore(0, termState)
-				}
+		case ch, ok := <-h.stdinCh:
+			if !ok {
+				h.restoreTerminal()
+				logrus.Debug("stdin closed, exiting")
+				fmt.Println(color.HiBlackString("Input closed — exiting."))
 				os.Exit(0)
 			}
 			if key, ok := actions.ReadKeyFromInput(ch); ok {

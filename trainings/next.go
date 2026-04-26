@@ -57,11 +57,11 @@ func (h *Handlers) promptRune(actions internal.Actions) rune {
 	drainChannel(h.stdinCh)
 
 	for {
-		ch := <-h.stdinCh
-		if string(ch) == "\x03" {
-			if rawErr == nil {
-				term.Restore(0, termState)
-			}
+		ch, ok := <-h.stdinCh
+		if !ok {
+			h.restoreTerminal()
+			logrus.Debug("stdin closed, exiting")
+			fmt.Println(color.HiBlackString("Input closed — exiting."))
 			os.Exit(0)
 		}
 		if key, ok := actions.ReadKeyFromInput(ch); ok {

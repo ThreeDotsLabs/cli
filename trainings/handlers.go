@@ -13,6 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
+	"golang.org/x/term"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -41,6 +42,11 @@ type Handlers struct {
 	stdinCh   <-chan rune       // centralized stdin channel; non-nil only during interactiveRun with MCP
 
 	pendingMCPResultCh chan<- mcppkg.MCPResult // deferred result for blocking MCP commands (e.g. next exercise)
+
+	// sessionTermState is the original terminal state captured at the start of
+	// interactiveRun (MCP mode). It is restored on any os.Exit path so the
+	// shell is left in cooked mode after the CLI exits.
+	sessionTermState *term.State
 
 	// Fallback update-state for when MCP is disabled (loopState == nil).
 	// When loopState is non-nil all update accessors route through it so
@@ -165,6 +171,15 @@ func (h *Handlers) newGitOps() *git.Ops {
 	cfg := h.config.TrainingConfig(trainingRootFs)
 	disabled := !cfg.GitConfigured || !cfg.GitEnabled
 	return git.NewOps(trainingRoot, disabled)
+}
+
+// restoreTerminal restores the terminal to the original cooked state that was
+// captured at the start of interactiveRun. Called before any os.Exit so the
+// shell is not left in raw mode.
+func (h *Handlers) restoreTerminal() {
+	if h.sessionTermState != nil {
+		_ = term.Restore(0, h.sessionTermState)
+	}
 }
 
 func newTrainingRootFs(trainingRoot string) *afero.BasePathFs {
