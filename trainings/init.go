@@ -46,8 +46,13 @@ func (h *Handlers) Init(ctx context.Context, trainingName string, dir string, no
 
 	if alreadyInitialized {
 		trainingRootFs := newTrainingRootFs(trainingRootDir)
+		cfg := h.config.TrainingConfig(trainingRootFs)
+		if !cfg.GitEnabled {
+			printInitNeedsFreshDir(cfg)
+			return nil
+		}
 		if files.DirOrFileExists(trainingRootFs, ".tdl-exercise") {
-			fmt.Println("Training is already initialised, nothing to do.")
+			fmt.Println("Training is already initialized, nothing to do.")
 			return nil
 		}
 		// Partial init: exercise not yet set up, fall through to nextExercise.
@@ -342,7 +347,7 @@ func (h *Handlers) startTraining(
 
 	alreadyExistingTrainingRoot, err := h.config.FindTrainingRoot()
 	if err == nil {
-		fmt.Println(color.BlueString("Training was already initialised. Training root:" + alreadyExistingTrainingRoot))
+		fmt.Println(color.BlueString("Found existing training workspace at: " + alreadyExistingTrainingRoot))
 		trainingRootDir = alreadyExistingTrainingRoot
 	} else if !errors.Is(err, config.TrainingRootNotFoundError) {
 		return "", false, false, errors.Wrap(err, "can't check if training root exists")
