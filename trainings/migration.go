@@ -103,6 +103,44 @@ func printGitNotices(cfg config.TrainingConfig) {
 	printGitNowAvailableNotice(cfg)
 }
 
+// printInitNeedsFreshDir is shown during `tdl training init` when the user runs init
+// in a directory that was already set up without git. Unlike printGitNowAvailableNotice
+// (rate-limited, shown during run/next/etc.), this fires unconditionally because the
+// user explicitly ran init and needs clear, actionable guidance.
+func printInitNeedsFreshDir(cfg config.TrainingConfig) {
+	sep := color.HiBlackString(strings.Repeat("─", internal.TerminalWidth()))
+	initCmd := color.CyanString("tdl training init %s .", cfg.TrainingName)
+
+	_, gitErr := git.CheckVersion()
+	gitAvailable := gitErr == nil
+
+	fmt.Println(sep)
+	if gitAvailable {
+		title := color.New(color.Bold, color.FgHiGreen).Sprint("  *** Git is now available! ***")
+		fmt.Println(title)
+		fmt.Println()
+		fmt.Println("  Git is now installed, but this workspace was set up without git tracking.")
+		fmt.Println("  To enable git integration, initialize in a fresh empty directory.")
+	} else {
+		title := color.New(color.Bold, color.FgHiYellow).Sprint("  *** Fresh directory required ***")
+		fmt.Println(title)
+		fmt.Println()
+		fmt.Println("  This workspace was set up without git tracking.")
+		fmt.Println("  Once git is installed, initialize in a fresh directory to enable it.")
+	}
+	fmt.Println()
+	fmt.Println("  Your progress is saved on the server and will be restored")
+	fmt.Println("  automatically: solutions, completion history, everything.")
+	fmt.Println()
+	fmt.Println("  Create a new directory and reinitialize:")
+	fmt.Println()
+	fmt.Printf("    cd ..\n")
+	fmt.Printf("    mkdir my-training && cd my-training\n")
+	fmt.Printf("    %s\n", initCmd)
+	fmt.Println(sep)
+	fmt.Println()
+}
+
 // showGitInstallNoticeIfDue shows the "git not installed" notice at most once per 24 h.
 // Fires whenever git is disabled and still not installed — covers both workspaces where
 // git was missing at init (GitUnavailable=true) and older workspaces that were silently
