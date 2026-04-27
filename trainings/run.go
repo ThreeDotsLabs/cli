@@ -36,7 +36,11 @@ func (h *Handlers) Run(ctx context.Context, detached bool) error {
 	}
 
 	trainingRootFs := newTrainingRootFs(trainingRoot)
-	printGitNotices(h.config.TrainingConfig(trainingRootFs))
+	cfg := h.config.TrainingConfig(trainingRootFs)
+	printGitNotices(cfg)
+	if !showGitInstallNoticeIfDue(cfg) {
+		return nil
+	}
 
 	agentInstructions, err := h.fetchAgentInstructions(ctx, trainingRootFs)
 	if err != nil {
@@ -767,9 +771,10 @@ func (h *Handlers) waitForAction(
 	defer fmt.Println()
 	printPrompt(actions)
 
-	termState, rawErr := term.MakeRaw(0)
+	stdinFd := int(os.Stdin.Fd())
+	termState, rawErr := term.MakeRaw(stdinFd)
 	if rawErr == nil {
-		defer term.Restore(0, termState)
+		defer term.Restore(stdinFd, termState)
 	}
 
 	drainChannel(h.stdinCh)
@@ -779,7 +784,7 @@ func (h *Handlers) waitForAction(
 		case ch := <-h.stdinCh:
 			if string(ch) == "\x03" {
 				if rawErr == nil {
-					term.Restore(0, termState)
+					term.Restore(stdinFd, termState)
 				}
 				os.Exit(0)
 			}

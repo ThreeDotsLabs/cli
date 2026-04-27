@@ -29,6 +29,22 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	AuthorName  = "Three Dots Labs"
+	AuthorEmail = "contact@threedotslabs.com"
+)
+
+// authorEnv returns the environment variables that set the git author and committer
+// identity for all CLI-driven git operations.
+func authorEnv() []string {
+	return []string{
+		"GIT_AUTHOR_NAME=" + AuthorName,
+		"GIT_AUTHOR_EMAIL=" + AuthorEmail,
+		"GIT_COMMITTER_NAME=" + AuthorName,
+		"GIT_COMMITTER_EMAIL=" + AuthorEmail,
+	}
+}
+
 // Ops provides git operations for the training CLI.
 // All methods are no-ops when enabled is false.
 //
@@ -84,6 +100,7 @@ func (g *Ops) PrintInfo(display string) {
 func (g *Ops) run(args ...string) (string, error) {
 	cmd := exec.Command("git", args...)
 	cmd.Dir = g.rootDir
+	cmd.Env = append(os.Environ(), authorEnv()...)
 
 	logrus.WithFields(logrus.Fields{
 		"args": args,
@@ -253,6 +270,7 @@ func (g *Ops) CommitAllowEmptyWithDate(msg string, date time.Time) error {
 		"GIT_AUTHOR_DATE="+dateStr,
 		"GIT_COMMITTER_DATE="+dateStr,
 	)
+	cmd.Env = append(cmd.Env, authorEnv()...)
 
 	logrus.WithFields(logrus.Fields{
 		"args": []string{"commit", "--allow-empty", "-m", msg},
@@ -286,6 +304,7 @@ func (g *Ops) CommitWithDate(msg string, date time.Time) error {
 		"GIT_AUTHOR_DATE="+dateStr,
 		"GIT_COMMITTER_DATE="+dateStr,
 	)
+	cmd.Env = append(cmd.Env, authorEnv()...)
 
 	logrus.WithFields(logrus.Fields{
 		"args": []string{"commit", "-m", msg},

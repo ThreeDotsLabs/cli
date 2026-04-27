@@ -2,6 +2,8 @@ package trainings
 
 import (
 	"fmt"
+	"os"
+	"runtime"
 	"strings"
 
 	"github.com/fatih/color"
@@ -43,11 +45,11 @@ func printGitMigrationNotice(cfg config.TrainingConfig) {
 	fmt.Println()
 }
 
-// printGitNowAvailableNotice shows a banner when git has become available
-// since the workspace was created without it (git was missing/too old).
-// Does not trigger for users who chose --no-git (GitUnavailable = false).
+// printGitNowAvailableNotice shows a banner (at most once per 24 h) when git is available
+// but the workspace has git disabled. Covers both workspaces where git was missing at init
+// and older workspaces that were silently disabled before the terminal-detection fix.
 func printGitNowAvailableNotice(cfg config.TrainingConfig) {
-	if !cfg.GitConfigured || cfg.GitEnabled || !cfg.GitUnavailable {
+	if !cfg.GitConfigured || cfg.GitEnabled {
 		return
 	}
 
@@ -56,6 +58,11 @@ func printGitNowAvailableNotice(cfg config.TrainingConfig) {
 		return
 	}
 
+	if !internal.ShouldShowGitInstallNotice() {
+		return
+	}
+	_ = internal.RecordGitInstallNoticeShown()
+
 	sep := color.HiBlackString(strings.Repeat("─", internal.TerminalWidth()))
 	title := color.New(color.Bold, color.FgHiGreen).Sprint("  *** Git is now available! ***")
 	initCmd := color.CyanString("tdl training init %s .", cfg.TrainingName)
@@ -63,7 +70,7 @@ func printGitNowAvailableNotice(cfg config.TrainingConfig) {
 	fmt.Println(sep)
 	fmt.Println(title)
 	fmt.Println()
-	fmt.Println("  Git was not available when this workspace was created.")
+	fmt.Println("  Git was not enabled for this workspace.")
 	fmt.Println("  You can enable git integration by reinitializing:")
 	fmt.Println()
 	fmt.Printf("    cd ..\n")
@@ -73,10 +80,47 @@ func printGitNowAvailableNotice(cfg config.TrainingConfig) {
 	fmt.Println("  Your progress will be restored automatically.")
 	fmt.Println(sep)
 	fmt.Println()
+
+	if internal.IsStdinTerminal() {
+		choice := internal.Prompt(
+			internal.Actions{
+				{Shortcut: '\n', Action: "continue for now", ShortcutAliases: []rune{'\r'}},
+				{Shortcut: 'q', Action: "quit to reinitialize"},
+			},
+			os.Stdin,
+			os.Stdout,
+		)
+		fmt.Println()
+		if choice == 'q' {
+			os.Exit(0)
+		}
+	}
 }
 
 // printGitNotices shows all relevant git migration/availability notices.
 func printGitNotices(cfg config.TrainingConfig) {
 	printGitMigrationNotice(cfg)
 	printGitNowAvailableNotice(cfg)
+}
+
+// showGitInstallNoticeIfDue shows the "git not installed" notice at most once per 24 h.
+// Fires whenever git is disabled and still not installed — covers both workspaces where
+// git was missing at init (GitUnavailable=true) and older workspaces that were silently
+// disabled before the terminal-detection fix. Returns false if the user chose to quit.
+func showGitInstallNoticeIfDue(cfg config.TrainingConfig) bool {
+	if !cfg.GitConfigured || cfg.GitEnabled {
+		return true
+	}
+	if _, err := git.CheckVersion(); err == nil {
+		return true // git is available — printGitNowAvailableNotice handles the reinitialize prompt
+	}
+	if !internal.ShouldShowGitInstallNotice() {
+		return true // shown recently, skip
+	}
+	_ = internal.RecordGitInstallNoticeShown()
+	printGitUnavailableNotice("Git is not installed.", git.InstallHint(runtime.GOOS))
+	if !internal.IsStdinTerminal() {
+		return true
+	}
+	return promptContinueWithoutGit()
 }

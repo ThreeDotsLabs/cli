@@ -3,13 +3,24 @@ package trainings
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
+	"runtime"
+	"strings"
 
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 
 	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings/config"
+	"github.com/ThreeDotsLabs/cli/trainings/git"
 )
+
+func printInfoSection(name string) {
+	fmt.Println()
+	fmt.Println(color.New(color.Bold).Sprint(name))
+	fmt.Println(color.HiBlackString(strings.Repeat("─", len(name))))
+}
 
 func (h *Handlers) Info(ctx context.Context) error {
 	trainingRoot, err := h.config.FindTrainingRoot()
@@ -25,21 +36,18 @@ func (h *Handlers) Info(ctx context.Context) error {
 
 	exerciseConfig := h.config.ExerciseConfig(trainingRootFs)
 
-	fmt.Println("### Training")
-	fmt.Println("Name:", color.CyanString(trainingConfig.TrainingName))
+	printInfoSection("Training")
+	fmt.Println("Name:    ", color.CyanString(trainingConfig.TrainingName))
 	fmt.Println("Root dir:", color.CyanString(trainingRoot))
-	fmt.Println()
 
-	fmt.Println("### Current exercise")
-	fmt.Println("ID:", color.CyanString(exerciseConfig.ExerciseID))
-	fmt.Println("Files:", color.CyanString(h.generateRunTerminalPath(trainingRootFs)))
-
+	printInfoSection("Current exercise")
+	fmt.Println("ID:     ", color.CyanString(exerciseConfig.ExerciseID))
+	fmt.Println("Files:  ", color.CyanString(h.generateRunTerminalPath(trainingRootFs)))
 	exerciseURL := internal.ExerciseURL(trainingConfig.TrainingName, exerciseConfig.ExerciseID)
 	fmt.Println("Content:", color.CyanString(exerciseURL))
 
 	if trainingConfig.GitConfigured {
-		fmt.Println()
-		fmt.Println("### Git")
+		printInfoSection("Git")
 		if !trainingConfig.GitEnabled {
 			fmt.Println("Status:", color.YellowString("disabled"))
 		} else {
@@ -64,5 +72,29 @@ func (h *Handlers) Info(ctx context.Context) error {
 		}
 	}
 
+	printInfoSection("Environment")
+	fmt.Println("CLI version:", color.CyanString(internal.BinaryVersion()))
+	fmt.Println("OS:         ", color.CyanString(runtime.GOOS+"/"+runtime.GOARCH))
+
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = os.Getenv("COMSPEC")
+	}
+	if shell == "" {
+		shell = "unknown"
+	}
+	fmt.Println("Shell:      ", color.CyanString(shell))
+	fmt.Println("Terminal:   ", color.CyanString(internal.IsStdinTerminalReason()))
+
+	if gitPath, err := exec.LookPath("git"); err == nil {
+		fmt.Println("Git path:   ", color.CyanString(gitPath))
+		if v, err := git.CheckVersion(); err == nil {
+			fmt.Println("Git version:", color.CyanString(v.String()))
+		}
+	} else {
+		fmt.Println("Git path:   ", color.YellowString("not found in PATH"))
+	}
+
+	fmt.Println()
 	return nil
 }

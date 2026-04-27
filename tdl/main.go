@@ -47,9 +47,7 @@ func main() {
 	}()
 
 	if version == "" || version == "dev" {
-		if bi, ok := debug.ReadBuildInfo(); ok && bi.Main.Version != "" && bi.Main.Version != "(devel)" {
-			version = strings.TrimPrefix(bi.Main.Version, "v")
-		}
+		version = internal.BinaryVersion()
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

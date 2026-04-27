@@ -100,6 +100,8 @@ func InstallHint(goos string) string {
 			"  winget install Git.Git",
 			"",
 			"Or download from https://git-scm.com/downloads",
+			"",
+			"IMPORTANT: After installing, open a new terminal window for git to be available.",
 		}, "\n")
 	default:
 		return "Install or upgrade git from https://git-scm.com/downloads"
