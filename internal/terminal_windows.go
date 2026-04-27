@@ -2,4 +2,4 @@
 
 package internal
 
-func EnableOutputProcessing(fd int) error { return nil }
+func FlushTerminalInput(fd int) error { return nil }

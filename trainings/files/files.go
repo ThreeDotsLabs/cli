@@ -9,23 +9,9 @@ type Files struct {
 	stdin  io.Reader
 	stdout io.Writer
 
-	// stdinCh, when set, takes precedence over stdin for confirm prompts.
-	// Callers running inside interactiveRun should pass h.stdinCh here so
-	// confirm prompts don't race with the MCP stdin reader goroutine for
-	// bytes on os.Stdin. See trainings/run.go interactiveRun for context.
-	stdinCh <-chan rune
-
 	deleteUnusedFiles bool
 	showFullDiff      bool
 	forceOverwrite    bool
-}
-
-// WithStdinCh returns a copy of f that reads confirm-prompt answers from ch
-// instead of f.stdin. Use this when the caller is inside interactiveRun and
-// MCP is active (h.stdinCh != nil).
-func (f Files) WithStdinCh(ch <-chan rune) Files {
-	f.stdinCh = ch
-	return f
 }
 
 func NewFiles() Files {

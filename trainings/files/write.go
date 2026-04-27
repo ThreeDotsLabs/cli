@@ -349,13 +349,7 @@ func (f Files) shouldWriteFile(fs afero.Fs, filePath string, file *genproto.File
 	}
 }
 
-// confirmPrompt routes to the MCP-safe channel reader when stdinCh is set,
-// otherwise falls back to the plain stdin reader. This avoids races with
-// the interactiveRun stdin goroutine that owns os.Stdin while MCP is active.
 func (f Files) confirmPrompt(msg string) bool {
-	if f.stdinCh != nil {
-		return internal.FConfirmPromptFromCh(msg, f.stdinCh, f.stdout)
-	}
 	return internal.FConfirmPrompt(msg, f.stdin, f.stdout)
 }
 

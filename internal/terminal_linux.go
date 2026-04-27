@@ -4,14 +4,10 @@ package internal
 
 import "golang.org/x/sys/unix"
 
-// EnableOutputProcessing re-enables output processing (OPOST + ONLCR) on fd
-// after term.MakeRaw has disabled it, so that \n is translated to \r\n and
-// terminal output looks correct while input is still in raw mode.
-func EnableOutputProcessing(fd int) error {
-	termios, err := unix.IoctlGetTermios(fd, unix.TCGETS)
-	if err != nil {
-		return err
-	}
-	termios.Oflag |= unix.OPOST | unix.ONLCR
-	return unix.IoctlSetTermios(fd, unix.TCSETS, termios)
+// FlushTerminalInput discards any bytes the kernel has buffered in the
+// terminal's input queue. Called after term.MakeRaw at prompt entry so that
+// keystrokes the user typed in cooked mode while the previous command was
+// running don't carry over and trigger spurious actions.
+func FlushTerminalInput(fd int) error {
+	return unix.IoctlSetInt(fd, unix.TCFLSH, unix.TCIFLUSH)
 }

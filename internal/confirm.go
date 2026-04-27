@@ -39,51 +39,6 @@ func FConfirmPrompt(msg string, stdin io.Reader, stdout io.Writer) bool {
 	}
 }
 
-// FConfirmPromptFromCh is the MCP-safe variant of FConfirmPrompt.
-// It reads runes from a channel instead of stdin directly. Use this from
-// inside interactiveRun when h.stdinCh is non-nil — the single stdin reader
-// goroutine owns os.Stdin in that mode, so any direct read would race with
-// it and lose bytes.
-func FConfirmPromptFromCh(msg string, ch <-chan rune, stdout io.Writer) bool {
-	defer func() {
-		_, _ = fmt.Fprintln(stdout)
-	}()
-
-	// Drop any runes that may have been buffered from a previous prompt.
-	for {
-		select {
-		case <-ch:
-		default:
-			goto drained
-		}
-	}
-drained:
-
-	for {
-		_, _ = fmt.Fprintf(stdout, "%s [y/n]: ", msg)
-
-		var sb strings.Builder
-		for {
-			r, ok := <-ch
-			if !ok {
-				return false
-			}
-			if r == '\n' || r == '\r' {
-				break
-			}
-			sb.WriteRune(r)
-		}
-
-		input := strings.ToLower(strings.TrimSpace(sb.String()))
-		if input == "y" || input == "yes" {
-			return true
-		}
-		if input == "n" || input == "no" {
-			return false
-		}
-	}
-}
-
 type Action struct {
 	Shortcut        rune
 	ShortcutAliases []rune

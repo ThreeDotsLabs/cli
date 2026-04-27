@@ -39,13 +39,12 @@ type Handlers struct {
 
 	loopState *mcppkg.LoopState // nil if MCP disabled
 	mcpPort   int               // 0 = MCP disabled
-	stdinCh   <-chan rune       // centralized stdin channel; non-nil only during interactiveRun with MCP
 
 	pendingMCPResultCh chan<- mcppkg.MCPResult // deferred result for blocking MCP commands (e.g. next exercise)
 
-	// sessionTermState is the original terminal state captured at the start of
-	// interactiveRun (MCP mode). It is restored on any os.Exit path so the
-	// shell is left in cooked mode after the CLI exits.
+	// sessionTermState is the cooked-mode terminal state captured during a
+	// prompt's call to enterPromptMode. Held only while a prompt is active so
+	// os.Exit paths can restore cooked mode before the process dies.
 	sessionTermState *term.State
 
 	// Fallback update-state for when MCP is disabled (loopState == nil).
@@ -173,9 +172,9 @@ func (h *Handlers) newGitOps() *git.Ops {
 	return git.NewOps(trainingRoot, disabled)
 }
 
-// restoreTerminal restores the terminal to the original cooked state that was
-// captured at the start of interactiveRun. Called before any os.Exit so the
-// shell is not left in raw mode.
+// restoreTerminal restores the terminal to cooked mode if a prompt currently
+// holds it in raw mode. Safe to call from os.Exit paths (no-op when no prompt
+// is active).
 func (h *Handlers) restoreTerminal() {
 	if h.sessionTermState != nil {
 		_ = term.Restore(0, h.sessionTermState)

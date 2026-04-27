@@ -1,7 +1,6 @@
 package trainings
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"os"
@@ -12,7 +11,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
-	"golang.org/x/term"
 
 	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings/config"
@@ -22,42 +20,22 @@ import (
 	mcppkg "github.com/ThreeDotsLabs/cli/trainings/mcp"
 )
 
-// promptRune displays a prompt for the given actions and reads a single valid keypress.
-// Uses h.stdinCh when MCP is active, otherwise reads os.Stdin directly.
-// This is the MCP-safe replacement for internal.Prompt when called from within interactiveRun.
+// promptRune displays a prompt for the given actions and reads a single valid
+// keypress from stdin. Sets raw mode for the prompt only and spawns a scoped
+// reader goroutine. Used both with and without MCP — does not select on MCP
+// commands (callers that need MCP commands use waitForAction instead).
 func (h *Handlers) promptRune(actions internal.Actions) rune {
 	defer fmt.Println()
-
 	printPrompt(actions)
 
-	termState, rawErr := term.MakeRaw(0)
-	if rawErr == nil {
-		defer term.Restore(0, termState)
-	}
+	defer h.enterPromptMode()()
 
-	if h.stdinCh == nil {
-		reader := bufio.NewReader(os.Stdin)
-		for {
-			ch, _, err := reader.ReadRune()
-			if err != nil {
-				return 'q'
-			}
-			if string(ch) == "\x03" {
-				if rawErr == nil {
-					term.Restore(0, termState)
-				}
-				os.Exit(0)
-			}
-			if key, ok := actions.ReadKeyFromInput(ch); ok {
-				return key
-			}
-		}
-	}
-
-	drainChannel(h.stdinCh)
+	done := make(chan struct{})
+	defer close(done)
+	runeCh := h.startScopedStdinReader(done)
 
 	for {
-		ch, ok := <-h.stdinCh
+		ch, ok := <-runeCh
 		if !ok {
 			h.restoreTerminal()
 			logrus.Debug("stdin closed, exiting")
@@ -168,9 +146,6 @@ func (h *Handlers) setExercise(ctx context.Context, fs *afero.BasePathFs, exerci
 		// Existing behavior (no git or text-only)
 		isEasy := exercise.TrainingDifficulty == genproto.TrainingDifficulty_EASY
 		f := files.NewFilesWithConfig(isEasy, isEasy)
-		if h.stdinCh != nil {
-			f = f.WithStdinCh(h.stdinCh)
-		}
 		if err := h.writeExerciseFiles(f, nextExerciseResponseToExerciseSolution(exercise), fs); err != nil {
 			return false, err
 		}

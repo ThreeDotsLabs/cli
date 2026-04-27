@@ -1,7 +1,6 @@
 package trainings
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -16,7 +15,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
-	"golang.org/x/term"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -145,49 +143,6 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 		} else {
 			fmt.Printf("%s\n", color.HiBlackString("MCP server listening on %s", srv.Addr()))
 		}
-	}
-
-	// Single stdin reader goroutine for the entire interactive session.
-	// Only needed when MCP is active (to select between stdin and MCP commands).
-	if h.loopState != nil {
-		// Set terminal to raw mode once for the entire session so the goroutine
-		// always reads in raw mode (ICANON off). Without this, the goroutine
-		// can block in a cooked-mode read between prompts, and term.MakeRaw
-		// called later in waitForAction may not interrupt that blocked syscall.
-		// Re-enable output processing (OPOST) so test output is not garbled.
-		if sessState, err := term.MakeRaw(0); err == nil {
-			_ = internal.EnableOutputProcessing(0)
-			h.sessionTermState = sessState
-			defer func() {
-				_ = term.Restore(0, sessState)
-				h.sessionTermState = nil
-			}()
-		}
-
-		ch := make(chan rune, 1)
-		go func() {
-			defer close(ch)
-			reader := bufio.NewReader(os.Stdin)
-			for {
-				r, _, err := reader.ReadRune()
-				if err != nil {
-					if err == io.EOF && internal.IsStdinTerminal() {
-						reader = bufio.NewReader(os.Stdin)
-						continue
-					}
-					return
-				}
-				if r == '\x03' {
-					// Ctrl+C: restore terminal before exiting so the shell is
-					// not left in raw mode (os.Exit bypasses deferred restores).
-					h.restoreTerminal()
-					os.Exit(0)
-				}
-				ch <- r
-			}
-		}()
-		h.stdinCh = ch
-		defer func() { h.stdinCh = nil }()
 	}
 
 	// Background poller: long `tr run` sessions (days/weeks) can outlive the
@@ -773,9 +728,11 @@ func (h *Handlers) handleUpdateAction(ctx context.Context) {
 	os.Exit(0)
 }
 
-// waitForAction prints a prompt and waits for input from either stdin or the MCP command channel.
-// When MCP is disabled (loopState == nil), it reads stdin synchronously (like internal.Prompt).
-// When MCP is enabled, stdinCh must be a long-lived channel fed by a single goroutine in interactiveRun.
+// waitForAction prints a prompt and waits for input from either stdin or the
+// MCP command channel. When MCP is disabled (loopState == nil), it reads stdin
+// synchronously via promptRune. When MCP is enabled, it sets raw mode for the
+// prompt only and spawns a scoped reader goroutine — there is no long-lived
+// stdin reader between prompts.
 func (h *Handlers) waitForAction(
 	actions internal.Actions,
 	actionMap map[rune]loopAction,
@@ -790,20 +747,18 @@ func (h *Handlers) waitForAction(
 		return loopActionQuit, false
 	}
 
-	// MCP mode — need to select on both stdinCh and MCP commands.
 	defer fmt.Println()
 	printPrompt(actions)
 
-	termState, rawErr := term.MakeRaw(0)
-	if rawErr == nil {
-		defer term.Restore(0, termState)
-	}
+	defer h.enterPromptMode()()
 
-	drainChannel(h.stdinCh)
+	done := make(chan struct{})
+	defer close(done)
+	runeCh := h.startScopedStdinReader(done)
 
 	for {
 		select {
-		case ch, ok := <-h.stdinCh:
+		case ch, ok := <-runeCh:
 			if !ok {
 				h.restoreTerminal()
 				logrus.Debug("stdin closed, exiting")
@@ -843,17 +798,6 @@ func printPrompt(actions internal.Actions) {
 		))
 	}
 	fmt.Printf("%s", "Press "+formatActionsMessage(actionsStr)+" ")
-}
-
-// drainChannel discards any buffered values from a channel.
-func drainChannel(ch <-chan rune) {
-	for {
-		select {
-		case <-ch:
-		default:
-			return
-		}
-	}
 }
 
 func (h *Handlers) sendPendingMCPResult(result mcppkg.MCPResult) {
