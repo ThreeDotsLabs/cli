@@ -3,10 +3,12 @@ package internal
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDetectInstallMethodFromPath(t *testing.T) {
@@ -132,24 +134,26 @@ func TestInstallMethodString(t *testing.T) {
 }
 
 func TestCanWriteBinary(t *testing.T) {
-	t.Run("writable file", func(t *testing.T) {
-		f, err := os.CreateTemp(t.TempDir(), "tdl-test-*")
-		assert.NoError(t, err)
-		_ = f.Close()
-		assert.True(t, canWriteBinary(f.Name()))
+	t.Run("writable directory", func(t *testing.T) {
+		dir := t.TempDir()
+		assert.True(t, canWriteBinary(filepath.Join(dir, "tdl")))
 	})
 
-	t.Run("read-only file", func(t *testing.T) {
-		f, err := os.CreateTemp(t.TempDir(), "tdl-test-*")
-		assert.NoError(t, err)
-		_ = f.Close()
-		err = os.Chmod(f.Name(), 0444)
-		assert.NoError(t, err)
-		assert.False(t, canWriteBinary(f.Name()))
+	t.Run("read-only directory", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("dir mode bits don't gate file creation on Windows")
+		}
+		if os.Geteuid() == 0 {
+			t.Skip("running as root bypasses permission checks")
+		}
+		dir := t.TempDir()
+		require.NoError(t, os.Chmod(dir, 0o555))
+		t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+		assert.False(t, canWriteBinary(filepath.Join(dir, "tdl")))
 	})
 
-	t.Run("non-existent file", func(t *testing.T) {
-		assert.False(t, canWriteBinary(filepath.Join(t.TempDir(), "does-not-exist")))
+	t.Run("non-existent directory", func(t *testing.T) {
+		assert.False(t, canWriteBinary(filepath.Join(t.TempDir(), "missing-dir", "tdl")))
 	})
 }
 

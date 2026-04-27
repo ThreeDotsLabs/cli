@@ -131,15 +131,22 @@ func detectInstallMethodFromPath(resolvedPath, gopath, gobin, home, goos string)
 	return InstallMethodDirectBinary
 }
 
-// canWriteBinary checks if the current process can write to the binary file.
+// canWriteBinary reports whether the current process can replace the binary
+// at path. The selfupdate library replaces the binary via tempfile + rename
+// in the same directory (see creativeprojects/go-selfupdate update/apply.go),
+// so write access to the parent directory is the necessary and sufficient
+// condition.
+//
+// We deliberately do NOT probe the binary file itself: on Linux the kernel
+// returns ETXTBSY for any write-open of a currently-running executable, which
+// would produce a false negative for every `tdl update` invocation.
 func canWriteBinary(path string) bool {
-	f, err := os.OpenFile(path, os.O_WRONLY, 0)
-	if err != nil {
-		logrus.WithFields(logrus.Fields{"path": path, "error": err}).Debug("Binary is not writable")
+	dir := filepath.Dir(path)
+	if err := dirWritable(dir); err != nil {
+		logrus.WithFields(logrus.Fields{"dir": dir, "error": err}).Debug("Update directory not writable")
 		return false
 	}
-	_ = f.Close()
-	logrus.WithField("path", path).Debug("Binary is writable")
+	logrus.WithField("dir", dir).Debug("Update directory writable")
 	return true
 }
 
