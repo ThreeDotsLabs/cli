@@ -363,7 +363,7 @@ TARBALL_URL=${GITHUB_DOWNLOAD}/${TAG}/${NAME}
 # check if the existing 'tdl' in PATH is a ThreeDotsLabs binary
 is_our_tdl() {
   existing_tdl=$(command -v tdl 2>/dev/null) || return 1
-  "$existing_tdl" --help 2>&1 | grep -q "threedots"
+  strings "$existing_tdl" 2>/dev/null | grep -q "ThreeDotsLabs"
 }
 
 # detect naming conflicts with other tools (e.g. omarchy) before installing
