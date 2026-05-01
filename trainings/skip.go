@@ -8,6 +8,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/manifoldco/promptui"
 
+	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings/config"
 	"github.com/ThreeDotsLabs/cli/trainings/genproto"
 )
@@ -58,7 +59,7 @@ func (h *Handlers) Skip(ctx context.Context) error {
 ` + color.New(color.Bold, color.FgYellow).Sprint("Before you skip, please keep in mind: ") + `
 	- We recommend skipping only modules that you are already familiar with.
 	- The example solutions in the following modules may contain code from the skipped module.
-	- You can always come back to the skipped module later using "tdl training jump".
+	- You can always come back to the skipped module later using "` + internal.BinaryName() + ` training jump".
 `)
 
 	actions := []string{actionSkipCurrent, actionCancel}

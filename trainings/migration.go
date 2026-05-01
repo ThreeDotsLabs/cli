@@ -23,7 +23,7 @@ func printGitMigrationNotice(cfg config.TrainingConfig) {
 
 	sep := color.HiBlackString(strings.Repeat("─", internal.TerminalWidth()))
 	title := color.New(color.Bold, color.FgHiYellow).Sprint("  *** CLI UPGRADE: Git Integration Available ***")
-	initCmd := color.CyanString("tdl training init %s .", cfg.TrainingName)
+	initCmd := color.CyanString(internal.BinaryName()+" training init %s .", cfg.TrainingName)
 
 	fmt.Println(sep)
 	fmt.Println(title)
@@ -65,7 +65,7 @@ func printGitNowAvailableNotice(cfg config.TrainingConfig) {
 
 	sep := color.HiBlackString(strings.Repeat("─", internal.TerminalWidth()))
 	title := color.New(color.Bold, color.FgHiGreen).Sprint("  *** Git is now available! ***")
-	initCmd := color.CyanString("tdl training init %s .", cfg.TrainingName)
+	initCmd := color.CyanString(internal.BinaryName()+" training init %s .", cfg.TrainingName)
 
 	fmt.Println(sep)
 	fmt.Println(title)
@@ -109,7 +109,7 @@ func printGitNotices(cfg config.TrainingConfig) {
 // user explicitly ran init and needs clear, actionable guidance.
 func printInitNeedsFreshDir(cfg config.TrainingConfig) {
 	sep := color.HiBlackString(strings.Repeat("─", internal.TerminalWidth()))
-	initCmd := color.CyanString("tdl training init %s .", cfg.TrainingName)
+	initCmd := color.CyanString(internal.BinaryName()+" training init %s .", cfg.TrainingName)
 
 	_, gitErr := git.CheckVersion()
 	gitAvailable := gitErr == nil

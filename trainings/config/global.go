@@ -41,7 +41,7 @@ func (c Config) GlobalConfig() GlobalConfig {
 	if !c.dirOrFileExists(c.osFs, configPath) {
 		panic(errors.Errorf(
 			"trainings are not configured, please visit %s to get credentials and run %s",
-			internal.WebsiteAddress, internal.SprintCommand("tdl training configure"),
+			internal.WebsiteAddress, internal.SprintCommand(internal.BinaryName()+" training configure"),
 		))
 	}
 

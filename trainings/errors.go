@@ -8,6 +8,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/ThreeDotsLabs/cli/internal"
 )
 
 type UserFacingError struct {
@@ -30,7 +32,7 @@ To start fresh, create a new directory and re-initialize:
   %s
 
 This will re-download all your existing solutions.`,
-		color.CyanString("tdl training init %s .", trainingName),
+		color.CyanString(internal.BinaryName()+" training init %s .", trainingName),
 	)
 }
 
@@ -53,7 +55,7 @@ func formatServerError(err error) error {
 	case codes.Unauthenticated:
 		return UserFacingError{
 			Msg:          "Authentication failed.",
-			SolutionHint: "Run " + color.CyanString("tdl training configure <token>") + " to set up your token.",
+			SolutionHint: "Run " + color.CyanString(internal.BinaryName()+" training configure <token>") + " to set up your token.",
 		}
 	case codes.ResourceExhausted:
 		return UserFacingError{

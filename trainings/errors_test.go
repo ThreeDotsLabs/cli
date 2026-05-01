@@ -18,7 +18,7 @@ func TestRecoveryHint(t *testing.T) {
 	if !strings.Contains(hint, "mkdir my-training") {
 		t.Error("expected recovery hint to create new directory")
 	}
-	if !strings.Contains(hint, "tdl training init go-event-driven .") {
+	if !strings.Contains(hint, "training init go-event-driven .") {
 		t.Error("expected recovery hint to include training name and dot")
 	}
 	if !strings.Contains(hint, "re-download all your existing solutions") {
@@ -51,7 +51,7 @@ func TestFormatGitError(t *testing.T) {
 	if !strings.Contains(msg, "git branch: fatal: branch already exists: exit status 128") {
 		t.Error("expected error to contain raw git error")
 	}
-	if !strings.Contains(msg, "tdl training init go-event-driven .") {
+	if !strings.Contains(msg, "training init go-event-driven .") {
 		t.Error("expected error to contain recovery hint with training name")
 	}
 }

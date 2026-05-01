@@ -13,6 +13,8 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/sirupsen/logrus"
+
+	"github.com/ThreeDotsLabs/cli/internal"
 )
 
 func registerTools(srv *server.MCPServer, state *LoopState) {
@@ -122,7 +124,7 @@ func handleGetExerciseInfo(state *LoopState) server.ToolHandlerFunc {
 		if updateAvailable, updateVersion, updateNotes := state.GetUpdateAvailable(); updateAvailable {
 			resp.UpdateAvailable = true
 			resp.UpdateVersion = updateVersion
-			resp.UpdateCommand = "tdl update"
+			resp.UpdateCommand = internal.BinaryName() + " update"
 			resp.UpdateReleaseNotes = updateNotes
 		}
 
@@ -333,7 +335,7 @@ func sendCommand(state *LoopState, cmdType CommandType, successMsg string, respo
 		if state.ShouldShowUpdateNoticeMCP() {
 			if updateAvailable, updateVersion, _ := state.GetUpdateAvailable(); updateAvailable {
 				msg += fmt.Sprintf(
-					"\n\nNote: a new CLI version (%s) is available. Run `tdl update` in your terminal.",
+					"\n\nNote: a new CLI version (%s) is available. Run `"+internal.BinaryName()+" update` in your terminal.",
 					updateVersion,
 				)
 				state.MarkUpdateNoticeShownMCP()

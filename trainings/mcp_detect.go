@@ -90,12 +90,12 @@ func promptMCPSetup() bool {
 	fmt.Println()
 	fmt.Println("  If you plan to use an AI coding tool (Claude Code, Cursor, etc.) alongside")
 	fmt.Println("  this training, the MCP server lets it run exercises and check results.")
-	fmt.Println("  It listens on 127.0.0.1 (localhost only) while " + color.CyanString("tdl tr run") + " is active.")
+	fmt.Println("  It listens on 127.0.0.1 (localhost only) while " + color.CyanString(internal.BinaryName()+" tr run") + " is active.")
 	fmt.Println()
 	fmt.Println("  The training works perfectly fine without it.")
 	fmt.Println("  It will integrate your coding agent with this CLI.")
 	fmt.Println(color.New(color.Bold).Sprint("  Writing by hand is still the default, and may help the ideas stick."))
-	fmt.Println("  You can change this later with: " + color.CyanString("tdl training settings"))
+	fmt.Println("  You can change this later with: " + color.CyanString(internal.BinaryName()+" training settings"))
 	fmt.Println()
 
 	choice := internal.Prompt(

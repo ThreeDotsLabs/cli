@@ -533,7 +533,7 @@ func (h *Handlers) runExercise(ctx context.Context, trainingRootFs *afero.BasePa
 			logrus.WithField("exercise_dir", exerciseConfig.Directory).Warn("Can't get realpath of solution")
 		}
 
-		hintCommand := "tdl training init " + h.config.TrainingConfig(trainingRootFs).TrainingName
+		hintCommand := internal.BinaryName() + " training init " + h.config.TrainingConfig(trainingRootFs).TrainingName
 		return false, UserFacingError{
 			Msg:          fmt.Sprintf("No solution files found in %s.", solutionFilesRealPath),
 			SolutionHint: "Please run " + color.CyanString(hintCommand) + " to init exercise files.",
