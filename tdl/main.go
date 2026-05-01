@@ -84,7 +84,7 @@ var configureFlags = []cli.Flag{
 var tokenDocs = fmt.Sprintf("token from %s", internal.WebsiteAddress)
 
 var app = &cli.App{
-	Name:      "tdl",
+	Name:      internal.BinaryName(),
 	Usage:     "https://threedots.tech/ CLI.",
 	Compiled:  time.Now(),
 	Copyright: "(c) Three Dots Labs",

@@ -21,7 +21,7 @@ func (h *Handlers) printCurrentExercise(moduleName string, exerciseName string) 
 
 func (h *Handlers) printNotInATrainingDirectory() {
 	fmt.Println("You are not in a training directory. If you already started the training, please go to the exercise directory.")
-	fmt.Printf("Please run %s if you didn't start training yet.\n", internal.SprintCommand("tdl training init"))
+	fmt.Printf("Please run %s if you didn't start training yet.\n", internal.SprintCommand(internal.BinaryName()+" training init"))
 }
 
 func printFinished() {

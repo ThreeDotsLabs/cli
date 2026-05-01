@@ -47,7 +47,7 @@ func (h *Handlers) Settings(opts SettingsOptions) error {
 		printCurrentSettings(cfg, globalCfg, gitAvailable)
 		fmt.Println()
 		fmt.Println("To change settings, use flags:")
-		fmt.Println("  " + color.CyanString("tdl training settings --auto-commit=on --mcp=off"))
+		fmt.Println("  " + color.CyanString(internal.BinaryName()+" training settings --auto-commit=on --mcp=off"))
 		return nil
 	}
 
@@ -67,7 +67,7 @@ func (h *Handlers) applySettingsFlags(opts SettingsOptions, cfg *config.Training
 	gitFlagSet := opts.AutoCommit != nil || opts.AutoSync != nil || opts.SyncMode != nil
 	if gitFlagSet && !gitAvailable {
 		fmt.Println("Git integration is not enabled for this training.")
-		fmt.Println("To enable it, reinitialize with: " + color.CyanString("tdl training init"))
+		fmt.Println("To enable it, reinitialize with: " + color.CyanString(internal.BinaryName()+" training init"))
 		return nil
 	}
 

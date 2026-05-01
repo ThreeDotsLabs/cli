@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/afero"
 
+	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings/config"
 )
 
@@ -55,7 +56,7 @@ func (h *Handlers) runSettingsForm(cfg *config.TrainingConfig, globalCfg *config
 		)
 	} else {
 		fmt.Println("Git integration is not enabled for this training.")
-		fmt.Println("To enable it, reinitialize with: " + color.CyanString("tdl training init"))
+		fmt.Println("To enable it, reinitialize with: " + color.CyanString(internal.BinaryName()+" training init"))
 		fmt.Println()
 	}
 

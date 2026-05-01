@@ -223,7 +223,7 @@ func showGitDefaults() {
 	fmt.Println("  Your work is saved to a backup branch first (never destructive).")
 	fmt.Println()
 	fmt.Printf("  Defaults: auto-commit on, auto-sync off.\n")
-	fmt.Printf("  To change: %s\n\n", color.CyanString("tdl training settings"))
+	fmt.Printf("  To change: %s\n\n", color.CyanString(internal.BinaryName()+" training settings"))
 }
 
 // printGitUnavailableNotice shows a recommendation banner when git is missing or too old.

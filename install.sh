@@ -360,5 +360,63 @@ adjust_binary
 # compute URL to download
 TARBALL_URL=${GITHUB_DOWNLOAD}/${TAG}/${NAME}
 
+# check if the existing 'tdl' in PATH is a ThreeDotsLabs binary
+is_our_tdl() {
+  existing_tdl=$(command -v tdl 2>/dev/null) || return 1
+  strings "$existing_tdl" 2>/dev/null | grep -q "ThreeDotsLabs"
+}
+
+# detect naming conflicts with other tools (e.g. omarchy) before installing
+detect_conflict() {
+  HAS_OMARCHY=false
+  HAS_OTHER_TDL=false
+
+  if [ -d "$HOME/.local/share/omarchy" ]; then
+    HAS_OMARCHY=true
+  fi
+
+  if is_command tdl && ! is_our_tdl; then
+    HAS_OTHER_TDL=true
+  fi
+
+  if [ "$HAS_OMARCHY" = false ] && [ "$HAS_OTHER_TDL" = false ]; then
+    return
+  fi
+
+  echo "" >/dev/tty
+  if [ "$HAS_OMARCHY" = true ]; then
+    echo "NOTE: Omarchy detected on this system." >/dev/tty
+    echo "  Omarchy provides its own 'tdl' command (Tmux Dev Layout) as a bash function," >/dev/tty
+    echo "  which would shadow the ThreeDotsLabs CLI binary." >/dev/tty
+  elif [ "$HAS_OTHER_TDL" = true ]; then
+    existing=$(command -v tdl)
+    echo "NOTE: Another 'tdl' command was found at: ${existing}" >/dev/tty
+    echo "  Installing the ThreeDotsLabs CLI as 'tdl' would conflict with it." >/dev/tty
+  fi
+
+  echo "" >/dev/tty
+  echo "  Options:" >/dev/tty
+  echo "    1) Install as 'threedots' instead of 'tdl' (recommended)" >/dev/tty
+  echo "    2) Install as 'tdl' anyway" >/dev/tty
+  if [ "$HAS_OMARCHY" = true ]; then
+    echo "" >/dev/tty
+    echo "  Tip: To disable omarchy's 'tdl' and use the ThreeDotsLabs CLI as 'tdl'," >/dev/tty
+    echo "  add this line to your ~/.bashrc (after omarchy's rc is sourced):" >/dev/tty
+    echo "    unset -f tdl" >/dev/tty
+  fi
+  echo "" >/dev/tty
+
+  printf "  Choose [1/2] (default: 1): " >/dev/tty
+  read choice </dev/tty 2>/dev/null || choice="1"
+  case "$choice" in
+    2) log_info "installing as 'tdl' (user chose to keep the name)" ;;
+    *) BINARY="threedots"
+       log_info "installing as 'threedots' to avoid conflict"
+       ;;
+  esac
+}
+
+detect_conflict
+
 # do it
 execute
