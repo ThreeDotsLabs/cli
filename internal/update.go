@@ -66,6 +66,16 @@ func CheckForUpdate(currentVersion string, commandName string, forcePrompt bool)
 	isDifferent := release.Version != "" && release.Version != currentVersion
 
 	if isNewer || (forcePrompt && isDifferent) {
+		// Don't advertise updates that aren't installable yet — e.g. the
+		// Homebrew tap formula may still point to the old version (24h
+		// auto-update debounce). The notice will appear once the tap refreshes.
+		if !forcePrompt && !isVersionAvailableForInstallMethod(release.Version) {
+			logrus.Debug("Version not yet available via install method, skipping notice")
+			updateInfo.LastChecked = time.Now()
+			_ = storeUpdateInfo(updateInfo)
+			return
+		}
+
 		updateInfo.CurrentVersion = currentVersion
 		updateInfo.AvailableVersion = release.Version
 		updateInfo.UpdateAvailable = true
@@ -122,10 +132,15 @@ func CheckUpdateAvailable(currentVersion string, forcePrompt bool) (available bo
 			isNewer := release.Version != "" && isNewerVersion(release.Version, currentVersion)
 			isDifferent := release.Version != "" && release.Version != currentVersion
 			if isNewer || (forcePrompt && isDifferent) {
-				updateInfo.CurrentVersion = currentVersion
-				updateInfo.AvailableVersion = release.Version
-				updateInfo.UpdateAvailable = true
-				updateInfo.ReleaseNotes = release.ReleaseNotes
+				// Same install-method gate as in CheckForUpdate — see comment there.
+				if forcePrompt || isVersionAvailableForInstallMethod(release.Version) {
+					updateInfo.CurrentVersion = currentVersion
+					updateInfo.AvailableVersion = release.Version
+					updateInfo.UpdateAvailable = true
+					updateInfo.ReleaseNotes = release.ReleaseNotes
+				} else {
+					logrus.Debug("Version not yet available via install method, skipping")
+				}
 			} else {
 				updateInfo.CurrentVersion = currentVersion
 				updateInfo.AvailableVersion = ""
