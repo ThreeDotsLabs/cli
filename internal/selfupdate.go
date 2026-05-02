@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -160,6 +161,68 @@ func repoSlug() selfupdate.RepositorySlug {
 	return selfupdate.NewRepositorySlug(repoOwner, repoName)
 }
 
+func parseBrewFormulaVersion(data []byte) (string, error) {
+	var result struct {
+		Formulae []struct {
+			Versions struct {
+				Stable string `json:"stable"`
+			} `json:"versions"`
+		} `json:"formulae"`
+	}
+	if err := json.Unmarshal(data, &result); err != nil {
+		return "", err
+	}
+	if len(result.Formulae) == 0 || result.Formulae[0].Versions.Stable == "" {
+		return "", fmt.Errorf("no version found in brew info output")
+	}
+	return result.Formulae[0].Versions.Stable, nil
+}
+
+// brewFormulaVersion returns the version from the local Homebrew tap formula.
+//
+// Homebrew caches third-party tap formulae as local git clones and only
+// refreshes them when auto-update fires. Auto-update is triggered by
+// commands like `brew install` or `brew upgrade`, but has a 24h debounce
+// (HOMEBREW_AUTO_UPDATE_SECS, default 86400s) — if any brew command ran
+// within that window, the refresh is skipped. There is no background
+// process; taps stay stale until the next brew command after the debounce
+// expires, or until the user runs `brew update` manually.
+//
+// Unlike `go install @vX.Y.Z`, there is no way to tell brew to install a
+// specific version of a tap formula. The `@version` syntax (e.g.
+// `python@3.11`) only works when a separate versioned formula file exists
+// in the tap, which we don't publish.
+//
+// This function lets us detect when the local formula is behind the latest
+// GitHub release, so we can suppress misleading update prompts rather than
+// pointing the user at an upgrade that would silently no-op.
+func brewFormulaVersion(ctx context.Context) (string, error) {
+	cmd := exec.CommandContext(ctx, "brew", "info", "--json=v2", "threedotslabs/tap/tdl")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("brew info failed: %w", err)
+	}
+	return parseBrewFormulaVersion(out)
+}
+
+// isVersionAvailableForInstallMethod checks whether the given version
+// is available through the user's install method. Currently only
+// Homebrew is checked — see brewFormulaVersion for why.
+// Returns true for all other methods or on any error (graceful fallback).
+func isVersionAvailableForInstallMethod(version string) bool {
+	method := DetectInstallMethod()
+	if method != InstallMethodHomebrew {
+		return true
+	}
+	formulaVer, err := brewFormulaVersion(context.Background())
+	if err != nil {
+		logrus.WithError(err).Debug("Could not check brew formula version")
+		return true
+	}
+	target := strings.TrimPrefix(version, "v")
+	return !isNewerVersion(target, formulaVer)
+}
+
 // RunUpdate checks for updates and applies them based on the installation method.
 func RunUpdate(ctx context.Context, currentVersion string, opts UpdateOptions) error {
 	if os.Getenv("TDL_NO_UPDATE_CHECK") != "" {
@@ -243,6 +306,22 @@ func RunUpdate(ctx context.Context, currentVersion string, opts UpdateOptions) e
 	// Branch on install method
 	switch method {
 	case InstallMethodHomebrew:
+		// Homebrew's local tap may still point to an older formula version
+		// (24h auto-update debounce). Bail out early instead of running a
+		// doomed `brew upgrade` that would print "already installed".
+		formulaVer, err := brewFormulaVersion(ctx)
+		if err == nil {
+			target := strings.TrimPrefix(targetVersion, "v")
+			if isNewerVersion(target, formulaVer) {
+				fmt.Println(color.YellowString(
+					"Version %s is not yet available via Homebrew (formula has %s).",
+					targetVersion, formulaVer,
+				))
+				fmt.Println("Homebrew updates its formula cache periodically. To refresh manually, run:")
+				fmt.Printf("  %s\n\n", SprintCommand("brew update && brew upgrade tdl"))
+				return nil
+			}
+		}
 		return updateViaCommand(ctx, "brew", opts, currentVersion, targetVersion,
 			[]string{"upgrade", "tdl"})
 

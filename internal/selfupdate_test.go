@@ -212,3 +212,54 @@ func TestFormatReleaseNotes(t *testing.T) {
 		assert.Contains(t, result, "Second line")
 	})
 }
+
+func TestParseBrewFormulaVersion(t *testing.T) {
+	tests := []struct {
+		name    string
+		json    string
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "valid response",
+			json: `{"formulae":[{"versions":{"stable":"0.1.78"}}],"casks":[]}`,
+			want: "0.1.78",
+		},
+		{
+			name: "version with multiple formulae",
+			json: `{"formulae":[{"versions":{"stable":"1.2.3"}},{"versions":{"stable":"4.5.6"}}],"casks":[]}`,
+			want: "1.2.3",
+		},
+		{
+			name:    "empty formulae array",
+			json:    `{"formulae":[],"casks":[]}`,
+			wantErr: true,
+		},
+		{
+			name:    "missing stable version",
+			json:    `{"formulae":[{"versions":{"head":"HEAD"}}],"casks":[]}`,
+			wantErr: true,
+		},
+		{
+			name:    "invalid json",
+			json:    `{broken`,
+			wantErr: true,
+		},
+		{
+			name:    "empty input",
+			json:    ``,
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseBrewFormulaVersion([]byte(tt.json))
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.want, got)
+			}
+		})
+	}
+}
