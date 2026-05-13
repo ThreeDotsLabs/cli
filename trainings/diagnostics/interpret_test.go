@@ -20,10 +20,11 @@ func TestInterpret(t *testing.T) {
 	}
 
 	tests := []struct {
-		name     string
-		results  []Result
-		snap     Snapshot
-		contains []string // headline phrases the interpretation must contain
+		name        string
+		results     []Result
+		snap        Snapshot
+		contains    []string // headline phrases the interpretation must contain
+		notContains []string // phrases that must NOT appear
 	}{
 		{
 			name:     "all_pass",
@@ -153,14 +154,43 @@ func TestInterpret(t *testing.T) {
 			snap:     Snapshot{Host: "example.com", Tunnels: []string{"utun4"}},
 			contains: []string{"unknown authority", "VPN / tunnel interface(s) active", "utun4"},
 		},
+		{
+			name: "pq_kx_note_appended_on_grpc_fail",
+			results: []Result{
+				pass(NameProxy), pass(NameDNS), pass(NameTCP),
+				{Name: NameTLS, Pass: true,
+					Extras: map[string]string{"curve": "X25519MLKEM768", "curve_pq": "1", "alpn": "h2"}},
+				pass(NameHTTPS),
+				{Name: NamePing, Pass: false, Err: status.Error(codes.DeadlineExceeded, "")},
+			},
+			snap:     Snapshot{Host: "example.com"},
+			contains: []string{"Ping timed out", "X25519MLKEM768", "GODEBUG", "tlsmlkem=0", "PowerShell"},
+		},
+		{
+			name: "pq_kx_note_NOT_appended_when_all_grpc_pass",
+			results: append([]Result{
+				pass(NameProxy), pass(NameDNS), pass(NameTCP),
+				{Name: NameTLS, Pass: true,
+					Extras: map[string]string{"curve": "X25519MLKEM768", "curve_pq": "1", "alpn": "h2"}},
+			}, pass(NameHTTPS), pass(NamePing), pass(NameGetTrainings), pass(NameStream),
+				pass(NameLat), pass(NameClock)),
+			snap:        Snapshot{Host: "example.com"},
+			contains:    []string{"All checks passed"},
+			notContains: []string{"tlsmlkem", "GODEBUG"},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := Interpret(tt.results, tt.snap)
+			got := stripANSI(Interpret(tt.results, tt.snap))
 			for _, want := range tt.contains {
-				if !strings.Contains(stripANSI(got), want) {
+				if !strings.Contains(got, want) {
 					t.Errorf("Interpret() output missing %q\n--- got ---\n%s", want, got)
+				}
+			}
+			for _, unwanted := range tt.notContains {
+				if strings.Contains(got, unwanted) {
+					t.Errorf("Interpret() output should NOT contain %q\n--- got ---\n%s", unwanted, got)
 				}
 			}
 		})

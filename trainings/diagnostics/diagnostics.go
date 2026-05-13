@@ -74,23 +74,27 @@ func Run(ctx context.Context, opts Options) error {
 	step(1, NameProxy, checkProxyEnv)
 	step(2, NameDNS, func(ctx context.Context) Result { return checkDNS(ctx, snap.Host) })
 	step(3, NameTCP, func(ctx context.Context) Result { return checkTCP(ctx, snap.Host, snap.Port) })
+	// Use snap.Insecure (which combines the --insecure flag with the persisted
+	// global-config setting) rather than opts.Insecure (the raw flag) — otherwise
+	// users who configured `insecure = true` in their global config get spurious
+	// TLS failures here while the production gRPC client honors the setting.
 	step(4, NameTLS, func(ctx context.Context) Result {
-		return checkTLS(ctx, snap.Host, snap.Port, opts.BuildTLSConfig(opts.Insecure), opts.Insecure)
+		return checkTLS(ctx, snap.Host, snap.Port, opts.BuildTLSConfig(snap.Insecure), snap.Insecure)
 	})
 	httpsRes := step(5, NameHTTPS, func(ctx context.Context) Result {
 		return checkHTTPS(ctx, internal.WebsiteAddress)
 	})
 	step(6, NamePing, func(ctx context.Context) Result {
-		return checkGRPCPing(ctx, opts.BuildFreshGRPCClient, opts.Server, opts.Region, opts.Insecure)
+		return checkGRPCPing(ctx, opts.BuildFreshGRPCClient, opts.Server, opts.Region, snap.Insecure)
 	})
 	step(7, NameGetTrainings, func(ctx context.Context) Result {
-		return checkGetTrainings(ctx, opts.BuildFreshGRPCClient, opts.Server, opts.Region, opts.Insecure, snap.Configured)
+		return checkGetTrainings(ctx, opts.BuildFreshGRPCClient, opts.Server, opts.Region, snap.Insecure, snap.Configured)
 	})
 	step(8, NameStream, func(ctx context.Context) Result {
-		return checkStreaming(ctx, opts.BuildFreshGRPCClient, opts.Server, opts.Region, opts.Insecure, snap.Configured, opts.token())
+		return checkStreaming(ctx, opts.BuildFreshGRPCClient, opts.Server, opts.Region, snap.Insecure, snap.Configured, opts.token())
 	})
 	step(9, NameLat, func(ctx context.Context) Result {
-		return checkLatency(ctx, opts.BuildFreshGRPCClient, opts.Server, opts.Region, opts.Insecure)
+		return checkLatency(ctx, opts.BuildFreshGRPCClient, opts.Server, opts.Region, snap.Insecure)
 	})
 	step(10, NameClock, func(ctx context.Context) Result {
 		return checkClockSkew(httpsRes)

@@ -348,9 +348,11 @@ func checkTLS(ctx context.Context, host, port string, baseConfig *tls.Config, in
 	if alpn == "" {
 		alpn = "(none)"
 	}
+	curve := state.CurveID.String()
 	sub := []string{
 		fmt.Sprintf("version: %s", tlsVersionString(state.Version)),
 		fmt.Sprintf("cipher:  %s", tls.CipherSuiteName(state.CipherSuite)),
+		fmt.Sprintf("curve:   %s", curve),
 		fmt.Sprintf("alpn:    %s", alpn),
 	}
 	if len(state.PeerCertificates) > 0 {
@@ -364,6 +366,10 @@ func checkTLS(ctx context.Context, host, port string, baseConfig *tls.Config, in
 	extras := map[string]string{
 		"insecure": boolStr(insecure),
 		"alpn":     state.NegotiatedProtocol,
+		"curve":    curve,
+	}
+	if isPostQuantumCurve(state.CurveID) {
+		extras["curve_pq"] = "1"
 	}
 	// gRPC requires h2 — if the middlebox stripped or downgraded ALPN, gRPC dials
 	// will hang or fail mysteriously. Treat as a warning, not a failure: the
@@ -400,6 +406,14 @@ func asHostnameError(err error, target *x509.HostnameError) bool {
 		e = u.Unwrap()
 	}
 	return false
+}
+
+// isPostQuantumCurve returns true for hybrid PQ key exchange mechanisms.
+// These produce a ClientHello ~1.5 KB larger than classical curves and are a
+// well-known cause of middlebox breakage as of Go 1.24's default-on.
+func isPostQuantumCurve(c tls.CurveID) bool {
+	// X25519MLKEM768 = 4588 (Go 1.24+). Earlier draft was X25519Kyber768Draft00 = 25497.
+	return c == 4588 || c == 25497
 }
 
 func tlsVersionString(v uint16) string {

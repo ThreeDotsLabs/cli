@@ -192,6 +192,24 @@ func Interpret(results []Result, snap Snapshot) string {
 		)
 	}
 
+	if anyGRPCFailed(idx) && tlsUsedPostQuantum(idx) {
+		curve := idx[NameTLS].Extras["curve"]
+		fmt.Fprintln(&b)
+		fmt.Fprintln(&b, color.YellowString(
+			"Note: TLS negotiated %s — a post-quantum key exchange enabled by default in Go 1.24+. "+
+				"Some corporate firewalls and TLS-inspection middleboxes mishandle the larger ClientHello "+
+				"and break gRPC traffic that follows. Quick test — re-run with this env var to disable it:",
+			curve,
+		))
+		fmt.Fprintln(&b, "  "+color.CyanString(`GODEBUG="tlsmlkem=0" `+internal.BinaryName()+" training diagnostics"))
+		fmt.Fprintln(&b, color.HiBlackString(
+			"  (PowerShell:  $env:GODEBUG=\"tlsmlkem=0\"; "+internal.BinaryName()+" tr diag)",
+		))
+		fmt.Fprintln(&b, color.YellowString(
+			"If gRPC passes with that set, your network's middleware is the culprit, and you'll need that env var (or a network change) until it's fixed.",
+		))
+	}
+
 	if hasProxy(snap) {
 		fmt.Fprintln(&b)
 		fmt.Fprintln(&b, color.YellowString("Note: proxy environment variables are set. "+
@@ -227,6 +245,27 @@ func failed(idx map[string]Result, name string) bool {
 
 func hasProxy(snap Snapshot) bool {
 	return len(snap.ProxyEnv) > 0
+}
+
+// anyGRPCFailed reports whether any of the gRPC checks (Ping, GetTrainings,
+// stream, latency) failed for a non-skip reason.
+func anyGRPCFailed(idx map[string]Result) bool {
+	for _, name := range []string{NamePing, NameGetTrainings, NameStream, NameLat} {
+		if failed(idx, name) {
+			return true
+		}
+	}
+	return false
+}
+
+// tlsUsedPostQuantum reports whether the TLS handshake negotiated a hybrid
+// post-quantum key exchange. The TLS check passes that into Extras["curve_pq"].
+func tlsUsedPostQuantum(idx map[string]Result) bool {
+	r, ok := idx[NameTLS]
+	if !ok {
+		return false
+	}
+	return r.Extras["curve_pq"] == "1"
 }
 
 func writeHeadline(b *strings.Builder, s string) {
