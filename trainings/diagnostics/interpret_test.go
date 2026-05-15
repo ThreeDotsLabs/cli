@@ -14,7 +14,7 @@ func TestInterpret(t *testing.T) {
 	fail := func(name string, err error) Result { return Result{Name: name, Pass: false, Err: err} }
 
 	allPass := []Result{
-		pass(NameProxy), pass(NameDNS), pass(NameTCP), pass(NameTLS),
+		pass(NameProxy), pass(NameDNS), pass(NameTCP), pass(NameTLS), pass(NameH2),
 		pass(NameHTTPS), pass(NamePing), pass(NameGetTrainings), pass(NameStream),
 		pass(NameLat), pass(NameClock),
 	}
@@ -167,11 +167,50 @@ func TestInterpret(t *testing.T) {
 			contains: []string{"Ping timed out", "X25519MLKEM768", "GODEBUG", "tlsmlkem=0", "PowerShell"},
 		},
 		{
+			name: "h2_probe_no_frame_is_the_headline",
+			results: []Result{
+				pass(NameProxy), pass(NameDNS), pass(NameTCP), pass(NameTLS),
+				{Name: NameH2, Pass: false, Err: errors.New("read frame: i/o timeout"),
+					Extras: map[string]string{"h2_no_frame": "1"}},
+				pass(NameHTTPS),
+				{Name: NamePing, Pass: false, Err: status.Error(codes.DeadlineExceeded, "")},
+			},
+			snap:     Snapshot{Host: "example.com"},
+			contains: []string{"HTTP/2 traffic is being blocked", "TLS handshake completes", "personal hotspot"},
+		},
+		{
+			name: "multiple_grpc_deadline_with_tls_pass_is_h2_middlebox",
+			results: []Result{
+				pass(NameProxy), pass(NameDNS), pass(NameTCP),
+				pass(NameTLS), pass(NameH2), pass(NameHTTPS),
+				{Name: NamePing, Pass: false, Err: status.Error(codes.DeadlineExceeded, "")},
+				{Name: NameGetTrainings, Pass: false, Err: status.Error(codes.DeadlineExceeded, "")},
+				{Name: NameStream, Pass: false, Err: errors.New("deadline"),
+					Extras: map[string]string{"stream_deadline": "1"}},
+			},
+			snap: Snapshot{Host: "example.com"},
+			// must NOT match the single-Ping headline; must match the combined one
+			contains:    []string{"Every gRPC call timed out", "fingerprint of HTTP/2", "personal hotspot"},
+			notContains: []string{"Ping timed out.", "see latency probe"},
+		},
+		{
+			name: "clock_skew_warning_surfaced",
+			results: append([]Result{
+				pass(NameProxy), pass(NameDNS), pass(NameTCP), pass(NameTLS), pass(NameH2),
+				pass(NameHTTPS), pass(NamePing), pass(NameGetTrainings), pass(NameStream),
+				pass(NameLat),
+			}, Result{Name: NameClock, Pass: true,
+				Extras: map[string]string{"clock_warn": "1", "drift_sec": "50"}}),
+			snap:     Snapshot{Host: "example.com"},
+			contains: []string{"All checks passed", "system clock is 50s off", "NTP-synced"},
+		},
+		{
 			name: "pq_kx_note_NOT_appended_when_all_grpc_pass",
 			results: append([]Result{
 				pass(NameProxy), pass(NameDNS), pass(NameTCP),
 				{Name: NameTLS, Pass: true,
 					Extras: map[string]string{"curve": "X25519MLKEM768", "curve_pq": "1", "alpn": "h2"}},
+				pass(NameH2),
 			}, pass(NameHTTPS), pass(NamePing), pass(NameGetTrainings), pass(NameStream),
 				pass(NameLat), pass(NameClock)),
 			snap:        Snapshot{Host: "example.com"},

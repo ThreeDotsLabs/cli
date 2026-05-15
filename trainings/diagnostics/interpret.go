@@ -17,6 +17,7 @@ const (
 	NameDNS          = "DNS resolution"
 	NameTCP          = "TCP connect"
 	NameTLS          = "TLS handshake"
+	NameH2           = "HTTP/2 frame exchange"
 	NameHTTPS        = "HTTPS GET (academy website)"
 	NamePing         = "gRPC Ping"
 	NameGetTrainings = "gRPC GetTrainings (auth)"
@@ -107,6 +108,46 @@ func Interpret(results []Result, snap Snapshot) string {
 			writeHeadline(&b, "TLS handshake failed.")
 			writeBody(&b, fmt.Sprintf("Error: %v", r.Err))
 		}
+
+	case failed(idx, NameH2):
+		r := idx[NameH2]
+		if r.Extras["h2_no_frame"] == "1" {
+			writeHeadline(&b, "HTTP/2 traffic is being blocked between you and the server.")
+			writeBody(&b,
+				"TLS handshake completes and ALPN negotiates h2, but the server's first HTTP/2 SETTINGS frame never arrives.",
+				"This is the direct fingerprint of a middlebox that breaks HTTP/2:",
+				"  - Corporate firewall / DPI tool that doesn't actually speak HTTP/2.",
+				"  - Antivirus or 'endpoint security' product doing TLS inspection.",
+				"  - VPN client (Cisco AnyConnect, GlobalProtect, ZScaler, etc.) interfering with h2.",
+				"Every gRPC call will fail until this is resolved.",
+				fmt.Sprintf("Quickest test: %s and re-run.",
+					color.CyanString("connect from a personal hotspot (phone tether)"),
+				),
+			)
+		} else if r.Extras["alpn_not_h2"] == "1" {
+			writeHeadline(&b, "Server did not negotiate HTTP/2 via ALPN — gRPC requires it.")
+			writeBody(&b, "A middlebox is likely downgrading the protocol. Subsequent gRPC checks will fail.")
+		} else {
+			writeHeadline(&b, "HTTP/2 frame exchange failed.")
+			writeBody(&b, fmt.Sprintf("Error: %v", r.Err))
+		}
+
+	case isMultipleGRPCDeadline(idx):
+		// Lower-confidence version of the h2-blocked case: TLS+HTTPS work,
+		// but multiple gRPC calls all time out the same way. Same fingerprint,
+		// reached via the indirect signal when the h2 probe didn't conclusively fail.
+		writeHeadline(&b, "Every gRPC call timed out, but TLS and HTTPS work.")
+		writeBody(&b,
+			"This is a strong fingerprint of HTTP/2 being mishandled by a middlebox:",
+			"the handshake completes, but the long-lived h2 connection that gRPC uses doesn't.",
+			"Likely culprits:",
+			"  - Corporate firewall / DPI tool.",
+			"  - Antivirus with TLS inspection.",
+			"  - VPN client (Cisco AnyConnect, GlobalProtect, ZScaler).",
+			fmt.Sprintf("Quickest test: %s and re-run.",
+				color.CyanString("connect from a personal hotspot (phone tether)"),
+			),
+		)
 
 	case failed(idx, NamePing):
 		r := idx[NamePing]
@@ -217,6 +258,15 @@ func Interpret(results []Result, snap Snapshot) string {
 			"these settings affect how Go's HTTP and gRPC clients reach the server."))
 	}
 
+	if r, ok := idx[NameClock]; ok && r.Extras["clock_warn"] == "1" {
+		fmt.Fprintln(&b)
+		fmt.Fprintln(&b, color.YellowString(
+			"Note: system clock is %ss off from server time. Not currently breaking TLS, "+
+				"but unusual — most NTP-synced systems are within 1s. Consider resyncing the clock.",
+			r.Extras["drift_sec"],
+		))
+	}
+
 	if len(snap.Tunnels) > 0 {
 		fmt.Fprintln(&b)
 		fmt.Fprintln(&b, color.YellowString(
@@ -245,6 +295,30 @@ func failed(idx map[string]Result, name string) bool {
 
 func hasProxy(snap Snapshot) bool {
 	return len(snap.ProxyEnv) > 0
+}
+
+// isMultipleGRPCDeadline returns true when the failure pattern is the
+// "h2-middlebox" fingerprint: TLS and HTTPS work, but at least two unary or
+// streaming gRPC calls timed out. Latency-probe deadlines also count.
+func isMultipleGRPCDeadline(idx map[string]Result) bool {
+	if failed(idx, NameTLS) || failed(idx, NameHTTPS) {
+		return false
+	}
+	deadlines := 0
+	for _, name := range []string{NamePing, NameGetTrainings, NameStream, NameLat} {
+		r, ok := idx[name]
+		if !ok || r.Skipped {
+			continue
+		}
+		if r.Pass {
+			continue
+		}
+		// Direct context-deadline for non-gRPC results; gRPC code for the rest.
+		if status.Code(r.Err) == codes.DeadlineExceeded || r.Extras["stream_deadline"] == "1" {
+			deadlines++
+		}
+	}
+	return deadlines >= 2
 }
 
 // anyGRPCFailed reports whether any of the gRPC checks (Ping, GetTrainings,

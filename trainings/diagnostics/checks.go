@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -431,6 +432,125 @@ func tlsVersionString(v uint16) string {
 	}
 }
 
+// checkH2 actively exercises the HTTP/2 wire protocol against the gRPC host.
+//
+// Why this exists: the TLS check passes when the handshake completes and ALPN
+// advertises h2, but some middleboxes accept the TLS handshake and *then* fail
+// to forward h2 frames (or rewrite them in ways that confuse both endpoints).
+// In that mode the gRPC client appears to "hang" — every RPC times out at the
+// deadline. This probe directly tests whether a SETTINGS frame can flow.
+//
+// Protocol (RFC 9113 §3.4, formerly RFC 7540 §3.5):
+//  1. Open TLS, negotiate h2 via ALPN
+//  2. Send the 24-byte HTTP/2 connection preface
+//  3. Send an empty SETTINGS frame (9 bytes: length=0, type=0x04, no flags, stream=0)
+//  4. Read the server's first frame header (9 bytes); it MUST be SETTINGS
+//
+// If step 4 times out while the TLS handshake succeeded, h2 traffic is being
+// blocked or stalled by a middlebox.
+func checkH2(ctx context.Context, host, port string, baseConfig *tls.Config) Result {
+	if host == "" {
+		return fail(nil, "no host")
+	}
+	cfg := baseConfig.Clone()
+	if cfg.ServerName == "" {
+		cfg.ServerName = host
+	}
+	cfg.NextProtos = []string{"h2"}
+
+	probeCtx, cancel := context.WithTimeout(ctx, 12*time.Second)
+	defer cancel()
+
+	dialer := &net.Dialer{Timeout: 10 * time.Second}
+	rawConn, err := dialer.DialContext(probeCtx, "tcp", net.JoinHostPort(host, port))
+	if err != nil {
+		return fail(err, fmt.Sprintf("tcp dial failed: %v", err))
+	}
+	defer func() { _ = rawConn.Close() }()
+
+	tlsConn := tls.Client(rawConn, cfg)
+	if err := tlsConn.HandshakeContext(probeCtx); err != nil {
+		return fail(err, fmt.Sprintf("tls handshake failed: %v", err))
+	}
+	if alpn := tlsConn.ConnectionState().NegotiatedProtocol; alpn != "h2" {
+		return Result{
+			Pass:   false,
+			Detail: fmt.Sprintf("server did not negotiate h2 via ALPN (got %q) — gRPC will fail", alpn),
+			Extras: map[string]string{"alpn_not_h2": "1"},
+		}
+	}
+
+	// Cap the remaining I/O at 8 seconds total. If the server doesn't send its
+	// SETTINGS frame within this window, the middlebox is the most likely culprit.
+	_ = tlsConn.SetDeadline(time.Now().Add(8 * time.Second))
+
+	// HTTP/2 connection preface (constant, 24 bytes).
+	const preface = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
+	if _, err := tlsConn.Write([]byte(preface)); err != nil {
+		return fail(err, fmt.Sprintf("write preface failed: %v", err))
+	}
+
+	// Empty SETTINGS frame:
+	//   length=0 (3B big-endian), type=0x04 (SETTINGS), flags=0, stream=0 (4B big-endian).
+	settingsFrame := []byte{0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00}
+	if _, err := tlsConn.Write(settingsFrame); err != nil {
+		return fail(err, fmt.Sprintf("write SETTINGS failed: %v", err))
+	}
+
+	// Read the server's first frame header (always 9 bytes per RFC 9113 §4.1).
+	header := make([]byte, 9)
+	readStart := time.Now()
+	if _, err := io.ReadFull(tlsConn, header); err != nil {
+		if isTimeout(err) {
+			return Result{
+				Pass:     false,
+				Err:      err,
+				Detail:   "TLS handshake completed but no HTTP/2 frame received from server within 8s — h2 traffic is being blocked",
+				Extras:   map[string]string{"h2_no_frame": "1"},
+				Subitems: []string{"sent preface and SETTINGS; server never replied — middlebox is the most likely culprit"},
+			}
+		}
+		return fail(err, fmt.Sprintf("read frame header failed: %v", err))
+	}
+	readMS := time.Since(readStart).Round(time.Millisecond)
+
+	length := int(header[0])<<16 | int(header[1])<<8 | int(header[2])
+	frameType := header[3]
+	// RFC 9113 §6.5: SETTINGS = 0x04. The very first server frame must be SETTINGS.
+	if frameType != 0x04 {
+		return Result{
+			Pass:     false,
+			Detail:   fmt.Sprintf("server replied but first frame was type 0x%02x, not SETTINGS (length=%d)", frameType, length),
+			Subitems: []string{fmt.Sprintf("frame: type=0x%02x flags=0x%02x length=%d", frameType, header[4], length)},
+		}
+	}
+
+	// Drain the SETTINGS payload so the connection closes cleanly.
+	if length > 0 {
+		_, _ = io.CopyN(io.Discard, tlsConn, int64(length))
+	}
+
+	return Result{
+		Pass:   true,
+		Detail: fmt.Sprintf("server SETTINGS received in %s (payload %d bytes)", readMS, length),
+	}
+}
+
+// isTimeout returns true for any flavour of timeout/deadline error.
+func isTimeout(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var nerr net.Error
+	if errors.As(err, &nerr) {
+		return nerr.Timeout()
+	}
+	return false
+}
+
 func checkHTTPS(ctx context.Context, url string) Result {
 	httpCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -677,8 +797,20 @@ func checkClockSkew(httpsRes Result) Result {
 	if abs < 0 {
 		abs = -abs
 	}
-	if abs > 60*time.Second {
+	switch {
+	case abs > 60*time.Second:
 		return fail(nil, fmt.Sprintf("local clock differs from server by %s — can break TLS", drift.Round(time.Second)))
+	case abs > 5*time.Second:
+		// Soft warning: still a pass, but worth surfacing. 5s leaves room for
+		// the inherent ~1–2s noise in HTTP Date timestamps and request latency.
+		return Result{
+			Pass:   true,
+			Detail: fmt.Sprintf("clock differs from server by %s — NTP may be off, consider resyncing", abs.Round(time.Second)),
+			Extras: map[string]string{
+				"clock_warn": "1",
+				"drift_sec":  fmt.Sprintf("%d", int(abs.Seconds())),
+			},
+		}
 	}
 	return Result{Pass: true, Detail: fmt.Sprintf("within %s of server", abs.Round(time.Second))}
 }

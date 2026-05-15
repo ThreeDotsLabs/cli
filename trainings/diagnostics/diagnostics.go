@@ -55,7 +55,7 @@ func Run(ctx context.Context, opts Options) error {
 	r.printHeader()
 	r.printSnapshot(snap)
 
-	const total = 10
+	const total = 11
 	results := make([]Result, 0, total)
 
 	step := func(idx int, name string, fn func(context.Context) Result) Result {
@@ -81,22 +81,25 @@ func Run(ctx context.Context, opts Options) error {
 	step(4, NameTLS, func(ctx context.Context) Result {
 		return checkTLS(ctx, snap.Host, snap.Port, opts.BuildTLSConfig(snap.Insecure), snap.Insecure)
 	})
-	httpsRes := step(5, NameHTTPS, func(ctx context.Context) Result {
+	step(5, NameH2, func(ctx context.Context) Result {
+		return checkH2(ctx, snap.Host, snap.Port, opts.BuildTLSConfig(snap.Insecure))
+	})
+	httpsRes := step(6, NameHTTPS, func(ctx context.Context) Result {
 		return checkHTTPS(ctx, internal.WebsiteAddress)
 	})
-	step(6, NamePing, func(ctx context.Context) Result {
+	step(7, NamePing, func(ctx context.Context) Result {
 		return checkGRPCPing(ctx, opts.BuildFreshGRPCClient, opts.Server, opts.Region, snap.Insecure)
 	})
-	step(7, NameGetTrainings, func(ctx context.Context) Result {
+	step(8, NameGetTrainings, func(ctx context.Context) Result {
 		return checkGetTrainings(ctx, opts.BuildFreshGRPCClient, opts.Server, opts.Region, snap.Insecure, snap.Configured)
 	})
-	step(8, NameStream, func(ctx context.Context) Result {
+	step(9, NameStream, func(ctx context.Context) Result {
 		return checkStreaming(ctx, opts.BuildFreshGRPCClient, opts.Server, opts.Region, snap.Insecure, snap.Configured, opts.token())
 	})
-	step(9, NameLat, func(ctx context.Context) Result {
+	step(10, NameLat, func(ctx context.Context) Result {
 		return checkLatency(ctx, opts.BuildFreshGRPCClient, opts.Server, opts.Region, snap.Insecure)
 	})
-	step(10, NameClock, func(ctx context.Context) Result {
+	step(11, NameClock, func(ctx context.Context) Result {
 		return checkClockSkew(httpsRes)
 	})
 
