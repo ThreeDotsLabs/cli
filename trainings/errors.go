@@ -41,16 +41,28 @@ This will re-download all your existing solutions.`,
 func formatServerError(err error) error {
 	logrus.WithError(err).Debug("server error")
 
+	diagnosticsCmd := color.CyanString(internal.BinaryName() + " training diagnostics")
+
 	switch status.Code(errors.Cause(err)) {
 	case codes.Unavailable:
 		return UserFacingError{
-			Msg:          "Verification server is not reachable.",
-			SolutionHint: "Check your internet connection and try again. If the problem persists, the server may be temporarily down.",
+			Msg: "Verification server is not reachable.",
+			SolutionHint: fmt.Sprintf(
+				"Check your internet connection and try again. If the problem persists, "+
+					"run %s to identify where the connection breaks, "+
+					"or the server may be temporarily down.",
+				diagnosticsCmd,
+			),
 		}
 	case codes.DeadlineExceeded:
 		return UserFacingError{
-			Msg:          "Verification timed out.",
-			SolutionHint: "Check your internet connection and try again.",
+			Msg: "Verification timed out.",
+			SolutionHint: fmt.Sprintf(
+				"This usually means the connection is slow or unstable.\n\n"+
+					"Run %s to test each layer (DNS, TCP, TLS, gRPC) "+
+					"and identify where it breaks.",
+				diagnosticsCmd,
+			),
 		}
 	case codes.Unauthenticated:
 		return UserFacingError{
@@ -76,7 +88,9 @@ func formatConnectionError(err error) error {
 				"  1. Your internet connection\n"+
 				"  2. Firewall or VPN settings that may block outgoing connections\n"+
 				"  3. The server may be temporarily unavailable: try again in a few minutes\n\n"+
+				"For a detailed connectivity report, run %s\n\n"+
 				"%s",
+			color.CyanString(internal.BinaryName()+" training diagnostics"),
 			color.HiBlackString("Raw error: %s", err),
 		),
 	}

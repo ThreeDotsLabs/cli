@@ -99,33 +99,43 @@ func (h *Handlers) newGrpcClient() genproto.TrainingsClient {
 	return h.newGrpcClientWithAddr(globalConfig.ServerAddr, globalConfig.Region, globalConfig.Insecure)
 }
 
-func (h *Handlers) newGrpcClientWithAddr(addr string, region string, insecure bool) genproto.TrainingsClient {
+// resolveServerAddr returns the effective host:port the gRPC client will dial.
+// Empty addr falls back to the default; non-empty region is prepended as a subdomain.
+func resolveServerAddr(addr, region string) string {
 	if addr == "" {
 		addr = internal.DefaultTrainingsServer
 	}
-
 	if region != "" {
 		addr = fmt.Sprintf("%s.%s", region, addr)
 	}
+	return addr
+}
+
+// buildTLSConfig returns the TLS config used for all gRPC dials to the verification server.
+// Diagnostics reuses this so it tests the exact same TLS path as production.
+func buildTLSConfig(insecure bool) *tls.Config {
+	if insecure {
+		return &tls.Config{InsecureSkipVerify: true}
+	}
+	systemRoots, err := x509.SystemCertPool()
+	if err != nil && runtime.GOOS != "windows" {
+		panic(errors.Wrap(err, "cannot load root CA cert"))
+	}
+	if systemRoots == nil {
+		systemRoots = x509.NewCertPool()
+	}
+	return &tls.Config{
+		RootCAs:    systemRoots,
+		MinVersion: tls.VersionTLS12,
+	}
+}
+
+func (h *Handlers) newGrpcClientWithAddr(addr string, region string, insecure bool) genproto.TrainingsClient {
+	addr = resolveServerAddr(addr, region)
 
 	if h.grpcClient == nil {
-		var opts []grpc.DialOption
-
-		if insecure {
-			opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})))
-		} else {
-			systemRoots, err := x509.SystemCertPool()
-			if err != nil && runtime.GOOS != "windows" {
-				panic(errors.Wrap(err, "cannot load root CA cert"))
-			}
-			if systemRoots == nil {
-				systemRoots = x509.NewCertPool()
-			}
-			creds := credentials.NewTLS(&tls.Config{
-				RootCAs:    systemRoots,
-				MinVersion: tls.VersionTLS12,
-			})
-			opts = append(opts, grpc.WithTransportCredentials(creds))
+		opts := []grpc.DialOption{
+			grpc.WithTransportCredentials(credentials.NewTLS(buildTLSConfig(insecure))),
 		}
 
 		retryOpts := []retry.CallOption{
@@ -152,6 +162,37 @@ func (h *Handlers) newGrpcClientWithAddr(addr string, region string, insecure bo
 	}
 
 	return h.grpcClient
+}
+
+// newFreshGrpcClient builds a fresh, un-cached gRPC client. Diagnostics uses this so an
+// explicit --server / --region / --insecure override never leaks into the cached field.
+// The returned close function should be called when the caller is done with the client.
+func (h *Handlers) newFreshGrpcClient(addr, region string, insecure bool) (genproto.TrainingsClient, func() error, error) {
+	addr = resolveServerAddr(addr, region)
+
+	opts := []grpc.DialOption{
+		grpc.WithTransportCredentials(credentials.NewTLS(buildTLSConfig(insecure))),
+	}
+
+	retryOpts := []retry.CallOption{
+		retry.WithMax(3),
+		retry.WithBackoff(retry.BackoffExponential(100 * time.Millisecond)),
+		retry.WithCodes(codes.Unavailable, codes.ResourceExhausted, codes.Internal),
+	}
+
+	opts = append(opts,
+		grpc.WithChainUnaryInterceptor(
+			retry.UnaryClientInterceptor(retryOpts...),
+			h.unaryInterceptor(),
+		),
+		grpc.WithStreamInterceptor(h.streamInterceptor()),
+	)
+
+	conn, err := grpc.NewClient(addr, opts...)
+	if err != nil {
+		return nil, nil, err
+	}
+	return genproto.NewTrainingsClient(conn), conn.Close, nil
 }
 
 func (h *Handlers) newGitOps() *git.Ops {

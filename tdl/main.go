@@ -151,7 +151,7 @@ var app = &cli.App{
 			Usage:   fmt.Sprintf("commands for %s commands", internal.WebsiteAddress),
 			Before: func(c *cli.Context) error {
 				sub := c.Args().First()
-				if sub == "init" || sub == "configure" {
+				if sub == "init" || sub == "configure" || sub == "diagnostics" || sub == "diag" {
 					return nil
 				}
 				return newHandlers(c).CheckServerConnection(c.Context, "", "", false)
@@ -366,6 +366,24 @@ Note: after completing this exercise, the next exercise will be the last one you
 					ArgsUsage: "",
 					Action: func(c *cli.Context) error {
 						return newHandlers(c).Skip(c.Context)
+					},
+				},
+				{
+					Name:    "diagnostics",
+					Aliases: []string{"diag"},
+					Usage:   "Run connectivity diagnostics for the verification server",
+					Flags:   configureFlags,
+					// Bypass the parent training command's CheckServerConnection so
+					// diagnostics still runs when the connection is broken — the
+					// whole point of this command.
+					Before: func(c *cli.Context) error { return nil },
+					Action: func(c *cli.Context) error {
+						return newHandlers(c).Diagnostics(
+							c.Context,
+							c.String("server"),
+							c.String("region"),
+							c.Bool("insecure"),
+						)
 					},
 				},
 				{
