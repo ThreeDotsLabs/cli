@@ -470,19 +470,28 @@ func (h *Handlers) interactiveRun(ctx context.Context, trainingRootFs *afero.Bas
 
 		postActions = append(postActions, internal.Action{Shortcut: 'q', Action: "quit"})
 
-		if h.loopState != nil {
-			// MCP mode: auto-continue. The MCP client already triggered
-			// the advance — no reason to block before running the solution.
-			continue
+		postActionMap := map[rune]loopAction{
+			'\n': loopActionRun,
+			'q':  loopActionQuit,
 		}
-		promptResult := internal.Prompt(postActions, os.Stdin, os.Stdout)
-		if promptResult == 'q' {
-			os.Exit(0)
+		if currentExerciseConfig.IsOptional {
+			postActionMap['s'] = loopActionSkip
 		}
 
-		if promptResult == 's' {
-			err = h.Skip(ctx)
-			if err != nil {
+		postAction, fromMCP := h.waitForAction(
+			postActions,
+			postActionMap,
+			map[mcppkg.CommandType]loopAction{
+				mcppkg.CmdRunSolution: loopActionRun,
+			},
+		)
+		ctx = withMCPTriggered(ctx, fromMCP)
+
+		if postAction == loopActionQuit {
+			os.Exit(0)
+		}
+		if postAction == loopActionSkip {
+			if err := h.Skip(ctx); err != nil {
 				return err
 			}
 		}
@@ -664,6 +673,7 @@ const (
 	loopActionQuit                            // Quit the loop
 	loopActionResetExercise                   // Reset exercise to clean files
 	loopActionUpdate                          // Update the CLI binary and exit
+	loopActionSkip                            // Skip current (optional) exercise
 )
 
 // backgroundUpdateCheck polls for a newer CLI release while the interactive
