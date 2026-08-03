@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/ThreeDotsLabs/cli/internal"
 	"github.com/ThreeDotsLabs/cli/trainings/config"
 	"github.com/ThreeDotsLabs/cli/trainings/git"
 )
@@ -37,7 +38,9 @@ func TestPrintInitNeedsFreshDir_GitAvailable(t *testing.T) {
 	assert.Contains(t, out, "go-event-driven")
 	assert.Contains(t, out, "cd ..")
 	assert.Contains(t, out, "mkdir my-training")
-	assert.Contains(t, out, "tdl training init go-event-driven .")
+	// Not hardcoded to "tdl": the command is built from internal.BinaryName(), which under
+	// `go test` is the test binary, and on some installs is a user-chosen name.
+	assert.Contains(t, out, internal.BinaryName()+" training init go-event-driven .")
 	assert.Contains(t, out, "Git is now available")
 }
 
@@ -60,6 +63,6 @@ func TestPrintInitNeedsFreshDir_GitNotAvailable(t *testing.T) {
 
 	assert.Contains(t, out, "go-event-driven")
 	assert.Contains(t, out, "Once git is installed")
-	assert.Contains(t, out, "tdl training init go-event-driven .")
+	assert.Contains(t, out, internal.BinaryName()+" training init go-event-driven .")
 	assert.NotContains(t, out, "Git is now available")
 }

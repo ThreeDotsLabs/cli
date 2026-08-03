@@ -20,8 +20,10 @@ var stdinFileDescriptor = int(os.Stdin.Fd())
 var stdoutFileDescriptor = int(os.Stdout.Fd())
 
 func stdinTerminalReason() (bool, string) {
-	if v, _ := strconv.ParseBool(os.Getenv("TDL_FORCE_INTERACTIVE")); v {
-		return true, "true (TDL_FORCE_INTERACTIVE)"
+	// Authoritative in both directions: the heuristics below are deliberately loose
+	// (see the TERM fallback), so there has to be a way to force interactivity off too.
+	if v, err := strconv.ParseBool(os.Getenv("TDL_FORCE_INTERACTIVE")); err == nil {
+		return v, fmt.Sprintf("%t (TDL_FORCE_INTERACTIVE)", v)
 	}
 	if term.IsTerminal(stdinFileDescriptor) {
 		return true, "true (native console)"
