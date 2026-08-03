@@ -22,9 +22,14 @@ func TestFiles_ReadSolutionFiles(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, []*genproto.File{
+		// baz has no go.mod, so baz/vendor is ordinary user code and must still be sent.
 		{
 			Path:    "baz/baz.go",
 			Content: "package baz\n",
+		},
+		{
+			Path:    "baz/vendor/vendor.go",
+			Content: "package vendor\n",
 		},
 		{
 			Path:    "go.mod",
@@ -34,6 +39,7 @@ func TestFiles_ReadSolutionFiles(t *testing.T) {
 			Path:    "main.go",
 			Content: "package main\n\nfunc main() {\n\n}\n",
 		},
+		// /foo/vendor sits next to /foo/go.mod, so it's a real Go vendor dir and is skipped.
 	}, protoFiles)
 }
 
