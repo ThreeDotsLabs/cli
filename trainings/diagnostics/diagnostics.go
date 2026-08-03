@@ -190,4 +190,3 @@ func safeGlobalConfig(get func() config.GlobalConfig) (cfg config.GlobalConfig) 
 	cfg = get()
 	return
 }
-
