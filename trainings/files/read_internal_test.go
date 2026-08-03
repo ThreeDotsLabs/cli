@@ -17,6 +17,10 @@ func TestIsGoVendorDir(t *testing.T) {
 	require.NoError(t, afero.WriteFile(fs, "/exercise/service-a/go.mod", []byte("module a\n"), 0644))
 	require.NoError(t, fs.MkdirAll("/exercise/service-a/vendor", 0755))
 
+	// `go work vendor` vendors into the workspace root, which often has no go.mod of its own.
+	require.NoError(t, afero.WriteFile(fs, "/workspace/go.work", []byte("go 1.22\n"), 0644))
+	require.NoError(t, fs.MkdirAll("/workspace/vendor/example.com/dep", 0755))
+
 	// A domain package that happens to be named "vendor" — no go.mod sibling.
 	require.NoError(t, fs.MkdirAll("/exercise/internal/marketplace/vendor", 0755))
 
@@ -35,6 +39,11 @@ func TestIsGoVendorDir(t *testing.T) {
 		{
 			name:     "vendor_at_nested_module_root",
 			dirPath:  "/exercise/service-a/vendor",
+			expected: true,
+		},
+		{
+			name:     "vendor_at_workspace_root",
+			dirPath:  "/workspace/vendor",
 			expected: true,
 		},
 		{

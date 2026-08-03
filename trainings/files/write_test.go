@@ -180,38 +180,6 @@ func main() {
 
 // TestWriteExerciseFiles_path_traversal is checking if WriteExerciseFiles is valuable for path traversal.
 // path.Join should protect us from that attack. But let's double-check.
-// Vendored dependencies are never part of the server's file set, so without an explicit
-// skip the delete-unused pass would wipe the user's whole vendor directory.
-func TestFiles_WriteExerciseFiles_delete_unused_keeps_vendor(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	dir := "dir"
-
-	vendoredFile := "dir/vendor/example.com/dep/dep.go"
-	staleFile := "dir/stale.go"
-
-	require.NoError(t, afero.WriteFile(fs, "dir/go.mod", []byte("module foo\n"), 0644))
-	require.NoError(t, afero.WriteFile(fs, vendoredFile, []byte("package dep\n"), 0644))
-	require.NoError(t, afero.WriteFile(fs, "dir/vendor/modules.txt", []byte("# example.com/dep v1.0.0\n"), 0644))
-	require.NoError(t, afero.WriteFile(fs, staleFile, []byte("package main\n"), 0644))
-
-	err := files.NewFilesSilentDeleteUnused().WriteExerciseFiles(
-		[]*genproto.File{
-			{Path: "go.mod", Content: "module foo\n"},
-			{Path: "main.go", Content: "package main\n"},
-		},
-		fs, dir,
-	)
-	require.NoError(t, err)
-
-	vendorExists, err := afero.Exists(fs, vendoredFile)
-	require.NoError(t, err)
-	assert.True(t, vendorExists, "vendored file should not be deleted")
-
-	staleExists, err := afero.Exists(fs, staleFile)
-	require.NoError(t, err)
-	assert.False(t, staleExists, "unused file outside vendor should still be deleted")
-}
-
 func TestWriteExerciseFiles_path_traversal(t *testing.T) {
 	testCases := []struct {
 		Name     string
@@ -268,4 +236,36 @@ func TestWriteExerciseFiles_path_traversal(t *testing.T) {
 			assert.Equal(t, originalFileContent, string(currentFileContent))
 		})
 	}
+}
+
+// Vendored dependencies are never part of the server's file set, so without an explicit
+// skip the delete-unused pass would wipe the user's whole vendor directory.
+func TestFiles_WriteExerciseFiles_delete_unused_keeps_vendor(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	dir := "dir"
+
+	vendoredFile := "dir/vendor/example.com/dep/dep.go"
+	staleFile := "dir/stale.go"
+
+	require.NoError(t, afero.WriteFile(fs, "dir/go.mod", []byte("module foo\n"), 0644))
+	require.NoError(t, afero.WriteFile(fs, vendoredFile, []byte("package dep\n"), 0644))
+	require.NoError(t, afero.WriteFile(fs, "dir/vendor/modules.txt", []byte("# example.com/dep v1.0.0\n"), 0644))
+	require.NoError(t, afero.WriteFile(fs, staleFile, []byte("package main\n"), 0644))
+
+	err := files.NewFilesSilentDeleteUnused().WriteExerciseFiles(
+		[]*genproto.File{
+			{Path: "go.mod", Content: "module foo\n"},
+			{Path: "main.go", Content: "package main\n"},
+		},
+		fs, dir,
+	)
+	require.NoError(t, err)
+
+	vendorExists, err := afero.Exists(fs, vendoredFile)
+	require.NoError(t, err)
+	assert.True(t, vendorExists, "vendored file should not be deleted")
+
+	staleExists, err := afero.Exists(fs, staleFile)
+	require.NoError(t, err)
+	assert.False(t, staleExists, "unused file outside vendor should still be deleted")
 }
