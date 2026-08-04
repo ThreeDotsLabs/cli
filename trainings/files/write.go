@@ -59,6 +59,12 @@ func (f Files) WriteExerciseFiles(filesToCreate []*genproto.File, trainingRootFs
 				return err
 			}
 
+			// The server never sends vendored dependencies back, so without this they'd all
+			// be marked unused and deleted. Vendoring is the user's business, not ours.
+			if info.IsDir() && isGoVendorDir(trainingRootFs, path) {
+				return filepath.SkipDir
+			}
+
 			if !info.IsDir() && filepath.Base(path) != ExerciseFile && filepath.Base(path) != "go.sum" {
 				filesToDelete[path] = struct{}{}
 			}

@@ -1,0 +1,3 @@
+# example.com/dep v1.0.0
+## explicit; go 1.17
+example.com/dep

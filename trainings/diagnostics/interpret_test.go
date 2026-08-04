@@ -257,10 +257,10 @@ func stripANSI(s string) string {
 
 func TestTokenStatus(t *testing.T) {
 	cases := map[string]string{
-		"":         "missing",
-		"abc":      "present (length=3)",
-		"  abc  ":  "present (length=7, has leading/trailing whitespace)",
-		"abc\n":    "present (length=4, has leading/trailing whitespace)",
+		"":        "missing",
+		"abc":     "present (length=3)",
+		"  abc  ": "present (length=7, has leading/trailing whitespace)",
+		"abc\n":   "present (length=4, has leading/trailing whitespace)",
 	}
 	for in, want := range cases {
 		if got := tokenStatus(in); got != want {
@@ -271,7 +271,7 @@ func TestTokenStatus(t *testing.T) {
 
 func TestSplitHostPort(t *testing.T) {
 	cases := []struct {
-		in        string
+		in         string
 		host, port string
 	}{
 		{"academy-grpc.threedots.tech:443", "academy-grpc.threedots.tech", "443"},
