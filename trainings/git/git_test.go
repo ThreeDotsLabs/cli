@@ -1202,3 +1202,146 @@ func TestResetStaging_ScopesCommitToOneDir(t *testing.T) {
 	// dir-b should still be in the working tree (unstaged)
 	assert.FileExists(t, filepath.Join(dir, "dir-b/file.go"))
 }
+
+func newOpsWithMergeAttributes(t *testing.T, dir string) *Ops {
+	t.Helper()
+	attributesFile, err := EnsureMergeAttributesFile(t.TempDir())
+	require.NoError(t, err)
+	return NewOps(dir, false).WithMergeAttributesFile(attributesFile)
+}
+
+// commitDivergedFile commits learnerContent on the current branch and initContent on a new
+// branch (initBranch) created from the previous commit, so both sides touch the same path.
+func commitDivergedFile(t *testing.T, dir, path, learnerContent, initContent, initBranch string) {
+	t.Helper()
+
+	writeFile(t, dir, path, learnerContent)
+	runGit(t, dir, "add", ".")
+	runGit(t, dir, "-c", "commit.gpgsign=false", "commit", "-m", "learner change")
+
+	runGit(t, dir, "branch", initBranch, "HEAD~1")
+	wt := filepath.Join(t.TempDir(), "wt")
+	runGit(t, dir, "worktree", "add", wt, initBranch)
+	writeFile(t, wt, path, initContent)
+	runGit(t, wt, "add", ".")
+	runGit(t, wt, "-c", "commit.gpgsign=false", "commit", "-m", "init change")
+	runGit(t, dir, "worktree", "remove", wt, "--force")
+}
+
+func assertNoConflictMarkers(t *testing.T, content string) {
+	t.Helper()
+	for _, marker := range []string{"<<<<<<<", "=======", ">>>>>>>"} {
+		assert.NotContains(t, content, marker)
+	}
+}
+
+func TestMerge_GoSumUnion(t *testing.T) {
+	t.Run("old_learner_go_sum_add_add", func(t *testing.T) {
+		dir := initTestRepo(t)
+		ops := newOpsWithMergeAttributes(t, dir)
+
+		learnerGoSum := "a v1.0.0 h1:aaa=\n" +
+			"c v1.0.0 h1:ccc=\n" +
+			"e v1.0.0 h1:eee=\n"
+		initGoSum := "a v1.0.0 h1:aaa=\n" +
+			"b v1.0.0 h1:bbb=\n" +
+			"c v1.0.0 h1:ccc=\n" +
+			"d v1.0.0 h1:ddd=\n" +
+			"e v1.0.0 h1:eee=\n" +
+			"f v1.0.0 h1:fff=\n"
+		commitDivergedFile(t, dir, "project/go.sum", learnerGoSum, initGoSum, "tdl/init/02")
+
+		conflictFiles, err := ops.MergeTreeCheck("tdl/init/02")
+		require.NoError(t, err)
+		assert.Empty(t, conflictFiles)
+
+		require.NoError(t, ops.Merge("tdl/init/02", "merge init"))
+
+		result := readFile(t, dir, "project/go.sum")
+		assertNoConflictMarkers(t, result)
+		for _, line := range strings.Split(strings.TrimSpace(learnerGoSum+initGoSum), "\n") {
+			assert.Contains(t, result, line)
+		}
+	})
+
+	t.Run("adjacent_go_sum_additions", func(t *testing.T) {
+		dir := initTestRepo(t)
+		ops := newOpsWithMergeAttributes(t, dir)
+
+		writeFile(t, dir, "project/go.sum", "a v1.0.0 h1:aaa=\nz v1.0.0 h1:zzz=\n")
+		runGit(t, dir, "add", ".")
+		runGit(t, dir, "-c", "commit.gpgsign=false", "commit", "-m", "base go.sum")
+
+		commitDivergedFile(t, dir, "project/go.sum",
+			"a v1.0.0 h1:aaa=\nlearner v1.0.0 h1:lll=\nz v1.0.0 h1:zzz=\n",
+			"a v1.0.0 h1:aaa=\nserver v1.0.0 h1:sss=\nz v1.0.0 h1:zzz=\n",
+			"tdl/init/03",
+		)
+
+		conflictFiles, err := ops.MergeTreeCheck("tdl/init/03")
+		require.NoError(t, err)
+		assert.Empty(t, conflictFiles)
+
+		require.NoError(t, ops.Merge("tdl/init/03", "merge init"))
+
+		result := readFile(t, dir, "project/go.sum")
+		assertNoConflictMarkers(t, result)
+		assert.Contains(t, result, "learner v1.0.0 h1:lll=")
+		assert.Contains(t, result, "server v1.0.0 h1:sss=")
+	})
+
+	t.Run("other_files_still_conflict", func(t *testing.T) {
+		dir := initTestRepo(t)
+		ops := newOpsWithMergeAttributes(t, dir)
+
+		writeFile(t, dir, "project/go.mod", "module example\n\nrequire (\n)\n")
+		runGit(t, dir, "add", ".")
+		runGit(t, dir, "-c", "commit.gpgsign=false", "commit", "-m", "base go.mod")
+
+		commitDivergedFile(t, dir, "project/go.mod",
+			"module example\n\nrequire (\n\tlearner v1.0.0\n)\n",
+			"module example\n\nrequire (\n\tserver v1.0.0\n)\n",
+			"tdl/init/04",
+		)
+
+		conflictFiles, err := ops.MergeTreeCheck("tdl/init/04")
+		require.NoError(t, err)
+		assert.Equal(t, []string{"project/go.mod"}, conflictFiles)
+
+		assert.Error(t, ops.Merge("tdl/init/04", "merge init"))
+		runGit(t, dir, "merge", "--abort")
+	})
+}
+
+func TestEnsureMergeAttributesFile(t *testing.T) {
+	dir := t.TempDir()
+	expectedPath := filepath.ToSlash(filepath.Join(dir, mergeAttributesFileName))
+
+	t.Run("creates_file", func(t *testing.T) {
+		path, err := EnsureMergeAttributesFile(dir)
+		require.NoError(t, err)
+		assert.Equal(t, expectedPath, path)
+		assert.Equal(t, mergeAttributes, readFile(t, dir, mergeAttributesFileName))
+	})
+
+	t.Run("rewrites_different_content", func(t *testing.T) {
+		writeFile(t, dir, mergeAttributesFileName, "outdated\n")
+
+		_, err := EnsureMergeAttributesFile(dir)
+		require.NoError(t, err)
+		assert.Equal(t, mergeAttributes, readFile(t, dir, mergeAttributesFileName))
+	})
+
+	t.Run("leaves_identical_content_alone", func(t *testing.T) {
+		fullPath := filepath.Join(dir, mergeAttributesFileName)
+		past := time.Now().Add(-time.Hour).Truncate(time.Second)
+		require.NoError(t, os.Chtimes(fullPath, past, past))
+
+		_, err := EnsureMergeAttributesFile(dir)
+		require.NoError(t, err)
+
+		info, err := os.Stat(fullPath)
+		require.NoError(t, err)
+		assert.True(t, info.ModTime().Equal(past), "file should not be rewritten")
+	})
+}

@@ -205,7 +205,17 @@ func (h *Handlers) newGitOps() *git.Ops {
 	trainingRootFs := newTrainingRootFs(trainingRoot)
 	cfg := h.config.TrainingConfig(trainingRootFs)
 	disabled := !cfg.GitConfigured || !cfg.GitEnabled
-	return git.NewOps(trainingRoot, disabled)
+	gitOps := git.NewOps(trainingRoot, disabled)
+	if disabled {
+		return gitOps
+	}
+
+	attributesFile, err := git.EnsureMergeAttributesFile(internal.GlobalConfigDir())
+	if err != nil {
+		logrus.WithError(err).Warn("Can't write git merge attributes file, go.sum conflicts won't be auto-resolved")
+		return gitOps
+	}
+	return gitOps.WithMergeAttributesFile(attributesFile)
 }
 
 func newTrainingRootFs(trainingRoot string) *afero.BasePathFs {
