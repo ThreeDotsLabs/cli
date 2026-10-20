@@ -16,6 +16,12 @@ brew install ThreeDotsLabs/tap/tdl
 sudo /bin/sh -c "$(curl -fsSL https://raw.githubusercontent.com/ThreeDotsLabs/cli/master/install.sh)" -- -b /usr/local/bin
 ```
 
+### Nix (macOS, Linux)
+
+```sh
+nix profile add github:ThreeDotsLabs/cli
+```
+
 ### Script (Windows)
 
 Install to your home directory:
