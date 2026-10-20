@@ -54,6 +54,8 @@ type Ops struct {
 	rootDir string
 	enabled bool
 	quiet   bool // suppress printCmd output (for internal worktree operations)
+
+	mergeAttributesFile string // passed as core.attributesFile to Merge and MergeTreeCheck; empty = not set
 }
 
 func NewOps(rootDir string, disabled bool) *Ops {
@@ -71,6 +73,13 @@ func NewQuietOps(rootDir string) *Ops {
 		enabled: true,
 		quiet:   true,
 	}
+}
+
+// WithMergeAttributesFile sets the gitattributes file used by Merge and MergeTreeCheck.
+// See EnsureMergeAttributesFile.
+func (g *Ops) WithMergeAttributesFile(path string) *Ops {
+	g.mergeAttributesFile = path
+	return g
 }
 
 func (g *Ops) Enabled() bool {
@@ -393,8 +402,19 @@ func (g *Ops) Merge(branch, msg string) error {
 	}
 
 	g.printCmd(fmt.Sprintf("merge %s", branch))
-	_, err := g.run("merge", branch, "--no-edit", "-m", msg)
+	args := append(g.mergeConfigArgs(), "merge", branch, "--no-edit", "-m", msg)
+	_, err := g.run(args...)
 	return err
+}
+
+// mergeConfigArgs returns `-c` flags for merges into the learner's branch.
+// Learners may have their own go.sum committed (from `go mod tidy`), which conflicts with the
+// go.sum shipped by the exercise. Union merge is safe because go.sum is a set of lines.
+func (g *Ops) mergeConfigArgs() []string {
+	if g.mergeAttributesFile == "" {
+		return nil
+	}
+	return []string{"-c", "core.attributesFile=" + g.mergeAttributesFile}
 }
 
 // MergeAutoResolve merges the named branch, auto-resolving conflicts by preferring
@@ -544,7 +564,8 @@ func (g *Ops) MergeTreeCheck(branch string) (conflictFiles []string, err error) 
 		return nil, nil
 	}
 
-	cmd := exec.Command("git", "-c", "core.preloadIndex=true", "merge-tree", "--write-tree", "HEAD", branch)
+	args := append(g.mergeConfigArgs(), "-c", "core.preloadIndex=true", "merge-tree", "--write-tree", "HEAD", branch)
+	cmd := exec.Command("git", args...)
 	cmd.Dir = g.rootDir
 	// Force English output so we can parse "CONFLICT" lines regardless of locale
 	cmd.Env = append(os.Environ(), "LC_ALL=C")
