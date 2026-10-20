@@ -88,16 +88,16 @@ func Run(ctx context.Context, opts Options) error {
 		return checkHTTPS(ctx, internal.WebsiteAddress)
 	})
 	step(7, NamePing, func(ctx context.Context) Result {
-		return checkGRPCPing(ctx, opts.BuildFreshGRPCClient, opts.Server, opts.Region, snap.Insecure)
+		return checkGRPCPing(ctx, opts.BuildFreshGRPCClient, snap.Server, snap.Region, snap.Insecure)
 	})
 	step(8, NameGetTrainings, func(ctx context.Context) Result {
-		return checkGetTrainings(ctx, opts.BuildFreshGRPCClient, opts.Server, opts.Region, snap.Insecure, snap.Configured)
+		return checkGetTrainings(ctx, opts.BuildFreshGRPCClient, snap.Server, snap.Region, snap.Insecure, snap.Configured)
 	})
 	step(9, NameStream, func(ctx context.Context) Result {
-		return checkStreaming(ctx, opts.BuildFreshGRPCClient, opts.Server, opts.Region, snap.Insecure, snap.Configured, opts.token())
+		return checkStreaming(ctx, opts.BuildFreshGRPCClient, snap.Server, snap.Region, snap.Insecure, snap.Configured, opts.token())
 	})
 	step(10, NameLat, func(ctx context.Context) Result {
-		return checkLatency(ctx, opts.BuildFreshGRPCClient, opts.Server, opts.Region, snap.Insecure)
+		return checkLatency(ctx, opts.BuildFreshGRPCClient, snap.Server, snap.Region, snap.Insecure)
 	})
 	step(11, NameClock, func(ctx context.Context) Result {
 		return checkClockSkew(httpsRes)
