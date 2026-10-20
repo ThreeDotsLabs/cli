@@ -134,26 +134,7 @@ func (h *Handlers) newGrpcClientWithAddr(addr string, region string, insecure bo
 	addr = resolveServerAddr(addr, region)
 
 	if h.grpcClient == nil {
-		opts := []grpc.DialOption{
-			grpc.WithTransportCredentials(credentials.NewTLS(buildTLSConfig(insecure))),
-		}
-
-		retryOpts := []retry.CallOption{
-			retry.WithMax(3),
-			retry.WithBackoff(retry.BackoffExponential(100 * time.Millisecond)),
-			retry.WithCodes(codes.Unavailable, codes.ResourceExhausted, codes.Internal),
-		}
-
-		opts = append(opts,
-			grpc.WithChainUnaryInterceptor(
-				retry.UnaryClientInterceptor(retryOpts...),
-				h.unaryInterceptor(),
-			),
-			grpc.WithStreamInterceptor(h.streamInterceptor()),
-		)
-
-		conn, err := grpc.NewClient(addr, opts...)
-
+		conn, err := grpc.NewClient(addr, h.grpcDialOptions(insecure)...)
 		if err != nil {
 			panic(err)
 		}
@@ -170,29 +151,32 @@ func (h *Handlers) newGrpcClientWithAddr(addr string, region string, insecure bo
 func (h *Handlers) newFreshGrpcClient(addr, region string, insecure bool) (genproto.TrainingsClient, func() error, error) {
 	addr = resolveServerAddr(addr, region)
 
-	opts := []grpc.DialOption{
-		grpc.WithTransportCredentials(credentials.NewTLS(buildTLSConfig(insecure))),
+	conn, err := grpc.NewClient(addr, h.grpcDialOptions(insecure)...)
+	if err != nil {
+		return nil, nil, err
 	}
+	return genproto.NewTrainingsClient(conn), conn.Close, nil
+}
 
+func (h *Handlers) grpcDialOptions(insecure bool) []grpc.DialOption {
 	retryOpts := []retry.CallOption{
 		retry.WithMax(3),
 		retry.WithBackoff(retry.BackoffExponential(100 * time.Millisecond)),
 		retry.WithCodes(codes.Unavailable, codes.ResourceExhausted, codes.Internal),
 	}
 
-	opts = append(opts,
+	return []grpc.DialOption{
+		grpc.WithTransportCredentials(credentials.NewTLS(buildTLSConfig(insecure))),
+		// We publish no service config. Without this, the first call waits for a
+		// _grpc_config TXT lookup, and resolvers that drop TXT queries (seen behind
+		// VPNs) make that call time out.
+		grpc.WithDisableServiceConfig(),
 		grpc.WithChainUnaryInterceptor(
 			retry.UnaryClientInterceptor(retryOpts...),
 			h.unaryInterceptor(),
 		),
 		grpc.WithStreamInterceptor(h.streamInterceptor()),
-	)
-
-	conn, err := grpc.NewClient(addr, opts...)
-	if err != nil {
-		return nil, nil, err
 	}
-	return genproto.NewTrainingsClient(conn), conn.Close, nil
 }
 
 func (h *Handlers) newGitOps() *git.Ops {
