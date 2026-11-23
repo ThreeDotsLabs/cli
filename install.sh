@@ -366,12 +366,29 @@ is_our_tdl() {
   strings "$existing_tdl" 2>/dev/null | grep -q "ThreeDotsLabs"
 }
 
+# home of the user running the installer; under sudo $HOME is root's, not theirs
+installer_home() {
+  if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ] && is_command getent; then
+    sudo_home=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+    if [ -n "$sudo_home" ]; then
+      echo "$sudo_home"
+      return
+    fi
+  fi
+  echo "$HOME"
+}
+
+# true if /dev/tty can be opened (false in CI, docker run without -t, etc.)
+has_tty() {
+  (: >/dev/tty) 2>/dev/null
+}
+
 # detect naming conflicts with other tools (e.g. omarchy) before installing
 detect_conflict() {
   HAS_OMARCHY=false
   HAS_OTHER_TDL=false
 
-  if [ -d "$HOME/.local/share/omarchy" ]; then
+  if [ -d "$(installer_home)/.local/share/omarchy" ]; then
     HAS_OMARCHY=true
   fi
 
@@ -380,6 +397,12 @@ detect_conflict() {
   fi
 
   if [ "$HAS_OMARCHY" = false ] && [ "$HAS_OTHER_TDL" = false ]; then
+    return
+  fi
+
+  if ! has_tty; then
+    BINARY="threedots"
+    log_info "'tdl' conflicts with another command and there is no terminal to ask; installing as 'threedots'"
     return
   fi
 
@@ -416,7 +439,21 @@ detect_conflict() {
   esac
 }
 
+print_usage_hint() {
+  if [ "$BINARY" = "threedots" ]; then
+    echo "" 1>&2
+    echo "Installed as 'threedots'. Wherever the training says 'tdl', type 'threedots' instead." 1>&2
+    echo "For example:  threedots training init <training-name>" 1>&2
+  elif [ "$HAS_OMARCHY" = true ]; then
+    echo "" 1>&2
+    echo "Installed as 'tdl', but omarchy's 'tdl' function still runs instead until you" 1>&2
+    echo "add 'unset -f tdl' to your ~/.bashrc and open a new terminal." 1>&2
+  fi
+}
+
 detect_conflict
 
 # do it
 execute
+
+print_usage_hint
