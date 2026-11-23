@@ -23,3 +23,6 @@ test:
 fmt:
 	goimports -local github.com/ThreeDotsLabs -l -w .
 
+.PHONY: test-install
+test-install:
+	scripts/test-install.sh
